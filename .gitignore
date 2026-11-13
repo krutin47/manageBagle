@@ -1,0 +1,23 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+server/src/ManageBagle.Api/wwwroot/
+
+# Node
+node_modules/
+client/dist/
+
+# Local config and secrets
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

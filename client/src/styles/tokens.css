@@ -1,0 +1,116 @@
+/*
+ * manageBagle design tokens.
+ * Every text/background pairing used in the app is asserted against WCAG 2.2 AA in
+ * src/styles/contrast.test.ts — change a value here and `npm test` tells you if it still passes.
+ */
+:root {
+  color-scheme: light;
+
+  /* Surfaces: warm paper */
+  --canvas: #f5f2eb;
+  --surface: #fffefb;
+  --sunken: #ece8de;
+  --hover: #f0ece3;
+  --line: #ddd7c9;
+  --line-strong: #837d70;
+
+  /* Ink */
+  --ink: #1b1c20;
+  --ink-2: #4d4f56;
+  --ink-3: #62646a;
+  --on-ink: #fffefb;
+
+  /* Brand: toasted crust */
+  --accent: #a8480f;
+  --accent-hover: #8c3a0a;
+  --accent-tint: #fbe6d6;
+  --accent-ink: #7c3308;
+  --on-accent: #fffefb;
+  --focus: #1d4ed8;
+
+  /* Status (reserved: never reused as an area colour) */
+  --good: #1f6f3d;
+  --good-tint: #ddf0e2;
+  --warn: #7a5200;
+  --warn-tint: #fbedc4;
+  --bad: #b3261e;
+  --bad-tint: #fbe2df;
+
+  /* Focus-area hues: solid = marks, tint = block fill, ink = text on tint */
+  --area-teal-solid: #008573;   --area-teal-tint: #dcf0eb;   --area-teal-ink: #0a5347;
+  --area-blue-solid: #2a62c9;   --area-blue-tint: #e0e9fa;   --area-blue-ink: #1b448e;
+  --area-violet-solid: #7a48cc; --area-violet-tint: #ebe3fa; --area-violet-ink: #532f9c;
+  --area-rose-solid: #c4366c;   --area-rose-tint: #fae2eb;   --area-rose-ink: #8d1f49;
+  --area-orange-solid: #d14a1c; --area-orange-tint: #fbe7d7; --area-orange-ink: #873c06;
+  --area-amber-solid: #8a6f00;  --area-amber-tint: #f8ecc6;  --area-amber-ink: #684700;
+  --area-green-solid: #3f8a1a;  --area-green-tint: #e3f1d9;  --area-green-ink: #2d5914;
+  --area-slate-solid: #5a687c;  --area-slate-tint: #e5e9ef;  --area-slate-ink: #3a4656;
+  --area-none-solid: #77736a;   --area-none-tint: #ebe7de;   --area-none-ink: #45423c;
+
+  --shadow-1: 0 1px 2px rgb(40 32 16 / 0.06), 0 1px 1px rgb(40 32 16 / 0.04);
+  --shadow-2: 0 6px 20px -6px rgb(40 32 16 / 0.16), 0 2px 6px rgb(40 32 16 / 0.06);
+  --shadow-3: 0 24px 60px -16px rgb(30 24 12 / 0.32), 0 6px 18px rgb(30 24 12 / 0.1);
+  --scrim: rgb(27 28 32 / 0.42);
+
+  /* Type */
+  --font-display: "Bricolage Grotesque Variable", "Geist Variable", system-ui, sans-serif;
+  --font-body: "Geist Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Shape & rhythm */
+  --r-1: 6px;
+  --r-2: 10px;
+  --r-3: 16px;
+  --r-pill: 999px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --t-fast: 120ms;
+  --t-med: 220ms;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --canvas: #131417;
+  --surface: #1b1d21;
+  --sunken: #0e0f11;
+  --hover: #24262b;
+  --line: #2e3137;
+  --line-strong: #757983;
+
+  --ink: #efece5;
+  --ink-2: #b9b6ae;
+  --ink-3: #96938c;
+  --on-ink: #131417;
+
+  --accent: #f0a468;
+  --accent-hover: #f6b783;
+  --accent-tint: #3a2414;
+  --accent-ink: #f6bb8c;
+  --on-accent: #1f1206;
+  --focus: #8fb4ff;
+
+  --good: #7fd49b;
+  --good-tint: #15301f;
+  --warn: #e9c264;
+  --warn-tint: #33280c;
+  --bad: #ff9d94;
+  --bad-tint: #3b1714;
+
+  --area-teal-solid: #3dbfa9;   --area-teal-tint: #11312c;   --area-teal-ink: #92e2d3;
+  --area-blue-solid: #6f9df0;   --area-blue-tint: #172a4b;   --area-blue-ink: #b3cdfb;
+  --area-violet-solid: #a685ea; --area-violet-tint: #2a1f48;  --area-violet-ink: #d0bdf8;
+  --area-rose-solid: #ec7aa4;   --area-rose-tint: #421a2a;   --area-rose-ink: #f9b9cf;
+  --area-orange-solid: #ea8b47; --area-orange-tint: #40230f;  --area-orange-ink: #f8c19b;
+  --area-amber-solid: #d3a53a;  --area-amber-tint: #352908;  --area-amber-ink: #ecd08a;
+  --area-green-solid: #86c25a;  --area-green-tint: #1e3312;  --area-green-ink: #bfe5a2;
+  --area-slate-solid: #95a2b5;  --area-slate-tint: #252b34;  --area-slate-ink: #cbd4e0;
+  --area-none-solid: #8e8b84;   --area-none-tint: #26272b;   --area-none-ink: #c9c6be;
+
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-2: 0 8px 24px -8px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.3);
+  --shadow-3: 0 24px 60px -16px rgb(0 0 0 / 0.75), 0 6px 18px rgb(0 0 0 / 0.4);
+  --scrim: rgb(0 0 0 / 0.6);
+}
