@@ -53,7 +53,18 @@ public static class SecurityMiddleware
             return;
         }
 
-        if (!await http.RequestServices.GetRequiredService<IAntiforgery>().IsRequestValidAsync(http))
+        bool tokenValid;
+        try
+        {
+            tokenValid = await http.RequestServices.GetRequiredService<IAntiforgery>().IsRequestValidAsync(http);
+        }
+        catch (InvalidOperationException)
+        {
+            // Plain HTTP reached an app that only issues tokens over HTTPS (someone bypassed the ingress,
+            // or the proxy is not in the trusted list). That is a refused request, not a server fault.
+            tokenValid = false;
+        }
+        if (!tokenValid)
         {
             await Reject(http, StatusCodes.Status400BadRequest, ErrorCodes.CsrfInvalid, "Your session token is out of date. Reload the page and try again.");
             return;

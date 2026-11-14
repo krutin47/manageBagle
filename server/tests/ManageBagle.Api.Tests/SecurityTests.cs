@@ -362,3 +362,62 @@ public class SecurityTests(ApiFactory factory)
         Assert.True(openApi.GetProperty("paths").TryGetProperty("/api/days/{date}/plan", out _));
     }
 }
+
+/// <summary>
+/// The API contract is committed at docs/api/openapi.json. Any change to a route, field or status shows
+/// up as a diff in the pull request. To accept an intended change, regenerate the file:
+///   MB_UPDATE_OPENAPI=1 dotnet test --filter Api_contract
+/// </summary>
+[Collection("api")]
+public class ContractTests(ApiFactory factory)
+{
+    [Fact]
+    public async Task Api_contract_matches_the_committed_snapshot()
+    {
+        var current = Normalize(await factory.NewClient().GetStringAsync("/api/openapi.json"));
+        var path = Path.Combine(RepositoryRoot(), "docs", "api", "openapi.json");
+
+        if (Environment.GetEnvironmentVariable("MB_UPDATE_OPENAPI") == "1" || !File.Exists(path))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            await File.WriteAllTextAsync(path, current);
+            return;
+        }
+        Assert.True(current == Normalize(await File.ReadAllTextAsync(path)),
+            "The API contract changed. Review the change, then run: MB_UPDATE_OPENAPI=1 dotnet test --filter Api_contract");
+    }
+
+    private static string Normalize(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var root = System.Text.Json.Nodes.JsonNode.Parse(json)!.AsObject();
+        root.Remove("servers"); // the host differs per environment and is not part of the contract
+        return root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }).ReplaceLineEndings("\n") + "\n";
+    }
+
+    private static string RepositoryRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, ".git"))) dir = dir.Parent;
+        return dir?.FullName ?? throw new InvalidOperationException("Run the tests from inside the repository.");
+    }
+}
+
+[Collection("api")]
+public class TransportTests(ApiFactory factory)
+{
+    [Fact]
+    public async Task A_state_changing_request_over_plain_http_is_refused_cleanly_not_with_a_500()
+    {
+        // Outside development, tokens and cookies are HTTPS-only. A request that arrives as plain HTTP
+        // (ingress bypassed, or an untrusted proxy whose X-Forwarded-Proto is ignored) must get a 400.
+        var client = factory.CreateDefaultClient(new Uri("http://localhost"));
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout");
+        request.Headers.Add("X-MB-Client", "web");
+        request.Headers.Add("X-CSRF-TOKEN", "anything");
+        request.Headers.Add("X-Forwarded-Proto", "https"); // spoofed: the sender is not a trusted proxy
+        var response = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("csrf_invalid", (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+    }
+}

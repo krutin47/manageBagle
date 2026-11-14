@@ -16,6 +16,10 @@ The workbook's formulas are kept: a block that ends before it starts runs past m
 empty "actual minutes" means *not recorded* (never zero), and every dashboard number is derived
 from the time blocks.
 
+**Working on the code? Read [AGENTS.md](AGENTS.md) first.** The engineering standard is the handbook in
+`docs/handbook/`; what has been adopted so far is tracked in [docs/handbook-status.md](docs/handbook-status.md),
+and the decisions are in [docs/adr/](docs/adr/README.md).
+
 **New here? Start with [docs/project-overview.md](docs/project-overview.md)** — what the app is, how it is
 built, the standards it follows, every feature so far, and what is still open.
 
@@ -47,8 +51,10 @@ cd client && npm install && npm run dev
 ```
 
 Open http://localhost:5173. The dev server proxies `/api` to the API on port 5242, and the
-database schema is created on first start. Password-reset emails are written to the API log
-until SMTP is configured.
+database schema is created on first start.
+
+**Signing up locally:** a new account must confirm its email. With no SMTP configured, the email is
+printed in the API's console and saved under `server/src/ManageBagle.Api/.mail/` — open the link from there.
 
 To run the production image instead: `docker compose --profile app up --build`, then open
 http://localhost:8080.
@@ -62,6 +68,12 @@ cd client && npm run lint && npm run typecheck && npm test
 ```bash
 dotnet test server/ManageBagle.slnx
 ```
+
+```bash
+cd e2e && npm ci && npx playwright test
+```
+
+The end-to-end tests start the API and the client themselves and need PostgreSQL running.
 
 The client tests include the WCAG contrast checks for every colour pairing in both themes. The
 API tests boot the real application against a throwaway PostgreSQL database (set

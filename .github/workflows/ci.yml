@@ -13,6 +13,9 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  POSTGRES_URL: Host=localhost;Port=5432;Username=managebagle;Password=managebagle
+
 jobs:
   client:
     name: Client (lint, types, tests, build)
@@ -33,9 +36,11 @@ jobs:
       - name: Unit tests (includes the WCAG contrast checks)
         run: npm test
       - run: npm run build
+      - name: Dependency audit (high and critical)
+        run: npm audit --omit=dev --audit-level=high
 
   server:
-    name: Server (build, tests)
+    name: Server (build, tests, API contract)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -54,14 +59,94 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - run: dotnet build server/ManageBagle.slnx -c Release -warnaserror
-      - run: dotnet test server/ManageBagle.slnx -c Release --no-build
+      - name: Tests (security, concurrency, time zones; fails if the API contract changed without its snapshot)
+        run: dotnet test server/ManageBagle.slnx -c Release --no-build
         env:
-          MB_TEST_POSTGRES: Host=localhost;Port=5432;Username=managebagle;Password=managebagle
+          MB_TEST_POSTGRES: ${{ env.POSTGRES_URL }}
+      - name: Dependency audit
+        run: dotnet list server/ManageBagle.slnx package --vulnerable --include-transitive 2>&1 | tee audit.txt && ! grep -qE "High|Critical" audit.txt
 
-  image:
-    name: Container image builds
+  e2e:
+    name: Browser end-to-end
     runs-on: ubuntu-latest
     needs: [client, server]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: managebagle
+          POSTGRES_PASSWORD: managebagle
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U managebagle"
+          --health-interval 5s --health-timeout 3s --health-retries 10
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t managebagle:${{ github.sha }} .
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            e2e/package-lock.json
+      - run: npm ci
+        working-directory: client
+      - run: npm ci
+        working-directory: e2e
+      - run: npx playwright install --with-deps chromium
+        working-directory: e2e
+      - run: dotnet build server/src/ManageBagle.Api
+      - run: npx playwright test
+        working-directory: e2e
+        env:
+          MB_E2E_POSTGRES: ${{ env.POSTGRES_URL }};Database=managebagle_e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 7
+
+  image:
+    name: Container image builds and boots
+    runs-on: ubuntu-latest
+    needs: [client, server]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: managebagle
+          POSTGRES_PASSWORD: managebagle
+          POSTGRES_DB: managebagle
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U managebagle"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      IMAGE: managebagle:${{ github.sha }}
+      DB: Host=localhost;Port=5432;Database=managebagle;Username=managebagle;Password=managebagle
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t "$IMAGE" .
+      - name: The image runs as a non-root user
+        run: test "$(docker run --rm --entrypoint id "$IMAGE" -u)" != "0"
+      - name: Not ready before migrations, as designed
+        run: |
+          docker run -d --name app --network host -e ASPNETCORE_ENVIRONMENT=Production -e "ConnectionStrings__Default=$DB" "$IMAGE"
+          for i in $(seq 1 30); do curl -fs http://localhost:8080/health/live && break; sleep 1; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/health/ready)" = "503"
+      - name: Release step applies migrations
+        run: docker run --rm --network host -e ASPNETCORE_ENVIRONMENT=Production -e "ConnectionStrings__Default=$DB" "$IMAGE" --migrate
+      - name: Ready, serving the app, with security headers
+        run: |
+          for i in $(seq 1 30); do curl -fs http://localhost:8080/health/ready && break; sleep 1; done
+          curl -fsI http://localhost:8080/ | tee headers.txt
+          grep -qi "content-security-policy" headers.txt
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/openapi.json)" = "404"
+      - if: always()
+        run: docker logs app || true

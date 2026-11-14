@@ -1,6 +1,10 @@
 # manageBagle — project overview
 
-Last updated: 2026-11-14 · Branch described: `claude/bold-hawking-q13xxd`
+Last updated: 2026-11-14 · Branch described: `feature/handbook-phase-1`
+
+> The engineering standard for this project is the *Production Architecture Handbook*
+> (`docs/handbook/`). **[handbook-status.md](handbook-status.md) is the live list of what has been
+> adopted and what is still open**; where it and this overview disagree, the status file wins.
 
 This is the one-stop description of the project: what it is, how it is built, the standards the
 code follows, what exists today, and what is still open. Deeper detail lives in the linked documents.
@@ -12,6 +16,10 @@ code follows, what exists today, and what is still open. Deeper detail lives in 
 | Configuration, hosting, branch protection | [deployment.md](deployment.md) |
 | Colours, type, motion | [design-system.md](design-system.md) |
 | The brain-dump design and its follow-ups | [plan-brain-dump.md](plan-brain-dump.md) |
+| Binding decisions and how far each is built | [adr/](adr/README.md) |
+| Rules for anyone changing the code | [AGENTS.md](../AGENTS.md) |
+| Release, rollback, backup, restore | [runbooks/](runbooks/) |
+| The API contract | [api/openapi.json](api/openapi.json) |
 
 ---
 
@@ -52,7 +60,8 @@ Each person's data is private to their account.
 | Animation | **Motion** | honours reduced-motion |
 | Icons / fonts | **Lucide**; Bricolage Grotesque, Geist, Geist Mono (self-hosted) | |
 | Styling | Plain CSS with design tokens (CSS custom properties) | no CSS framework |
-| Tests | **xUnit** + `WebApplicationFactory` (API); **Vitest** (client) | |
+| Tests | **xUnit** + `WebApplicationFactory` (API); **Vitest** (client); **Playwright** (browser) | |
+| Observability | JSON logs with trace ids; **OpenTelemetry** export (opt-in) | |
 | Delivery | **Docker** (one image), **GitHub Actions** CI | |
 
 ### How it fits together
@@ -113,16 +122,18 @@ These describe what the code does today. New work should follow them.
 
 - **Sessions**: encrypted `HttpOnly`, `SameSite=Lax` cookie; `Secure` outside development. Nothing
   is stored in `localStorage` except the theme choice.
-- **CSRF**: every state-changing `/api` request must carry the `X-MB-Client` header; no CORS origins
-  are allowed.
+- **CSRF**: every state-changing `/api` request needs the app's custom header, a same-site `Origin`,
+  and an antiforgery token bound to the browser and account (ADR-006).
+- **Email confirmation** before an account can sign in; registration does not reveal who has an account.
+- **Lost updates**: tasks and blocks carry a version; a stale edit gets 409, never a silent overwrite.
 - **Data isolation**: every query filters by the signed-in user's id, and ids supplied by the client
   (focus area, task) are checked for ownership before use. Tests assert one user cannot read, edit
   or attach to another's data.
 - **Passwords**: 10-character minimum; five failures lock the account for 10 minutes.
 - **MFA**: TOTP with ten single-use recovery codes. Turning it off, regenerating codes and deleting
   the account require the password or a code again.
-- **External sign-in**: a provider's email is trusted only if the provider proves it per sign-in
-  (see [authentication.md](authentication.md)).
+- **External sign-in**: an outside identity is attached only by creating a new account or by the
+  signed-in owner linking it after step-up; a matching email alone never links (ADR-007).
 - **Account enumeration**: password reset answers identically whether or not the account exists.
 - **Rate limiting** on auth endpoints; **security headers** including a Content-Security-Policy with
   no inline or third-party scripts.
@@ -135,7 +146,9 @@ These describe what the code does today. New work should follow them.
 - Validation: data annotations for shape, explicit checks for rules; failures return
   RFC 7807 problem details with field-level errors.
 - Enums are stored and sent as strings, so the database and JSON stay readable.
-- Dates and times are `DateOnly` / `TimeOnly` — the user's wall clock, never converted to UTC.
+- Dates and times are civil (`DateOnly` / `TimeOnly`) plus the account's IANA zone; durations are
+  elapsed minutes, so DST is handled (ADR-008).
+- Errors are RFC 9457 problem documents with a stable `code` and a `traceId` (ADR-005).
 - Multi-step saves happen in one `SaveChanges` so they are all-or-nothing.
 - Schema changes go through EF Core migrations only; they apply on startup by default.
 - Nullable reference types are on, and CI builds with **warnings as errors**.
@@ -171,7 +184,8 @@ These describe what the code does today. New work should follow them.
   no mocked data layer. Unit tests cover the week-summary maths.
 - **Client**: unit tests for time helpers, calendar layout, the day-fitting scheduler and contrast.
 - Tests are written against behaviour ("a plan is all or nothing"), not implementation.
-- Current count: **28 API tests, 192 client tests**, all passing.
+- **Browser**: Playwright drives the real API and client through the day plan, moving work and accounts.
+- Current count: **71 API tests, 194 client tests, 10 end-to-end tests**, all passing locally.
 
 ### Git and delivery
 
@@ -246,42 +260,27 @@ These describe what the code does today. New work should follow them.
 
 ## 5. What is pending
 
+The detailed, phase-by-phase list is **[handbook-status.md](handbook-status.md)**. In short:
+
 ### Needs your action (cannot be done from code)
 | Item | Why |
 |---|---|
 | **Protect `main` and `uat`** | Needs repository-admin rights. Run `scripts/protect-branches.sh` or set it in GitHub settings. |
-| **Open the pull request** `feature → dev` | Not opened yet. It will also be the first real run of CI. |
-| **Google and Microsoft credentials** | Buttons stay hidden until set. Neither flow has been exercised against the real provider. |
-| **SMTP settings** | Without them, password-reset emails are only written to the development log. |
-| **Choose a host** for UAT and production | The image is ready; no deployment target or deploy pipeline exists yet. |
+| **Open a pull request** into `dev` | Not opened yet. It will be the first real run of CI, including the image build. |
+| **Choose a host**, then set `ForwardedHeaders__KnownNetworks` to its ingress | Until then nothing is deployed and the proxy trust list is only loopback. |
+| **Google and Microsoft credentials** | Buttons stay hidden until set. Neither flow has been exercised against the real provider (the linking rules are tested with a stand-in provider). |
+| **SMTP settings** | Required in UAT and production: accounts now need a confirmation email. |
+| **An error-monitoring backend** | Telemetry export is wired but points nowhere. |
 
 ### Not verified yet
-- The **Docker image** and the **CI workflow** have never run (no Docker daemon was available where
-  this was built, and no pull request has been opened).
-- No testing on real phones or with a screen reader; accessibility has been checked by automated
-  contrast tests and keyboard use only.
-- No browser end-to-end test suite is committed. Browser checks so far were one-off scripted runs.
+- The **Docker image** and the **CI workflow** have never run.
+- No **hosted environment** exists, so nothing about a real deployment, a real redeploy, or a
+  production backup has been demonstrated.
+- No performance measurements. No testing on real phones or with a screen reader.
 
-### Known gaps in what is built
-- New email/password accounts are not asked to **confirm their email**.
-- A Google or Microsoft account **cannot be linked from Settings** to an existing account.
-- **Calendar drag does not work on touch**; phones use the edit dialog.
-- Focus areas **cannot be reordered** in the UI (the API supports it).
-- No **recurring blocks**, no **reminders or notifications**, no **import/export** (including from
-  the original spreadsheet), no **calendar sync**.
-- Times are the browser's local clock; there is **no per-user time-zone setting**.
-- No admin tooling: a user locked out of MFA without recovery codes needs a database fix.
-- Eight focus-area colours cannot all be told apart under colour-blindness, which is why the area
-  name is always shown.
-
-### Planned next (agreed, not started)
-- **AI rewrite** of a brain-dump line into a clear goal.
-- **Topic sorting by meaning** of the text, and automatic focus-area suggestion (same model as above).
-- **Single sign-on (SSO)** — the provider list is already structured for it.
-
-### Worth doing before production
-- Email confirmation on sign-up.
-- Error monitoring and structured logging to a central place.
-- Database backups and a restore drill.
-- A committed end-to-end test for the main flow.
-- Decide whether migrations should keep running at startup or move to a release step.
+### Still open from the handbook
+- Phase 2's main item: use-case classes (PlanDay first) and moving database access out of endpoints.
+- Generated TypeScript API types; import-boundary lint rules; Prettier and accessibility lint.
+- An admin process for MFA lockout; a queryable audit table.
+- Overlap rules for fixed commitments; pagination; recurring blocks.
+- Phase 3 entirely (load testing, two-replica validation, AI features).

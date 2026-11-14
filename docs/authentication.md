@@ -1,9 +1,20 @@
 # Authentication
 
 Sessions are an encrypted, `HttpOnly`, `SameSite=Lax` cookie issued by ASP.NET Core Identity.
-Nothing is kept in `localStorage`, so scripts cannot read the session.
+Nothing is kept in `localStorage`, so scripts cannot read the session. A session ends after 14 days
+without a visit, and after 30 days regardless (`Auth__IdleSessionDays`, `Auth__AbsoluteSessionDays`).
 
-## The three ways in
+## Email confirmation
+
+A new account cannot sign in until its owner opens the link sent to their address (valid 2 hours).
+Registration always answers the same way, so it cannot be used to discover who has an account; if
+the address is already registered, its owner gets an email saying so. A sign-in attempt on an
+unconfirmed account offers a new link, but only after the correct password.
+
+**Locally**, with no SMTP configured, emails are printed in the API console and written to
+`server/src/ManageBagle.Api/.mail/`.
+
+## The ways in
 
 **Email and password.** Minimum 10 characters. Five wrong attempts lock the account for 10 minutes.
 
@@ -13,40 +24,27 @@ Nothing is kept in `localStorage`, so scripts cannot read the session.
    *Web application*.
 2. Add the authorised redirect URI `https://<your-host>/api/auth/external/google/callback`
    (for local development: `http://localhost:5173/api/auth/external/google/callback`).
-3. Give the API the two values:
+3. Set `Authentication:Google:ClientId` and `Authentication:Google:ClientSecret` (user-secrets
+   locally; `Authentication__Google__…` environment variables elsewhere).
 
-   ```bash
-   cd server/src/ManageBagle.Api
-   dotnet user-secrets init
-   dotnet user-secrets set "Authentication:Google:ClientId" "<id>"
-   dotnet user-secrets set "Authentication:Google:ClientSecret" "<secret>"
-   ```
+**Microsoft.** Same pattern: register a web app in the Azure portal with the redirect URI
+`https://<your-host>/api/auth/external/microsoft/callback`, then set
+`Authentication:Microsoft:ClientId` / `ClientSecret`.
 
-   In UAT and production use the environment variables `Authentication__Google__ClientId` and
-   `Authentication__Google__ClientSecret`.
+Use a **separate OAuth client per environment**.
 
-**Microsoft.** Same pattern. In the Azure portal → *App registrations*, register a web app with the
-redirect URI `https://<your-host>/api/auth/external/microsoft/callback`, create a client secret, and
-set `Authentication:Microsoft:ClientId` / `Authentication:Microsoft:ClientSecret`
-(`Authentication__Microsoft__…` as environment variables).
+### How an outside account meets a manageBagle account (ADR-007)
 
-**No button showing?** A provider's button appears on the sign-in page only when both of its values
-are set. On a fresh install neither is, so only email and password is offered.
+- It can **start a new account**. Google proves the email per sign-in, so the account is usable at
+  once; Microsoft does not, so the account confirms by email first.
+- It can be **connected to an existing account only by that account's signed-in owner**, in
+  *Settings → Sign-in & security → Connect*, after re-entering the password or an authenticator code.
+- A sign-in whose email merely matches an existing account is **refused and changes nothing**.
+- The last remaining way to sign in cannot be disconnected.
 
-How an outside account meets an existing one:
-
-- **Google** states per sign-in whether the email is verified. A verified Google sign-in whose
-  email already has an account is linked to it. If that account's email was never proven, its
-  password, authenticator and other linked sign-ins are removed first, so nobody can pre-register
-  someone else's address and keep a way in.
-- **Microsoft** work and school directories can carry any email address, so its email is never
-  treated as proof. A Microsoft sign-in can start a new account, but is refused if an account with
-  that email already exists.
-
-**Adding SSO later.** Providers are listed in one place (`ExternalProviders` in
-`Auth/AuthEndpoints.cs`) with a flag for whether their email claim can be trusted. An OpenID Connect
-provider is one more entry there plus its `AddOpenIdConnect` registration in `Program.cs`; the
-sign-in page and Settings pick it up from `/api/auth/providers`.
+**Adding SSO later.** Providers are listed in one place (`ExternalProviders`) with a flag for
+whether their email claim can be trusted. An OpenID Connect provider is one more entry plus its
+registration in `Program.cs`.
 
 **Two-step verification (MFA).** *Settings → Sign-in & security → Turn on.* Scan the QR code with
 any TOTP authenticator app and confirm with a code. Ten single-use recovery codes are shown once.
@@ -62,16 +60,20 @@ email is written to the log in Development and an error is logged elsewhere.
 
 ## Other protections
 
-- **CSRF** – every state-changing `/api` request must carry the `X-MB-Client` header. Browsers do
-  not send custom headers cross-site without a CORS preflight, and the API allows no CORS origins.
+- **CSRF** (ADR-006) – a state-changing request needs the app's custom header, an `Origin` that is
+  this site, and an antiforgery token bound to the browser and the signed-in account.
 - **Rate limiting** – auth endpoints allow 20 requests per minute per IP (`RateLimits__AuthPerMinute`).
-- **Headers** – a strict Content-Security-Policy (no inline or third-party scripts), `X-Frame-Options: DENY`,
-  `nosniff`, HSTS outside Development, and `Cache-Control: no-store` on API responses.
-- **Data isolation** – every query is filtered by the signed-in user's id; the API tests assert that
-  one user cannot read, edit or attach to another user's data.
+  This is per instance; with more than one replica, enforce limits at the ingress.
+- **Headers** – a strict Content-Security-Policy, `X-Frame-Options: DENY`, `nosniff`, HSTS outside
+  Development, and `Cache-Control: no-store` on API responses.
+- **Data isolation** – every query is filtered by the signed-in user's id, and ids sent by the client
+  are checked for ownership.
+- **Audit trail** – account events (sign-in, password change, MFA on/off, account linked/unlinked) are
+  written as structured log entries under the `ManageBagle.Audit` category, without credentials.
 
 ## Known limits
 
-- New email/password accounts are not asked to confirm their address before first use.
-- There is no admin UI; a locked-out user without recovery codes needs a database-level reset of
-  `TwoFactorEnabled`.
+- There is no admin process for someone locked out of MFA without recovery codes; today that needs
+  a database change, which the handbook says must be replaced by an audited procedure.
+- Audit events live in logs, not in a table the app can query.
+- Sessions on other devices cannot be listed or revoked individually; changing the password ends them.
