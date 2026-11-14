@@ -16,6 +16,9 @@ The workbook's formulas are kept: a block that ends before it starts runs past m
 empty "actual minutes" means *not recorded* (never zero), and every dashboard number is derived
 from the time blocks.
 
+**New here? Start with [docs/project-overview.md](docs/project-overview.md)** — what the app is, how it is
+built, the standards it follows, every feature so far, and what is still open.
+
 ## Stack
 
 - **API** – ASP.NET Core 10 minimal APIs, EF Core, PostgreSQL 16, ASP.NET Core Identity
