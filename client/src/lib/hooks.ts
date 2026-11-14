@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { nowMinutes } from "./time";
 
 export function useMediaQuery(query: string): boolean {
   return useSyncExternalStore(
@@ -30,15 +31,11 @@ export function useTheme(): [Theme, (t: Theme) => void] {
   return [theme, apply];
 }
 
-/** Minutes since local midnight, refreshed every 30 s — drives the "now" line. */
+/** Minutes since midnight in the account's zone, refreshed every 30 s — drives the "now" line. */
 export function useNowMinutes(): number {
-  const read = () => {
-    const d = new Date();
-    return d.getHours() * 60 + d.getMinutes();
-  };
-  const [now, setNow] = useState(read);
+  const [now, setNow] = useState(nowMinutes);
   useEffect(() => {
-    const id = window.setInterval(() => setNow(read()), 30_000);
+    const id = window.setInterval(() => setNow(nowMinutes()), 30_000);
     return () => window.clearInterval(id);
   }, []);
   return now;

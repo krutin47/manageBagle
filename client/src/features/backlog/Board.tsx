@@ -1,4 +1,4 @@
-import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, pointerWithin, rectIntersection, useDraggable, useDroppable, useSensor, useSensors, type CollisionDetection, type DragEndEvent } from "@dnd-kit/core";
+import { DndContext, DragOverlay, KeyboardCode, KeyboardSensor, PointerSensor, pointerWithin, rectIntersection, useDraggable, useDroppable, useSensor, useSensors, type CollisionDetection, type DragEndEvent, type KeyboardCoordinateGetter } from "@dnd-kit/core";
 import { CalendarPlus, MapPin } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
@@ -30,10 +30,24 @@ interface BoardProps {
   onSchedule: (task: Task) => void;
 }
 
+/**
+ * With the keyboard, one press of an arrow key moves the card one whole column, instead of the
+ * library's default nudge of a few pixels that would take a dozen presses to cross a column.
+ */
+const columnByColumn: KeyboardCoordinateGetter = (event, { context, currentCoordinates }) => {
+  const step = event.code === KeyboardCode.Right ? 1 : event.code === KeyboardCode.Left ? -1 : 0;
+  if (step === 0) return undefined;
+  event.preventDefault();
+  const order = COLUMNS.map((c) => c.status as string);
+  const from = order.indexOf(String(context.over?.id ?? context.active?.data.current?.status ?? order[0]));
+  const target = context.droppableRects.get(order[Math.max(0, Math.min(order.length - 1, from + step))]!);
+  return target ? { x: target.left + 12, y: currentCoordinates.y } : undefined;
+};
+
 export function Board({ tasks, areaById, onMove, onOpen, onSchedule }: BoardProps) {
   const [dragging, setDragging] = useState<Task | null>(null);
   // A small drag distance keeps a plain click (open the task) from starting a drag.
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: columnByColumn }));
 
   const onDragEnd = (e: DragEndEvent) => {
     setDragging(null);
@@ -56,7 +70,7 @@ export function Board({ tasks, areaById, onMove, onOpen, onSchedule }: BoardProp
           onDragEnd: ({ over }) => (over ? `Dropped in ${COLUMNS.find((c) => c.status === over.id)?.title}.` : "Dropped."),
           onDragCancel: () => "Move cancelled.",
         },
-        screenReaderInstructions: { draggable: "Press space to pick up the task, arrow keys to move it between columns, space to drop, escape to cancel." },
+        screenReaderInstructions: { draggable: "Press space to pick up the task, left or right arrow to move it one column, space to drop, escape to cancel." },
       }}
     >
       <div className="board">
@@ -96,7 +110,7 @@ function Column({ status, title, empty, count, minutes, active, children }: { st
 }
 
 function Card({ task, area, hidden, onOpen, onSchedule }: { task: Task; area?: Area; hidden: boolean; onOpen: () => void; onSchedule: () => void }) {
-  const { attributes, listeners, setNodeRef } = useDraggable({ id: task.id });
+  const { attributes, listeners, setNodeRef } = useDraggable({ id: task.id, data: { status: task.status } });
   return (
     <motion.div ref={setNodeRef} layout="position" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: hidden ? 0.25 : 1, scale: 1 }} transition={{ duration: 0.18 }} {...attributes} {...listeners} aria-roledescription="draggable task" className="board-card-wrap">
       <CardBody task={task} area={area} onOpen={onOpen} onSchedule={onSchedule} />

@@ -419,3 +419,10 @@
   .due-row .agenda-main, .due-row .btn { grid-column: 2; justify-self: start; }
   .review-facts { grid-template-columns: 1fr; }
 }
+
+/* ---- Notices, boundaries ---- */
+.zone-notice { align-items: flex-start; }
+.zone-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.boundary { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-3); }
+.boundary-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.auth-resend { margin-top: 16px; }

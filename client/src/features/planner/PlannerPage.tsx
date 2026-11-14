@@ -8,7 +8,7 @@ import { useToast } from "../../components/toast";
 import { useDocumentTitle, useMediaQuery, useNowMinutes } from "../../lib/hooks";
 import { modeLabel, statusLabel } from "../../lib/labels";
 import { useAreas, useBlockMutations, useWeekBlocks } from "../../lib/queries";
-import { formatDate, formatDuration, formatTime, formatVariance, formatWeekRange, fromMinutes, isValidISODate, snap, todayISO, toMinutes, weekDays, weekStart } from "../../lib/time";
+import { formatDate, formatDuration, formatTime, formatVariance, formatWeekRange, fromMinutes, isValidISODate, nowMinutes, snap, todayISO, toMinutes, weekDays, weekStart } from "../../lib/time";
 import { BlockDialog, type BlockDraft } from "./BlockDialog";
 import { placeBlocks } from "./layout";
 
@@ -69,8 +69,7 @@ export function PlannerPage() {
 /** Next half hour if planning today, otherwise 09:00. */
 function defaultStart(date: string) {
   if (date !== todayISO()) return 9 * 60;
-  const now = new Date();
-  return Math.min(snap(now.getHours() * 60 + now.getMinutes() + 15, 30), 23 * 60);
+  return Math.min(snap(nowMinutes() + 15, 30), 23 * 60);
 }
 
 function DayStrip({ days, selected, blocks, onSelect }: { days: string[]; selected: string; blocks: Block[]; onSelect: (d: string) => void }) {

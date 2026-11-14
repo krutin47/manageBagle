@@ -2,14 +2,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Check, Copy, Download, KeyRound, Link2, Plus, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
-import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 import { useToast } from "../../components/toast";
-import { Button, ConfirmDialog, cx, Dialog, ErrorNote, Field, IconButton, Input, PageHeader, Segmented, Skeleton } from "../../components/ui";
+import { Button, ConfirmDialog, cx, Dialog, ErrorNote, Field, IconButton, Input, PageHeader, Segmented, Select, Skeleton } from "../../components/ui";
 import { api, ApiError, errorMessage, type Area, type AreaColor, type User } from "../../lib/api";
 import { useDocumentTitle, useTheme } from "../../lib/hooks";
 import { AREA_COLORS, colorLabel } from "../../lib/labels";
-import { useAreaMutations, useAreas, useProviders, useUser } from "../../lib/queries";
+import { keys, useAreaMutations, useAreas, useProviders, useUser } from "../../lib/queries";
+import { browserTimeZone } from "../../lib/time";
 
 export function SettingsPage() {
   useDocumentTitle("Settings");
@@ -30,7 +31,7 @@ export function SettingsPage() {
 
 function useRefreshUser() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: ["me"] });
+  return () => qc.invalidateQueries({ queryKey: keys.me });
 }
 
 // ---- Profile ---------------------------------------------------------------------------------
@@ -39,13 +40,19 @@ function ProfileCard({ user }: { user: User }) {
   const toast = useToast();
   const qc = useQueryClient();
   const [name, setName] = useState(user.displayName);
+  const [zone, setZone] = useState(user.timeZone ?? browserTimeZone());
   const [busy, setBusy] = useState(false);
+  const zones = useMemo(() => {
+    const all = typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
+    return [...new Set([zone, browserTimeZone(), ...all])].sort();
+  }, [zone]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     try {
-      qc.setQueryData(["me"], await api<User>("/auth/profile", { method: "PUT", body: { displayName: name } }));
+      qc.setQueryData(keys.me, await api<User>("/auth/profile", { method: "PUT", body: { displayName: name, timeZone: zone } }));
+      qc.invalidateQueries({ queryKey: keys.blocks.all });
       toast.success("Profile saved");
     } catch (err) {
       toast.error(errorMessage(err));
@@ -60,7 +67,10 @@ function ProfileCard({ user }: { user: User }) {
       <form className="form settings-form" onSubmit={submit}>
         <Field label="Name">{(p) => <Input {...p} required maxLength={80} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />}</Field>
         <Field label="Email" hint="Your sign-in address.">{(p) => <Input {...p} value={user.email} readOnly />}</Field>
-        <div><Button type="submit" variant="primary" loading={busy} disabled={!name.trim() || name.trim() === user.displayName}>Save profile</Button></div>
+        <Field label="Time zone" hint="Decides what “today” and “now” mean. Blocks you have already planned stay anchored to the zone they were planned in.">
+          {(p) => <Select {...p} value={zone} onChange={(e) => setZone(e.target.value)}>{zones.map((z) => <option key={z} value={z}>{z.replace(/_/g, " ")}</option>)}</Select>}
+        </Field>
+        <div><Button type="submit" variant="primary" loading={busy} disabled={!name.trim() || (name.trim() === user.displayName && zone === user.timeZone)}>Save profile</Button></div>
       </form>
     </section>
   );
@@ -162,11 +172,35 @@ function AreaRow({ area, onDelete }: { area: Area; onDelete: () => void }) {
   );
 }
 
+const PROVIDER_ROWS = [
+  { key: "google", name: "Google", flag: "googleLinked" },
+  { key: "microsoft", name: "Microsoft", flag: "microsoftLinked" },
+] as const;
+
+const LINK_ERRORS: Record<string, string> = {
+  link_expired: "That took too long, so nothing was connected. Start again.",
+  link_in_use: "That account is already connected to a different manageBagle account.",
+  link_failed: "That account could not be connected.",
+};
+
 // ---- Security --------------------------------------------------------------------------------
 
 function SecurityCard({ user }: { user: User }) {
   const [dialog, setDialog] = useState<"password" | "enable" | "disable" | "codes" | null>(null);
   const providers = useProviders();
+  const [linking, setLinking] = useState<(typeof PROVIDER_ROWS)[number] & { mode: "link" | "unlink" } | null>(null);
+  const [params, setParams] = useSearchParams();
+  const toast = useToast();
+
+  // The provider round trip lands back here with its result in the address.
+  useEffect(() => {
+    const linked = params.get("linked");
+    const error = params.get("error");
+    if (!linked && !error) return;
+    if (linked) toast.success(`${PROVIDER_ROWS.find((p) => p.key === linked)?.name ?? "Account"} connected`);
+    else toast.error(LINK_ERRORS[error!] ?? "That account could not be connected.");
+    setParams({}, { replace: true });
+  }, [params, setParams, toast]);
   return (
     <section className="card" aria-labelledby="security">
       <header className="card-head"><div><h2 id="security">Sign-in &amp; security</h2></div></header>
@@ -198,19 +232,39 @@ function SecurityCard({ user }: { user: User }) {
             <Button variant="primary" onClick={() => setDialog("enable")}>Turn on</Button>
           )}
         </li>
-        {([["google", "Google", user.googleLinked], ["microsoft", "Microsoft", user.microsoftLinked]] as const)
-          .filter(([key, , linked]) => linked || providers.data?.[key])
-          .map(([key, name, linked]) => (
-            <li key={key}>
+        {PROVIDER_ROWS.filter((p) => user[p.flag] || providers.data?.[p.key]).map((p) => {
+          const linked = user[p.flag];
+          return (
+            <li key={p.key}>
               <span className={cx("sec-icon", linked && "is-on")}><Link2 size={18} aria-hidden /></span>
               <div>
-                <h3>{name} <span className={cx("badge", linked ? "badge-good" : "badge-neutral")}>{linked ? "Connected" : "Not connected"}</span></h3>
-                <p>{linked ? `You can sign in with your ${name} account.` : key === "google" ? `Choose “Continue with Google” at sign-in using ${user.email} to connect it.` : `Not connected. For your safety a ${name} account can only start a new manageBagle account, not attach to this one.`}</p>
+                <h3>{p.name} <span className={cx("badge", linked ? "badge-good" : "badge-neutral")}>{linked ? "Connected" : "Not connected"}</span></h3>
+                <p>{linked ? `You can sign in with your ${p.name} account.` : `Connect your ${p.name} account to sign in with it. We will ask you to confirm it is you first.`}</p>
               </div>
+              {linked
+                ? <Button variant="ghost" className="danger-text" onClick={() => setLinking({ ...p, mode: "unlink" })}>Disconnect</Button>
+                : <Button onClick={() => setLinking({ ...p, mode: "link" })}>Connect</Button>}
             </li>
-          ))}
+          );
+        })}
       </ul>
 
+      <Dialog open={!!linking} onClose={() => setLinking(null)} width="sm"
+        title={linking?.mode === "unlink" ? `Disconnect ${linking.name}?` : `Connect ${linking?.name ?? ""}`}
+        description={linking?.mode === "unlink" ? `You will no longer be able to sign in with ${linking.name}.` : "Confirm it is you, then choose the account to connect."}>
+        {linking && (user.hasPassword || user.mfaEnabled || linking.mode === "unlink" ? (
+          <ConfirmIdentity<{ url?: string }>
+            user={user}
+            action={`/auth/external/${linking.key}/${linking.mode}`}
+            submitLabel={linking.mode === "unlink" ? "Disconnect" : "Continue"}
+            danger={linking.mode === "unlink"}
+            onResult={(r) => { if (r?.url) window.location.assign(r.url); }}
+            onDone={() => { if (linking.mode === "unlink") setLinking(null); }}
+          />
+        ) : (
+          <div className="dialog-body"><ErrorNote>Set a password first, so we can confirm it is you before connecting another account.</ErrorNote></div>
+        ))}
+      </Dialog>
       <Dialog open={dialog === "password"} onClose={() => setDialog(null)} title={user.hasPassword ? "Change password" : "Set a password"} width="sm">
         <PasswordForm user={user} onClose={() => setDialog(null)} />
       </Dialog>
@@ -444,7 +498,7 @@ function DangerCard({ user }: { user: User }) {
         <Button variant="danger" onClick={() => setOpen(true)}>Delete account</Button>
       </header>
       <Dialog open={open} onClose={() => setOpen(false)} title="Delete your account?" description="Everything you have planned and logged will be erased immediately." width="sm">
-        <ConfirmIdentity user={user} action="/auth/account/delete" submitLabel="Delete everything" danger onDone={() => { qc.clear(); qc.setQueryData(["me"], null); navigate("/login", { replace: true }); }} />
+        <ConfirmIdentity user={user} action="/auth/account/delete" submitLabel="Delete everything" danger onDone={() => { qc.clear(); qc.setQueryData(keys.me, null); navigate("/login", { replace: true }); }} />
       </Dialog>
     </section>
   );

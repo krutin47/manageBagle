@@ -7,7 +7,7 @@ import { errorMessage, type Area, type Block, type PlanItem, type Priority, type
 import { modeLabel, PRIORITIES, WORK_MODES } from "../../lib/labels";
 import { useBacklog, usePlanDay } from "../../lib/queries";
 import { proposeSchedule } from "../../lib/schedule";
-import { addDays, formatDate, formatDuration, fromMinutes, snap, todayISO, toMinutes } from "../../lib/time";
+import { addDays, formatDate, formatDuration, fromMinutes, nowMinutes, snap, todayISO, toMinutes } from "../../lib/time";
 
 interface Row {
   key: string;
@@ -67,10 +67,7 @@ export function BrainDumpDialog({ open, date, areas, blocks, takenRanks, seed, o
 }
 
 function defaultStart(date: string, blocks: Block[]) {
-  if (date === todayISO()) {
-    const now = new Date();
-    return Math.min(snap(now.getHours() * 60 + now.getMinutes() + 10, 15), 23 * 60);
-  }
+  if (date === todayISO()) return Math.min(snap(nowMinutes() + 10, 15), 23 * 60);
   return blocks.length ? Math.min(...blocks.map((b) => toMinutes(b.start)), 9 * 60) : 9 * 60;
 }
 
@@ -86,6 +83,7 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const nextKey = useRef(1);
+  const sent = useRef({ fingerprint: "", key: "" });
 
   // Ranks already held by outcomes that are not part of this plan stay theirs.
   const freeRanks = [1, 2, 3].filter((r) => !takenRanks.includes(r));
@@ -160,7 +158,10 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
       };
     });
     try {
-      const result = await plan.mutateAsync(items);
+      // Same plan, same key: a double click or a retry is saved once. A changed plan gets a new key.
+      const fingerprint = JSON.stringify(items);
+      if (sent.current.fingerprint !== fingerprint) sent.current = { fingerprint, key: crypto.randomUUID() };
+      const result = await plan.mutateAsync({ items, idempotencyKey: sent.current.key });
       toast.success(
         result.leftInBacklog > 0
           ? `${result.blocksBooked} booked for ${date === todayISO() ? "today" : formatDate(date, "medium")} · ${result.leftInBacklog} kept in your backlog`

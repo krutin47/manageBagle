@@ -9,7 +9,7 @@ import { errorMessage, type Area, type Block, type DayName, type Outcome, type S
 import { useDocumentTitle, useNowMinutes } from "../../lib/hooks";
 import { modeLabel, STATUSES, statusLabel } from "../../lib/labels";
 import { useAreas, useBacklog, useBlockMutations, useDay, useDayMutations, useThemes, useUser, useWeekBlocks } from "../../lib/queries";
-import { addDays, formatDate, formatDuration, formatHours, fromMinutes, isValidISODate, parseISODate, snap, todayISO, toMinutes } from "../../lib/time";
+import { addDays, nowMinutes, formatDate, formatDuration, formatHours, fromMinutes, isValidISODate, parseISODate, snap, todayISO, toMinutes } from "../../lib/time";
 import { BlockDialog, type BlockDraft } from "../planner/BlockDialog";
 import { Variance } from "../planner/PlannerPage";
 import { BrainDumpDialog, dueLabel, valueScore } from "./BrainDumpDialog";
@@ -17,7 +17,7 @@ import { BrainDumpDialog, dueLabel, valueScore } from "./BrainDumpDialog";
 const DAY_NAMES: DayName[] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function greeting() {
-  const h = new Date().getHours();
+  const h = Math.floor(nowMinutes() / 60);
   return h < 5 ? "Still up" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
 }
 
@@ -57,7 +57,7 @@ export function TodayPage() {
 
   const newBlock = (seed: Partial<BlockDraft> = {}, minutes = 60) => {
     const last = blocks.at(-1);
-    const startMin = last ? Math.min(toMinutes(last.start) + last.plannedMinutes, 23 * 60) : isToday ? Math.min(snap(new Date().getHours() * 60 + new Date().getMinutes() + 15, 30), 23 * 60) : 9 * 60;
+    const startMin = last ? Math.min(toMinutes(last.start) + last.plannedMinutes, 23 * 60) : isToday ? Math.min(snap(nowMinutes() + 15, 30), 23 * 60) : 9 * 60;
     setDraft({ date, start: fromMinutes(startMin), end: fromMinutes(startMin + minutes), ...seed });
   };
 

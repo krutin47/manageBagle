@@ -11,7 +11,30 @@ export function parseISODate(iso: string): Date {
   return new Date(y, m - 1, d);
 }
 
-export const todayISO = () => toISODate(new Date());
+// ---- The account's time zone --------------------------------------------------------------------
+// "Today" and "now" are read in the zone the person plans in (their account setting), not in whatever
+// zone the device happens to be in. Until an account has a zone, the device's zone is used.
+
+let appZone: string | undefined;
+
+export function setTimeZone(zone: string | null | undefined) {
+  appZone = zone ?? undefined;
+}
+
+export const browserTimeZone = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+function clock(): { date: string; minutes: number } {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: appZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date());
+  const get = (type: string) => parts.find((p) => p.type === type)!.value;
+  return { date: `${get("year")}-${get("month")}-${get("day")}`, minutes: Number(get("hour")) * 60 + Number(get("minute")) };
+}
+
+export const todayISO = () => clock().date;
+
+/** Minutes since midnight, now, in the account's zone. */
+export const nowMinutes = () => clock().minutes;
 
 export function addDays(iso: string, days: number): string {
   const d = parseISODate(iso);

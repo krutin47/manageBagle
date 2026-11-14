@@ -1,8 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ErrorNote, Logo } from "./components/ui";
-import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyPage } from "./features/auth/AuthPages";
+import { ConfirmEmailPage, ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyPage } from "./features/auth/AuthPages";
 import { BacklogPage } from "./features/backlog/BacklogPage";
 import { GuidePage } from "./features/guide/GuidePage";
 import { PlannerPage } from "./features/planner/PlannerPage";
@@ -10,7 +11,8 @@ import { ReviewPage } from "./features/review/ReviewPage";
 import { AppShell } from "./features/shell/AppShell";
 import { TodayPage } from "./features/today/TodayPage";
 import { WeekPage } from "./features/week/WeekPage";
-import { useMe } from "./lib/queries";
+import { keys, useMe } from "./lib/queries";
+import { setTimeZone } from "./lib/time";
 
 // Settings carries the QR-code generator; load it only when someone opens that page.
 const SettingsPage = lazy(() => import("./features/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })));
@@ -30,7 +32,11 @@ function RequireAuth() {
 
   // Any API call that discovers the session has ended sends the user back to sign in.
   useEffect(() => {
-    const onSignedOut = () => qc.setQueryData(["me"], null);
+    const onSignedOut = () => {
+      // Nothing of the previous account may linger on screen or in memory.
+      qc.clear();
+      qc.setQueryData(keys.me, null);
+    };
     window.addEventListener("mb:signed-out", onSignedOut);
     return () => window.removeEventListener("mb:signed-out", onSignedOut);
   }, [qc]);
@@ -47,6 +53,8 @@ function RequireAuth() {
     const from = location.pathname + location.search;
     return <Navigate to={from === "/" ? "/login" : `/login?next=${encodeURIComponent(from)}`} replace />;
   }
+  // "Today" and "now" follow the zone the account plans in.
+  setTimeZone(me.data.timeZone);
   return <AppShell />;
 }
 
@@ -64,6 +72,7 @@ function GuestOnly() {
 
 export function App() {
   return (
+    <ErrorBoundary area="manageBagle">
     <Routes>
       <Route element={<GuestOnly />}>
         <Route path="/login" element={<LoginPage />} />
@@ -72,6 +81,8 @@ export function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
       </Route>
+      {/* Reachable signed in or out: the link may be opened in a browser that already has a session. */}
+      <Route path="/confirm-email" element={<ConfirmEmailPage />} />
       <Route element={<RequireAuth />}>
         <Route index element={<TodayPage />} />
         <Route path="/week" element={<WeekPage />} />
@@ -83,5 +94,6 @@ export function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
+    </ErrorBoundary>
   );
 }
