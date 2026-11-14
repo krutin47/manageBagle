@@ -61,13 +61,18 @@ public static class DayEndpoints
             // An outcome that came from a planned task carries that day's blocks and the task with it.
             if (outcome.BacklogTaskId is { } taskId && req.Status == ItemStatus.Done)
             {
-                var task = await db.BacklogTasks.FirstOrDefaultAsync(t => t.Id == taskId && t.UserId == uid);
-                if (task is not null) task.Status = ItemStatus.Done;
-                var blocks = await db.TimeBlocks.Where(b => b.UserId == uid && b.Date == date && b.BacklogTaskId == taskId).ToListAsync();
-                foreach (var block in blocks)
+                // Ticking the outcome finishes that day's sessions. The task itself is finished only if
+                // it has no open session left on another day.
+                var blocks = await db.TimeBlocks.Where(b => b.UserId == uid && b.BacklogTaskId == taskId).ToListAsync();
+                foreach (var block in blocks.Where(b => b.Date == date))
                 {
                     block.Status = ItemStatus.Done;
                     block.ActualMinutes ??= block.PlannedMinutes;
+                }
+                var task = await db.BacklogTasks.FirstOrDefaultAsync(t => t.Id == taskId && t.UserId == uid);
+                if (task is not null)
+                {
+                    task.Status = Domain.TaskCompletion.AfterSessionFinished(task.Status, blocks.Where(b => b.Date != date).Select(b => b.Status));
                 }
             }
             await db.SaveChangesAsync();

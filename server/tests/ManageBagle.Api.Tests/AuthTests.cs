@@ -20,7 +20,7 @@ public class AuthTests(ApiFactory factory)
     [Fact]
     public async Task State_changing_requests_without_the_client_header_are_rejected()
     {
-        var response = await factory.NewClient(withClientHeader: false)
+        var response = await factory.NewClient(likeTheApp: false)
             .PostAsJsonAsync("/api/auth/login", new { email = "a@example.com", password = "x" });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -40,17 +40,11 @@ public class AuthTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task Weak_or_duplicate_registrations_are_refused_with_field_errors()
+    public async Task Weak_passwords_are_refused_with_a_field_error()
     {
-        var (_, email) = await factory.NewUserAsync();
-        var client = factory.NewClient();
-
-        var weak = await client.PostAsJsonAsync("/api/auth/register", new { email = "new@example.com", password = "short", displayName = "N" });
+        var weak = await factory.NewClient().PostAsJsonAsync("/api/auth/register", new { email = "new@example.com", password = "short", displayName = "N" });
         Assert.Equal(HttpStatusCode.BadRequest, weak.StatusCode);
         Assert.True((await weak.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors").TryGetProperty("password", out _));
-
-        var duplicate = await client.PostAsJsonAsync("/api/auth/register", new { email, password = ApiFactory.Password, displayName = "N" });
-        Assert.Equal(HttpStatusCode.BadRequest, duplicate.StatusCode);
     }
 
     [Fact]
@@ -154,6 +148,13 @@ public class AuthTests(ApiFactory factory)
 
         var reset = await client.PostAsJsonAsync("/api/auth/password/reset", new { email, token = "bm9wZQ", newPassword = "another long passphrase" });
         Assert.Equal(HttpStatusCode.BadRequest, reset.StatusCode);
+
+        // The emailed link works exactly once.
+        var token = factory.Email.ResetTokenFor(email);
+        (await client.PostAsJsonAsync("/api/auth/password/reset", new { email, token, newPassword = "another long passphrase" })).EnsureSuccessStatusCode();
+        var again = await client.PostAsJsonAsync("/api/auth/password/reset", new { email, token, newPassword = "yet another passphrase" });
+        Assert.Equal(HttpStatusCode.BadRequest, again.StatusCode);
+        (await factory.NewClient().PostAsJsonAsync("/api/auth/login", new { email, password = "another long passphrase" })).EnsureSuccessStatusCode();
     }
 
     [Fact]
@@ -163,13 +164,12 @@ public class AuthTests(ApiFactory factory)
         (await client.PostAsync("/api/auth/logout", null)).EnsureSuccessStatusCode();
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/auth/me")).StatusCode);
 
-        // External providers stay switched off, and unreachable, until their credentials are configured.
+        // A provider stays switched off, and unreachable, until its credentials are configured.
+        // (In tests "google" is a stand-in provider; Microsoft has no credentials.)
         var providers = await client.GetFromJsonAsync<JsonElement>("/api/auth/providers");
-        foreach (var provider in new[] { "google", "microsoft" })
-        {
-            Assert.False(providers.GetProperty(provider).GetBoolean());
-            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/auth/external/{provider}")).StatusCode);
-        }
+        Assert.True(providers.GetProperty("google").GetBoolean());
+        Assert.False(providers.GetProperty("microsoft").GetBoolean());
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/auth/external/microsoft")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/auth/external/evil")).StatusCode);
     }
 

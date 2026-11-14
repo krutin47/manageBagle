@@ -11,6 +11,8 @@ public enum ItemStatus { Planned, InProgress, Done, Skipped }
 public class AppUser : IdentityUser<Guid>
 {
     public string DisplayName { get; set; } = "";
+    /// <summary>IANA zone the person plans in. Null until first set (accounts created before the setting existed).</summary>
+    public string? TimeZoneId { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
@@ -29,7 +31,23 @@ public static class AreaColors
     public static readonly string[] All = ["teal", "blue", "violet", "rose", "orange", "amber", "green", "slate"];
 }
 
-public class TimeBlock
+/// <summary>Rows that are edited by people and so carry a version for optimistic concurrency.</summary>
+public interface IVersioned
+{
+    int Version { get; set; }
+}
+
+public class IdempotencyRecord
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public string Key { get; set; } = "";
+    public string RequestHash { get; set; } = "";
+    public string ResponseJson { get; set; } = "";
+    public DateTimeOffset ExpiresAt { get; set; }
+}
+
+public class TimeBlock : IVersioned
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
@@ -51,18 +69,29 @@ public class TimeBlock
     public BacklogTask? BacklogTask { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
-    /// <summary>An end earlier than the start means the block runs past midnight.</summary>
-    public int PlannedMinutes => PlannedMinutesBetween(Start, End);
+    /// <summary>The zone the block was planned in. It stays anchored there if the person later travels. Null on rows from before zones existed.</summary>
+    public string? TimeZoneId { get; set; }
+    /// <summary>Elapsed length, fixed when the block is scheduled (see <see cref="Domain.CivilTime"/>).</summary>
+    public int PlannedMinutes { get; set; }
+    public int Version { get; set; } = 1;
 
-    public static int PlannedMinutesBetween(TimeOnly start, TimeOnly end)
+    /// <summary>Sets when the block happens. Returns the problem instead if a clock time does not exist that day.</summary>
+    public Domain.CivilTime.Span.Nonexistent? Schedule(DateOnly date, TimeOnly start, TimeOnly end, string? timeZoneId)
     {
-        var diff = (int)(end - start).TotalMinutes; // TimeOnly subtraction already wraps past midnight
-        return diff;
+        var span = Domain.CivilTime.Measure(date, start, end, Domain.TimeZones.Find(timeZoneId));
+        if (span is Domain.CivilTime.Span.Nonexistent gap) return gap;
+        Date = date;
+        Start = start;
+        End = end;
+        TimeZoneId = timeZoneId;
+        PlannedMinutes = ((Domain.CivilTime.Span.Ok)span).Minutes;
+        return null;
     }
 }
 
-public class BacklogTask
+public class BacklogTask : IVersioned
 {
+    public int Version { get; set; } = 1;
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public string Title { get; set; } = "";

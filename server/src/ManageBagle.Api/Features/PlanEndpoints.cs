@@ -2,6 +2,10 @@ using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using ManageBagle.Api.Data;
 using ManageBagle.Api.Infrastructure;
+using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace ManageBagle.Api.Features;
@@ -26,17 +30,40 @@ public record PlanItem(
 
 public record PlanRequest([Required, MinLength(1), MaxLength(40)] PlanItem[] Items);
 
-public record PlanResponse(int TasksCreated, int BlocksBooked, int LeftInBacklog, IEnumerable<OutcomeResponse> Outcomes);
+public record PlanResponse(int TasksCreated, int BlocksBooked, int LeftInBacklog, IReadOnlyList<OutcomeResponse> Outcomes);
 
 public static class PlanEndpoints
 {
+    private static readonly JsonSerializerOptions HashJson = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions ResponseJson = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
+
     public static void MapPlanEndpoints(this IEndpointRouteBuilder app)
     {
         // "Plan my day": capture tasks, name the top three, and book the lot in one atomic save.
-        app.MapPost("/api/days/{date}/plan", async (DateOnly date, PlanRequest req, ClaimsPrincipal user, AppDbContext db) =>
+        // Replay-safe: with an Idempotency-Key header, sending the same plan twice (a double click, a
+        // retry after a dropped connection) saves it once and returns the first answer again.
+        app.MapPost("/api/days/{date}/plan", async (DateOnly date, PlanRequest req, [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+            ClaimsPrincipal user, AppDbContext db, TimeProvider clock, CancellationToken ct) =>
         {
             var uid = user.UserId();
             var items = req.Items;
+
+            string? requestHash = null;
+            if (!string.IsNullOrWhiteSpace(idempotencyKey))
+            {
+                if (idempotencyKey.Length > 64) return HttpExtensions.Invalid("Idempotency-Key", "Use a key of at most 64 characters.");
+                requestHash = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new { date, req.Items }, HashJson)));
+                var now = clock.GetUtcNow();
+                var seen = await db.IdempotencyRecords.AsNoTracking().FirstOrDefaultAsync(r => r.UserId == uid && r.Key == idempotencyKey && r.ExpiresAt > now, ct);
+                if (seen is not null)
+                {
+                    return seen.RequestHash == requestHash
+                        ? Results.Content(seen.ResponseJson, "application/json")
+                        : HttpExtensions.Problem(StatusCodes.Status409Conflict, ErrorCodes.IdempotencyKeyReused, "This request key was already used for a different plan.");
+                }
+                await db.IdempotencyRecords.Where(r => r.ExpiresAt <= now).ExecuteDeleteAsync(ct);
+            }
+            var zone = await db.TimeZoneOf(uid, ct);
 
             var ranks = items.Where(i => i.TopRank is not null).Select(i => i.TopRank!.Value).ToList();
             if (ranks.Count != ranks.Distinct().Count()) return HttpExtensions.Invalid("items", "Each top-three rank can be used once.");
@@ -84,12 +111,14 @@ public static class PlanEndpoints
 
                 if (item.Start is { } start && item.End is { } end)
                 {
-                    db.TimeBlocks.Add(new TimeBlock
+                    var block = new TimeBlock
                     {
-                        UserId = uid, Date = date, Start = start, End = end, Title = task.Title, FocusAreaId = task.FocusAreaId,
+                        UserId = uid, Title = task.Title, FocusAreaId = task.FocusAreaId,
                         Priority = task.Priority, WorkMode = task.WorkMode, IsOutside = task.IsOutside, BacklogTaskId = task.Id,
                         Notes = task.NextStep.Length > 0 ? $"Next step: {task.NextStep}" : "",
-                    });
+                    };
+                    if (block.Schedule(date, start, end, zone) is { } gap) return BlockEndpoints.NonexistentTime(gap);
+                    db.TimeBlocks.Add(block);
                     task.ScheduledDate = date;
                     booked++;
                 }
@@ -112,9 +141,20 @@ public static class PlanEndpoints
                 }
             }
 
-            await db.SaveChangesAsync(); // one transaction: the whole plan lands or none of it does
-            return Results.Ok(new PlanResponse(created, booked, items.Length - booked,
-                currentOutcomes.OrderBy(o => o.Rank).Select(DayEndpoints.ToResponse)));
-        }).RequireAuthorization().WithTags("Daily focus");
+            var response = new PlanResponse(created, booked, items.Length - booked, currentOutcomes.OrderBy(o => o.Rank).Select(DayEndpoints.ToResponse).ToList());
+            if (requestHash is not null)
+            {
+                db.IdempotencyRecords.Add(new IdempotencyRecord
+                {
+                    UserId = uid, Key = idempotencyKey!, RequestHash = requestHash,
+                    ResponseJson = JsonSerializer.Serialize(response, ResponseJson), ExpiresAt = clock.GetUtcNow().AddHours(24),
+                });
+            }
+
+            // One transaction: tasks, blocks, outcomes and the replay record land together or not at all.
+            // Two plans racing for the same day collide on a unique index and one is answered 409.
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(response);
+        }).RequireAuthorization().WithTags("Daily focus").Produces<PlanResponse>().ProducesValidationProblem().ProducesProblem(StatusCodes.Status409Conflict);
     }
 }

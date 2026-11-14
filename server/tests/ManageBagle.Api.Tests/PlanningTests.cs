@@ -8,9 +8,9 @@ namespace ManageBagle.Api.Tests;
 public class PlanningTests(ApiFactory factory)
 {
     private static object Block(string title = "Write acceptance test", string start = "09:00:00", string end = "10:30:00",
-        string date = "2026-11-16", Guid? area = null, string status = "Planned", int? actual = null) => new
+        string date = "2026-11-16", Guid? area = null, string status = "Planned", int? actual = null, int? version = null) => new
     {
-        date, start, end, title, focusAreaId = area, priority = "High", workMode = "DeepFocus", status, actualMinutes = actual, notes = "",
+        date, start, end, title, focusAreaId = area, priority = "High", workMode = "DeepFocus", status, actualMinutes = actual, notes = "", version,
     };
 
     private static async Task<JsonElement> Json(HttpResponseMessage response)
@@ -30,7 +30,7 @@ public class PlanningTests(ApiFactory factory)
         Assert.Equal(JsonValueKind.Null, created.GetProperty("actualMinutes").ValueKind);
         Assert.Equal(JsonValueKind.Null, created.GetProperty("varianceMinutes").ValueKind);
 
-        var logged = await Json(await client.PatchAsJsonAsync($"/api/blocks/{id}/progress", new { status = "Done", actualMinutes = 105 }));
+        var logged = await Json(await client.PatchAsJsonAsync($"/api/blocks/{id}/progress", new { status = "Done", actualMinutes = 105, version = 1 }));
         Assert.Equal("Done", logged.GetProperty("status").GetString());
         Assert.Equal(15, logged.GetProperty("varianceMinutes").GetInt32());
 
@@ -65,8 +65,8 @@ public class PlanningTests(ApiFactory factory)
         var id = block.GetProperty("id").GetGuid();
 
         Assert.Equal(0, (await bob.GetFromJsonAsync<JsonElement>("/api/blocks?from=2026-11-16&to=2026-11-22")).GetArrayLength());
-        Assert.Equal(HttpStatusCode.NotFound, (await bob.PutAsJsonAsync($"/api/blocks/{id}", Block("hijacked"))).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await bob.PatchAsJsonAsync($"/api/blocks/{id}/progress", new { status = "Done" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await bob.PutAsJsonAsync($"/api/blocks/{id}", Block("hijacked", version: 1))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await bob.PatchAsJsonAsync($"/api/blocks/{id}/progress", new { status = "Done", version = 1 })).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await bob.DeleteAsync($"/api/blocks/{id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await bob.DeleteAsync($"/api/areas/{aliceArea}")).StatusCode);
 
@@ -109,7 +109,7 @@ public class PlanningTests(ApiFactory factory)
         var blockId = scheduled.GetProperty("block").GetProperty("id").GetGuid();
         Assert.Equal("Compare supplier quotes", scheduled.GetProperty("block").GetProperty("title").GetString());
 
-        await Json(await client.PatchAsJsonAsync($"/api/blocks/{blockId}/progress", new { status = "Done", actualMinutes = 25 }));
+        await Json(await client.PatchAsJsonAsync($"/api/blocks/{blockId}/progress", new { status = "Done", actualMinutes = 25, version = 1 }));
         var tasks = await client.GetFromJsonAsync<JsonElement>("/api/backlog");
         Assert.Equal("Done", tasks[0].GetProperty("status").GetString());
     }
@@ -188,7 +188,7 @@ public class PlanningTests(ApiFactory factory)
 
         // One tick finishes all three views of the same piece of work: block, top-three outcome, task.
         var importer = blocks[0].GetProperty("id").GetGuid();
-        await Json(await client.PatchAsJsonAsync($"/api/blocks/{importer}/progress", new { status = "Done", actualMinutes = 80 }));
+        await Json(await client.PatchAsJsonAsync($"/api/blocks/{importer}/progress", new { status = "Done", actualMinutes = 80, version = 1 }));
         outcomes = (await client.GetFromJsonAsync<JsonElement>($"/api/days/{day}")).GetProperty("outcomes");
         Assert.Equal("Done", outcomes[0].GetProperty("status").GetString());
 

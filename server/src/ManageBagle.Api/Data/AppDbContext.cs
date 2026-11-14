@@ -15,12 +15,24 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<DailyReview> DailyReviews => Set<DailyReview>();
     public DbSet<DayTheme> DayThemes => Set<DayTheme>();
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+
+    /// <summary>Every edit to a versioned row moves its version on, so a stale writer is detected (HTTP 409).</summary>
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        foreach (var entry in ChangeTracker.Entries<IVersioned>().Where(e => e.State == EntityState.Modified))
+        {
+            entry.Entity.Version = entry.Property(e => e.Version).OriginalValue + 1;
+        }
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
 
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
 
         b.Entity<AppUser>().Property(u => u.DisplayName).HasMaxLength(80);
+        b.Entity<AppUser>().Property(u => u.TimeZoneId).HasMaxLength(64);
 
         b.Entity<FocusArea>(e =>
         {
@@ -37,7 +49,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.Priority).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.WorkMode).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
-            e.Ignore(x => x.PlannedMinutes);
+            e.Property(x => x.TimeZoneId).HasMaxLength(64);
+            e.Property(x => x.Version).IsConcurrencyToken().HasDefaultValue(1);
             e.HasIndex(x => new { x.UserId, x.Date });
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.FocusArea).WithMany().HasForeignKey(x => x.FocusAreaId).OnDelete(DeleteBehavior.SetNull);
@@ -46,6 +59,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
 
         b.Entity<BacklogTask>(e =>
         {
+            e.Property(x => x.Version).IsConcurrencyToken().HasDefaultValue(1);
             e.Property(x => x.Title).HasMaxLength(200);
             e.Property(x => x.NextStep).HasMaxLength(200);
             e.Property(x => x.Priority).HasConversion<string>().HasMaxLength(16);
@@ -74,6 +88,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.Interruptions).HasMaxLength(1000);
             e.Property(x => x.ChangeTomorrow).HasMaxLength(1000);
             e.HasIndex(x => new { x.UserId, x.Date }).IsUnique();
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<IdempotencyRecord>(e =>
+        {
+            e.Property(x => x.Key).HasMaxLength(64);
+            e.Property(x => x.RequestHash).HasMaxLength(64);
+            e.HasIndex(x => new { x.UserId, x.Key }).IsUnique();
+            e.HasIndex(x => x.ExpiresAt);
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 

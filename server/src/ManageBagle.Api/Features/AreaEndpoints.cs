@@ -74,6 +74,6 @@ public static class AreaEndpoints
     }
 
     /// <summary>True when the id is null or names one of the caller's own areas.</summary>
-    public static async Task<bool> OwnsAreaAsync(this AppDbContext db, Guid userId, Guid? areaId) =>
-        areaId is null || await db.FocusAreas.AnyAsync(a => a.Id == areaId && a.UserId == userId);
+    public static async Task<bool> OwnsAreaAsync(this AppDbContext db, Guid userId, Guid? areaId, CancellationToken ct = default) =>
+        areaId is null || await db.FocusAreas.AnyAsync(a => a.Id == areaId && a.UserId == userId, ct);
 }

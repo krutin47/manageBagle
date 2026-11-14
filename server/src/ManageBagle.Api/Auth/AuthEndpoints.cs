@@ -1,21 +1,26 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
-using System.Text;
 using System.Text.Encodings.Web;
 using ManageBagle.Api.Data;
 using ManageBagle.Api.Infrastructure;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.MicrosoftAccount;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Options;
+using ManageBagle.Api.Domain;
 
 namespace ManageBagle.Api.Auth;
 
 public record RegisterRequest(
     [Required, EmailAddress, StringLength(254)] string Email,
     [Required, StringLength(128)] string Password,
-    [Required, StringLength(80, MinimumLength = 1)] string DisplayName);
+    [Required, StringLength(80, MinimumLength = 1)] string DisplayName,
+    [StringLength(64)] string? TimeZone = null);
+
+public record ConfirmEmailRequest(Guid UserId, [Required] string Token);
 
 public record LoginRequest([Required] string Email, [Required] string Password, bool RememberMe);
 
@@ -32,9 +37,9 @@ public record CodeRequest([Required, StringLength(40)] string Code);
 /// <summary>Re-authentication for sensitive actions: the current password, or an authenticator code.</summary>
 public record ConfirmRequest(string? Password, string? Code);
 
-public record ProfileRequest([Required, StringLength(80, MinimumLength = 1)] string DisplayName);
+public record ProfileRequest([Required, StringLength(80, MinimumLength = 1)] string DisplayName, [StringLength(64)] string? TimeZone = null);
 
-public record UserResponse(Guid Id, string Email, string DisplayName, bool MfaEnabled, bool HasPassword, bool GoogleLinked, bool MicrosoftLinked, int RecoveryCodesLeft);
+public record UserResponse(Guid Id, string Email, string DisplayName, string? TimeZone, bool MfaEnabled, bool HasPassword, bool GoogleLinked, bool MicrosoftLinked, int RecoveryCodesLeft);
 
 /// <param name="Key">Name used in URLs and by the client.</param>
 /// <param name="TrustsEmailClaim">True when the provider states, per sign-in, that the email is verified.</param>
@@ -60,6 +65,11 @@ public static class AuthEndpoints
         var g = app.MapGroup("/api/auth").WithTags("Auth");
         var limited = g.MapGroup("").RequireRateLimiting("auth");
 
+        // The antiforgery token for this browser and account. The client sends it back in X-CSRF-TOKEN on
+        // every state-changing request, and fetches a new one after signing in or out.
+        g.MapGet("/csrf", (HttpContext http, IAntiforgery antiforgery) =>
+            Results.Ok(new { token = antiforgery.GetAndStoreTokens(http).RequestToken }));
+
         g.MapGet("/providers", async (IAuthenticationSchemeProvider schemes) =>
         {
             var enabled = new Dictionary<string, bool>();
@@ -73,21 +83,89 @@ public static class AuthEndpoints
             return user is null ? Results.Unauthorized() : Results.Ok(await ToResponse(users, user));
         }).RequireAuthorization();
 
-        limited.MapPost("/register", async (RegisterRequest req, UserManager<AppUser> users, SignInManager<AppUser> signIn, AppDbContext db) =>
+        limited.MapPost("/register", async (RegisterRequest req, UserManager<AppUser> users, AppDbContext db, IAppEmailSender email, AccountLinks links, IOptions<IdentityOptions> identity) =>
         {
-            var user = new AppUser { UserName = req.Email.Trim(), Email = req.Email.Trim(), DisplayName = req.DisplayName.Trim() };
-            var result = await users.CreateAsync(user, req.Password);
-            if (!result.Succeeded) return IdentityProblem(result);
+            var address = req.Email.Trim();
+            // Password rules are not a secret, so those errors are reported whether or not the address is known.
+            var probe = new AppUser { UserName = address, Email = address };
+            foreach (var validator in users.PasswordValidators)
+            {
+                var check = await validator.ValidateAsync(users, probe, req.Password);
+                if (!check.Succeeded) return IdentityProblem(check);
+            }
 
-            DefaultData.AddFor(db, user.Id);
-            await db.SaveChangesAsync();
-            await signIn.SignInAsync(user, isPersistent: false);
-            return Results.Ok(await ToResponse(users, user));
+            var existing = await users.FindByEmailAsync(address);
+            if (existing is null)
+            {
+                var user = new AppUser { UserName = address, Email = address, DisplayName = req.DisplayName.Trim(), TimeZoneId = TimeZones.Normalize(req.TimeZone) };
+                var result = await users.CreateAsync(user, req.Password);
+                if (!result.Succeeded) return IdentityProblem(result);
+                DefaultData.AddFor(db, user.Id);
+                await db.SaveChangesAsync();
+                await links.SendConfirmationAsync(users, email, user);
+                Audit.Log(app, "account_created", user.Id);
+            }
+            else if (!existing.EmailConfirmed)
+            {
+                await links.SendConfirmationAsync(users, email, existing);
+            }
+            else
+            {
+                var (subject, body) = EmailTemplates.AlreadyRegistered(existing.DisplayName, links.Url("/login"));
+                await email.SendAsync(existing.Email!, subject, body);
+            }
+
+            // The same answer in every case: this endpoint must not reveal which addresses have accounts.
+            return Results.Accepted(value: new { status = "confirmation_sent" });
         });
 
-        limited.MapPost("/login", async (LoginRequest req, SignInManager<AppUser> signIn) =>
+        limited.MapPost("/email/confirm", async (ConfirmEmailRequest req, UserManager<AppUser> users, SignInManager<AppUser> signIn) =>
         {
+            var invalid = HttpExtensions.Problem(400, "invalid_token", "This confirmation link is invalid or has expired. Ask for a new one.");
+            var user = await users.FindByIdAsync(req.UserId.ToString());
+            if (user is null || !AccountLinks.TryDecode(req.Token, out var token)) return invalid;
+            if (!user.EmailConfirmed)
+            {
+                var result = await users.ConfirmEmailAsync(user, token);
+                if (!result.Succeeded) return invalid;
+                Audit.Log(app, "email_confirmed", user.Id);
+            }
+            else if (!await users.VerifyUserTokenAsync(user, users.Options.Tokens.EmailConfirmationTokenProvider, UserManager<AppUser>.ConfirmEmailTokenPurpose, token))
+            {
+                return invalid;
+            }
+
+            // Opening the link proves the mailbox. That is enough to sign in — unless two-step
+            // verification is on, which a mailbox alone must never bypass.
+            if (await users.GetTwoFactorEnabledAsync(user)) return Results.Ok(new { status = "confirmed" });
+            await signIn.SignInAsync(user, isPersistent: false);
+            return Results.Ok(new { status = "signed_in" });
+        });
+
+        limited.MapPost("/email/resend", async (ForgotPasswordRequest req, UserManager<AppUser> users, IAppEmailSender email, AccountLinks links) =>
+        {
+            var user = await users.FindByEmailAsync(req.Email.Trim());
+            if (user is { EmailConfirmed: false }) await links.SendConfirmationAsync(users, email, user);
+            return Results.Accepted();
+        });
+
+        limited.MapPost("/login", async (LoginRequest req, SignInManager<AppUser> signIn, UserManager<AppUser> users) =>
+        {
+            var user = await users.FindByEmailAsync(req.Email.Trim());
+            if (user is { EmailConfirmed: false })
+            {
+                // Only someone who knows the password learns that the address is waiting for confirmation.
+                if (await users.IsLockedOutAsync(user)) return SignInOutcome(Microsoft.AspNetCore.Identity.SignInResult.LockedOut);
+                if (await users.CheckPasswordAsync(user, req.Password))
+                {
+                    return HttpExtensions.Problem(403, "email_unconfirmed", "Confirm your email address first. Check your inbox for the link, or ask for a new one.");
+                }
+                await users.AccessFailedAsync(user);
+                return SignInOutcome(Microsoft.AspNetCore.Identity.SignInResult.Failed);
+            }
+
             var result = await signIn.PasswordSignInAsync(req.Email.Trim(), req.Password, req.RememberMe, lockoutOnFailure: true);
+            if (user is not null) Audit.Log(app, result.Succeeded ? "sign_in" : result.RequiresTwoFactor ? "sign_in_needs_mfa" : "sign_in_failed", user.Id);
             return SignInOutcome(result);
         });
 
@@ -113,89 +191,134 @@ public static class AuthEndpoints
         });
 
         // ---- External providers (Google, Microsoft; an OIDC SSO provider would be one more entry) ----
+        //
+        // An outside identity is attached to an account in exactly two ways:
+        //   - it creates a brand-new account, or
+        //   - the signed-in owner of an existing account links it from Settings after re-entering
+        //     their password or an authenticator code.
+        // A matching email address alone never attaches anything and never changes credentials.
 
-        g.MapGet("/external/{provider}", async (string provider, string? returnUrl, SignInManager<AppUser> signIn, IAuthenticationSchemeProvider schemes) =>
+        g.MapGet("/external/{provider}", async (string provider, string? returnUrl, string? link, ClaimsPrincipal principal,
+            SignInManager<AppUser> signIn, IAuthenticationSchemeProvider schemes, AccountLinks links) =>
         {
             var known = ExternalProviders.Find(provider);
             if (known is null || await schemes.GetSchemeAsync(known.Scheme) is null) return Results.NotFound();
+
             var callback = "/api/auth/external-callback?returnUrl=" + UrlEncoder.Default.Encode(SafeReturnUrl(returnUrl));
+            if (link is not null)
+            {
+                if (!links.IsValidLinkTicket(link, principal, known.Key)) return Results.Redirect("/settings?error=link_expired");
+                callback += "&link=" + UrlEncoder.Default.Encode(link);
+            }
             var props = signIn.ConfigureExternalAuthenticationProperties(known.Scheme, callback);
             return Results.Challenge(props, [known.Scheme]);
         });
 
-        g.MapGet("/external-callback", async (string? returnUrl, string? remoteError, SignInManager<AppUser> signIn,
-            UserManager<AppUser> users, AppDbContext db, ILoggerFactory logs) =>
+        g.MapGet("/external-callback", async (string? returnUrl, string? remoteError, string? link, HttpContext http, SignInManager<AppUser> signIn,
+            UserManager<AppUser> users, AppDbContext db, IAppEmailSender email, AccountLinks links) =>
         {
-            var log = logs.CreateLogger("Auth.External");
             var info = remoteError is null ? await signIn.GetExternalLoginInfoAsync() : null;
             var known = info is null ? null : ExternalProviders.All.FirstOrDefault(p => p.Scheme == info.LoginProvider);
             if (info is null || known is null) return Results.Redirect("/login?error=external_failed");
 
+            // ---- Explicit linking, started from Settings by the signed-in owner ----
+            if (link is not null)
+            {
+                await http.SignOutAsync(IdentityConstants.ExternalScheme);
+                var current = await users.GetUserAsync(http.User);
+                if (current is null || !links.IsValidLinkTicket(link, http.User, known.Key)) return Results.Redirect("/settings?error=link_expired");
+                if (await users.FindByLoginAsync(info.LoginProvider, info.ProviderKey) is not null) return Results.Redirect("/settings?error=link_in_use");
+                var added = await users.AddLoginAsync(current, info);
+                if (!added.Succeeded) return Results.Redirect("/settings?error=link_failed");
+                Audit.Log(app, "external_login_linked", current.Id, known.Key);
+                return Results.Redirect($"/settings?linked={known.Key}");
+            }
+
+            // ---- Ordinary sign-in ----
             var result = await signIn.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: false, bypassTwoFactor: false);
+            if (result.Succeeded) return Results.Redirect(SafeReturnUrl(returnUrl));
             if (result.RequiresTwoFactor) return Results.Redirect("/login/verify");
             if (result.IsLockedOut) return Results.Redirect("/login?error=locked");
 
-            if (!result.Succeeded)
+            var linkedUser = await users.FindByLoginAsync(info.LoginProvider, info.ProviderKey);
+            if (linkedUser is not null)
             {
-                var email = info.Principal.FindFirstValue(ClaimTypes.Email);
-                if (string.IsNullOrEmpty(email)) return Results.Redirect("/login?error=external_no_email");
-
-                // Only some providers prove the person owns the mailbox. Google says so per sign-in;
-                // Microsoft work/school directories can carry any address, so theirs is never trusted.
-                var emailProven = known.TrustsEmailClaim &&
-                    string.Equals(info.Principal.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase);
-                if (known.TrustsEmailClaim && !emailProven) return Results.Redirect("/login?error=external_unverified");
-
-                var user = await users.FindByEmailAsync(email);
-                if (user is null)
-                {
-                    user = new AppUser
-                    {
-                        UserName = email, Email = email, EmailConfirmed = emailProven,
-                        DisplayName = info.Principal.FindFirstValue(ClaimTypes.GivenName)
-                                      ?? info.Principal.FindFirstValue(ClaimTypes.Name) ?? email.Split('@')[0],
-                    };
-                    var created = await users.CreateAsync(user);
-                    if (!created.Succeeded) return Results.Redirect("/login?error=external_failed");
-                    DefaultData.AddFor(db, user.Id);
-                    await db.SaveChangesAsync();
-                }
-                else if (!emailProven)
-                {
-                    // Without proof of the mailbox we never attach a new sign-in method to an existing account.
-                    return Results.Redirect("/login?error=external_account_exists");
-                }
-                else if (!user.EmailConfirmed)
-                {
-                    // The account's address was never proven, so whoever created it may not own the
-                    // mailbox. None of its earlier ways in may survive the link to a proven identity.
-                    await users.RemovePasswordAsync(user);
-                    await users.SetTwoFactorEnabledAsync(user, false);
-                    await users.ResetAuthenticatorKeyAsync(user);
-                    foreach (var old in await users.GetLoginsAsync(user))
-                    {
-                        await users.RemoveLoginAsync(user, old.LoginProvider, old.ProviderKey);
-                    }
-                    user.EmailConfirmed = true;
-                    await users.UpdateAsync(user);
-                    await users.UpdateSecurityStampAsync(user);
-                    log.LogWarning("Unproven credentials removed while linking {Provider} for user {UserId}.", known.Scheme, user.Id);
-                }
-
-                var linked = await users.AddLoginAsync(user, info);
-                if (!linked.Succeeded) return Results.Redirect("/login?error=external_failed");
-
-                result = await signIn.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: false, bypassTwoFactor: false);
-                if (result.RequiresTwoFactor) return Results.Redirect("/login/verify");
-                if (!result.Succeeded) return Results.Redirect("/login?error=external_failed");
+                // The identity is known but the account's email is still unconfirmed.
+                await http.SignOutAsync(IdentityConstants.ExternalScheme);
+                await links.SendConfirmationAsync(users, email, linkedUser);
+                return Results.Redirect("/login?notice=confirm_email");
             }
 
-            return Results.Redirect(SafeReturnUrl(returnUrl));
+            var address = info.Principal.FindFirstValue(ClaimTypes.Email);
+            if (string.IsNullOrEmpty(address)) return Results.Redirect("/login?error=external_no_email");
+            if (await users.FindByEmailAsync(address) is not null)
+            {
+                // Never attach to, or alter, an existing account from here. The owner links it in Settings.
+                return Results.Redirect("/login?error=external_account_exists");
+            }
+
+            // Only some providers prove the mailbox. Google says so per sign-in; Microsoft work/school
+            // directories can carry any address, so an account created through them confirms by email.
+            var emailProven = known.TrustsEmailClaim &&
+                string.Equals(info.Principal.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase);
+            var user = new AppUser
+            {
+                UserName = address, Email = address, EmailConfirmed = emailProven,
+                DisplayName = info.Principal.FindFirstValue(ClaimTypes.GivenName) ?? info.Principal.FindFirstValue(ClaimTypes.Name) ?? address.Split('@')[0],
+            };
+            if (!(await users.CreateAsync(user)).Succeeded) return Results.Redirect("/login?error=external_failed");
+            DefaultData.AddFor(db, user.Id);
+            await db.SaveChangesAsync();
+            if (!(await users.AddLoginAsync(user, info)).Succeeded) return Results.Redirect("/login?error=external_failed");
+            Audit.Log(app, "account_created", user.Id, known.Key);
+
+            if (!emailProven)
+            {
+                await http.SignOutAsync(IdentityConstants.ExternalScheme);
+                await links.SendConfirmationAsync(users, email, user);
+                return Results.Redirect("/login?notice=confirm_email");
+            }
+            result = await signIn.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: false, bypassTwoFactor: false);
+            return Results.Redirect(result.Succeeded ? SafeReturnUrl(returnUrl) : "/login?error=external_failed");
         });
 
         // ---- Passwords -------------------------------------------------------------------------
 
         var authed = limited.MapGroup("").RequireAuthorization();
+
+        // Step-up: prove it is you (password or authenticator code), receive a 5-minute ticket to link.
+        authed.MapPost("/external/{provider}/link", async (string provider, ConfirmRequest req, ClaimsPrincipal principal, UserManager<AppUser> users,
+            IAuthenticationSchemeProvider schemes, AccountLinks links) =>
+        {
+            var known = ExternalProviders.Find(provider);
+            if (known is null || await schemes.GetSchemeAsync(known.Scheme) is null) return Results.NotFound();
+            var user = (await users.GetUserAsync(principal))!;
+            if (!await users.HasPasswordAsync(user) && !await users.GetTwoFactorEnabledAsync(user))
+            {
+                return HttpExtensions.Problem(409, "step_up_unavailable", "Set a password first, so we can confirm it is you before linking another account.");
+            }
+            if (!await Confirm(users, user, req)) return ConfirmFailed();
+            return Results.Ok(new { url = $"/api/auth/external/{known.Key}?link={Uri.EscapeDataString(links.CreateLinkTicket(user.Id, known.Key))}&returnUrl=%2Fsettings" });
+        });
+
+        authed.MapPost("/external/{provider}/unlink", async (string provider, ConfirmRequest req, ClaimsPrincipal principal, UserManager<AppUser> users, SignInManager<AppUser> signIn) =>
+        {
+            var known = ExternalProviders.Find(provider);
+            if (known is null) return Results.NotFound();
+            var user = (await users.GetUserAsync(principal))!;
+            var logins = await users.GetLoginsAsync(user);
+            var login = logins.FirstOrDefault(l => l.LoginProvider == known.Scheme);
+            if (login is null) return Results.NotFound();
+            if (!await users.HasPasswordAsync(user) && logins.Count == 1)
+            {
+                return HttpExtensions.Problem(409, "last_sign_in_method", "This is your only way to sign in. Set a password before disconnecting it.");
+            }
+            if (!await Confirm(users, user, req)) return ConfirmFailed();
+            await users.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey);
+            await signIn.RefreshSignInAsync(user);
+            Audit.Log(app, "external_login_unlinked", user.Id, known.Key);
+            return Results.NoContent();
+        });
 
         authed.MapPost("/password", async (ChangePasswordRequest req, ClaimsPrincipal principal, UserManager<AppUser> users, SignInManager<AppUser> signIn) =>
         {
@@ -205,20 +328,19 @@ public static class AuthEndpoints
                 : await users.AddPasswordAsync(user, req.NewPassword);
             if (!result.Succeeded) return IdentityProblem(result);
             await signIn.RefreshSignInAsync(user);
+            Audit.Log(app, "password_changed", user.Id);
             return Results.NoContent();
         });
 
-        limited.MapPost("/password/forgot", async (ForgotPasswordRequest req, UserManager<AppUser> users, IAppEmailSender email, IConfiguration config, HttpContext http) =>
+        limited.MapPost("/password/forgot", async (ForgotPasswordRequest req, UserManager<AppUser> users, IAppEmailSender email, AccountLinks links) =>
         {
             // Always answer the same way so the endpoint cannot be used to discover accounts.
             var user = await users.FindByEmailAsync(req.Email.Trim());
             if (user is not null)
             {
-                var token = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(await users.GeneratePasswordResetTokenAsync(user)));
-                var origin = config["App:PublicUrl"]?.TrimEnd('/') ?? $"{http.Request.Scheme}://{http.Request.Host}";
-                var link = $"{origin}/reset-password?email={Uri.EscapeDataString(user.Email!)}&token={token}";
-                await email.SendAsync(user.Email!, "Reset your manageBagle password",
-                    $"Hi {user.DisplayName},\n\nUse this link to choose a new password. It expires in 2 hours.\n\n{link}\n\nIf you did not ask for this, you can ignore this email.");
+                var token = AccountLinks.Encode(await users.GeneratePasswordResetTokenAsync(user));
+                var (subject, body) = EmailTemplates.ResetPassword(user.DisplayName, links.Url($"/reset-password?email={Uri.EscapeDataString(user.Email!)}&token={token}"));
+                await email.SendAsync(user.Email!, subject, body);
             }
             return Results.Accepted();
         });
@@ -228,9 +350,7 @@ public static class AuthEndpoints
             var invalid = HttpExtensions.Problem(400, "invalid_token", "This reset link is invalid or has expired. Request a new one.");
             var user = await users.FindByEmailAsync(req.Email.Trim());
             if (user is null) return invalid;
-            string token;
-            try { token = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(req.Token)); }
-            catch (FormatException) { return invalid; }
+            if (!AccountLinks.TryDecode(req.Token, out var token)) return invalid;
 
             var result = await users.ResetPasswordAsync(user, token, req.NewPassword);
             if (!result.Succeeded)
@@ -244,6 +364,7 @@ public static class AuthEndpoints
                 await users.UpdateAsync(user);
             }
             await users.SetLockoutEndDateAsync(user, null);
+            Audit.Log(app, "password_reset", user.Id);
             return Results.NoContent();
         });
 
@@ -277,6 +398,7 @@ public static class AuthEndpoints
             await users.SetTwoFactorEnabledAsync(user, true);
             var codes = await users.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
             await signIn.RefreshSignInAsync(user);
+            Audit.Log(app, "mfa_enabled", user.Id);
             return Results.Ok(new { recoveryCodes = codes });
         });
 
@@ -288,6 +410,7 @@ public static class AuthEndpoints
             await users.ResetAuthenticatorKeyAsync(user);
             await signIn.ForgetTwoFactorClientAsync();
             await signIn.RefreshSignInAsync(user);
+            Audit.Log(app, "mfa_disabled", user.Id);
             return Results.NoContent();
         });
 
@@ -309,6 +432,11 @@ public static class AuthEndpoints
         {
             var user = (await users.GetUserAsync(principal))!;
             user.DisplayName = req.DisplayName.Trim();
+            if (req.TimeZone is not null)
+            {
+                if (TimeZones.Normalize(req.TimeZone) is not { } zone) return HttpExtensions.Invalid("timeZone", "That is not a time zone we recognise.");
+                user.TimeZoneId = zone;
+            }
             await users.UpdateAsync(user);
             return Results.Ok(await ToResponse(users, user));
         }).RequireAuthorization();
@@ -368,7 +496,7 @@ public static class AuthEndpoints
         var logins = await users.GetLoginsAsync(user);
         var mfa = await users.GetTwoFactorEnabledAsync(user);
         return new UserResponse(
-            user.Id, user.Email!, user.DisplayName, mfa,
+            user.Id, user.Email!, user.DisplayName, user.TimeZoneId, mfa,
             await users.HasPasswordAsync(user),
             logins.Any(l => l.LoginProvider == GoogleDefaults.AuthenticationScheme),
             logins.Any(l => l.LoginProvider == MicrosoftAccountDefaults.AuthenticationScheme),
