@@ -177,6 +177,9 @@ public static class Versioning
                 "This was changed somewhere else since you loaded it. Reload to see the latest version.");
         }
         db.Entry(entity).Property(e => e.Version).OriginalValue = expected.Value;
+        // Moved on here rather than left to change tracking, so that even a save that alters nothing
+        // else still claims the version: of several writers holding the same version, exactly one wins.
+        entity.Version = expected.Value + 1;
         return null;
     }
 

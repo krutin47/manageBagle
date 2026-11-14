@@ -20,7 +20,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Every edit to a versioned row moves its version on, so a stale writer is detected (HTTP 409).</summary>
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
-        foreach (var entry in ChangeTracker.Entries<IVersioned>().Where(e => e.State == EntityState.Modified))
+        // Rows changed as a side effect (a task finished because its block was) move on here; rows
+        // edited through an endpoint already claimed their next version in Versioning.Check.
+        foreach (var entry in ChangeTracker.Entries<IVersioned>().Where(e => e.State == EntityState.Modified && !e.Property(v => v.Version).IsModified))
         {
             entry.Entity.Version = entry.Property(e => e.Version).OriginalValue + 1;
         }

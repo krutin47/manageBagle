@@ -102,6 +102,8 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     }
 }
 
+public record ConfirmEmail(Guid UserId, string Token);
+
 public sealed partial class CapturedEmail : IAppEmailSender
 {
     public ConcurrentQueue<(string To, string Subject, string Body)> Sent { get; } = new();
@@ -115,11 +117,11 @@ public sealed partial class CapturedEmail : IAppEmailSender
     public IEnumerable<(string To, string Subject, string Body)> To(string address) => Sent.Where(m => m.To == address);
 
     /// <summary>The body the confirmation page would post, taken from the newest confirmation email.</summary>
-    public object ConfirmationFor(string address)
+    public ConfirmEmail ConfirmationFor(string address)
     {
         var body = To(address).Last(m => m.Subject.StartsWith("Confirm")).Body;
         var match = ConfirmLink().Match(body);
-        return new { userId = Guid.Parse(match.Groups[1].Value), token = match.Groups[2].Value };
+        return new ConfirmEmail(Guid.Parse(match.Groups[1].Value), match.Groups[2].Value);
     }
 
     public string ResetTokenFor(string address) => ResetLink().Match(To(address).Last(m => m.Subject.StartsWith("Reset")).Body).Groups[1].Value;
@@ -166,6 +168,8 @@ public static class FakeProvider
         start.Headers.Add("X-Fake-Verified", verified ? "true" : "false");
         var toCallback = await client.SendAsync(start);
         if (toCallback.Headers.Location is null) return $"{(int)toCallback.StatusCode}";
+        // Refused before reaching the provider: the app sent the browser straight back to a page.
+        if (!toCallback.Headers.Location.ToString().StartsWith("/api/")) return toCallback.Headers.Location.ToString();
         var final = await client.GetAsync(toCallback.Headers.Location);
         return final.Headers.Location?.ToString() ?? $"{(int)final.StatusCode}";
     }
