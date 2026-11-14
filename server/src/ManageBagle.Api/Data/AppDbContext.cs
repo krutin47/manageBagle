@@ -50,6 +50,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.NextStep).HasMaxLength(200);
             e.Property(x => x.Priority).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.WorkMode).HasConversion<string>().HasMaxLength(16).HasDefaultValue(WorkMode.DeepFocus);
             e.HasIndex(x => new { x.UserId, x.Status });
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.FocusArea).WithMany().HasForeignKey(x => x.FocusAreaId).OnDelete(DeleteBehavior.SetNull);
@@ -61,6 +62,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.NextAction).HasMaxLength(200);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
             e.HasIndex(x => new { x.UserId, x.Date, x.Rank }).IsUnique();
+            e.HasOne(x => x.BacklogTask).WithMany().HasForeignKey(x => x.BacklogTaskId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.FocusArea).WithMany().HasForeignKey(x => x.FocusAreaId).OnDelete(DeleteBehavior.SetNull);
         });

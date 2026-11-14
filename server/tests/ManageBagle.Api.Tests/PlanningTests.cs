@@ -147,4 +147,84 @@ public class PlanningTests(ApiFactory factory)
         Assert.Equal("Shipping day", themes[0].GetProperty("primaryFocus").GetString());
         Assert.Equal("Sunday", themes[6].GetProperty("day").GetString());
     }
+
+    [Fact]
+    public async Task Plan_my_day_captures_tasks_books_them_and_names_the_top_three()
+    {
+        var (client, _) = await factory.NewUserAsync();
+        const string day = "2026-11-18";
+        var existing = await Json(await client.PostAsJsonAsync("/api/backlog", new { title = "Renew passport", priority = "Low", status = "Planned" }));
+
+        var plan = await Json(await client.PostAsJsonAsync($"/api/days/{day}/plan", new
+        {
+            items = new object[]
+            {
+                new { title = "Ship the importer", estimatedMinutes = 90, workMode = "DeepFocus", priority = "Medium", topRank = 1, start = "09:00:00", end = "10:30:00" },
+                new { taskId = existing.GetProperty("id").GetGuid(), title = "Renew passport", estimatedMinutes = 40, workMode = "Personal", isOutside = true, priority = "Low", topRank = 2, start = "10:35:00", end = "11:25:00" },
+                new { title = "Sort the garage", estimatedMinutes = 120, workMode = "Personal", priority = "Low" },
+            },
+        }));
+        Assert.Equal(2, plan.GetProperty("tasksCreated").GetInt32());
+        Assert.Equal(2, plan.GetProperty("blocksBooked").GetInt32());
+        Assert.Equal(1, plan.GetProperty("leftInBacklog").GetInt32());
+
+        var blocks = await client.GetFromJsonAsync<JsonElement>($"/api/blocks?from={day}&to={day}");
+        Assert.Equal(2, blocks.GetArrayLength());
+        Assert.True(blocks[1].GetProperty("isOutside").GetBoolean());
+        Assert.Equal(50, blocks[1].GetProperty("plannedMinutes").GetInt32()); // 40 estimated + the buffer the client added
+
+        var tasks = await client.GetFromJsonAsync<JsonElement>("/api/backlog");
+        Assert.Equal(3, tasks.GetArrayLength()); // the existing task was reused, not duplicated
+        var garage = tasks.EnumerateArray().Single(t => t.GetProperty("title").GetString() == "Sort the garage");
+        Assert.Equal(JsonValueKind.Null, garage.GetProperty("scheduledDate").ValueKind);
+
+        var outcomes = (await client.GetFromJsonAsync<JsonElement>($"/api/days/{day}")).GetProperty("outcomes");
+        Assert.Equal("Ship the importer", outcomes[0].GetProperty("result").GetString());
+        Assert.Equal("Renew passport", outcomes[1].GetProperty("result").GetString());
+
+        // One tick finishes all three views of the same piece of work: block, top-three outcome, task.
+        var importer = blocks[0].GetProperty("id").GetGuid();
+        await Json(await client.PatchAsJsonAsync($"/api/blocks/{importer}/progress", new { status = "Done", actualMinutes = 80 }));
+        outcomes = (await client.GetFromJsonAsync<JsonElement>($"/api/days/{day}")).GetProperty("outcomes");
+        Assert.Equal("Done", outcomes[0].GetProperty("status").GetString());
+
+        // …and the other way round: ticking the outcome finishes its block and task.
+        await Json(await client.PutAsJsonAsync($"/api/days/{day}/outcomes/2", new { result = "Renew passport", status = "Done" }));
+        blocks = await client.GetFromJsonAsync<JsonElement>($"/api/blocks?from={day}&to={day}");
+        Assert.Equal("Done", blocks[1].GetProperty("status").GetString());
+        Assert.Equal(50, blocks[1].GetProperty("actualMinutes").GetInt32());
+        tasks = await client.GetFromJsonAsync<JsonElement>("/api/backlog");
+        Assert.Equal(2, tasks.EnumerateArray().Count(t => t.GetProperty("status").GetString() == "Done"));
+    }
+
+    [Fact]
+    public async Task A_plan_is_all_or_nothing_and_cannot_touch_another_users_tasks()
+    {
+        var (alice, _) = await factory.NewUserAsync();
+        var (bob, _) = await factory.NewUserAsync();
+        var aliceTask = (await Json(await alice.PostAsJsonAsync("/api/backlog", new { title = "Private", priority = "Low", status = "Planned" }))).GetProperty("id").GetGuid();
+
+        var stolen = await bob.PostAsJsonAsync("/api/days/2026-11-18/plan", new
+        {
+            items = new object[]
+            {
+                new { title = "Fine", estimatedMinutes = 30, workMode = "DeepFocus", priority = "Low", start = "09:00:00", end = "09:30:00" },
+                new { taskId = aliceTask, title = "Renamed by Bob", estimatedMinutes = 30, workMode = "DeepFocus", priority = "Low" },
+            },
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, stolen.StatusCode);
+        Assert.Equal(0, (await bob.GetFromJsonAsync<JsonElement>("/api/backlog")).GetArrayLength());
+        Assert.Equal(0, (await bob.GetFromJsonAsync<JsonElement>("/api/blocks?from=2026-11-18&to=2026-11-18")).GetArrayLength());
+        Assert.Equal("Private", (await alice.GetFromJsonAsync<JsonElement>("/api/backlog"))[0].GetProperty("title").GetString());
+
+        var twoFirsts = await bob.PostAsJsonAsync("/api/days/2026-11-18/plan", new
+        {
+            items = new object[]
+            {
+                new { title = "A", estimatedMinutes = 30, workMode = "DeepFocus", priority = "Low", topRank = 1 },
+                new { title = "B", estimatedMinutes = 30, workMode = "DeepFocus", priority = "Low", topRank = 1 },
+            },
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, twoFirsts.StatusCode);
+    }
 }

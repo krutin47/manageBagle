@@ -31,7 +31,7 @@ public static class SecurityMiddleware
         h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
         h.ContentSecurityPolicy =
             "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; " +
-            "script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com";
+            "script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
         if (ctx.Request.Path.StartsWithSegments("/api"))
         {
             h.CacheControl = "no-store";

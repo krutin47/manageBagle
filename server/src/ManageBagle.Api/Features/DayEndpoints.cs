@@ -13,7 +13,7 @@ public record OutcomeRequest(
     ItemStatus Status,
     [Range(5, 1440)] int? MinutesNeeded);
 
-public record OutcomeResponse(int Rank, string Result, Guid? FocusAreaId, string NextAction, ItemStatus Status, int? MinutesNeeded);
+public record OutcomeResponse(int Rank, string Result, Guid? FocusAreaId, string NextAction, ItemStatus Status, int? MinutesNeeded, Guid? BacklogTaskId);
 
 public record ReviewRequest([StringLength(1000)] string? BiggestWin, [StringLength(1000)] string? Interruptions, [StringLength(1000)] string? ChangeTomorrow);
 
@@ -57,6 +57,19 @@ public static class DayEndpoints
             outcome.NextAction = req.NextAction?.Trim() ?? "";
             outcome.Status = req.Status;
             outcome.MinutesNeeded = req.MinutesNeeded;
+
+            // An outcome that came from a planned task carries that day's blocks and the task with it.
+            if (outcome.BacklogTaskId is { } taskId && req.Status == ItemStatus.Done)
+            {
+                var task = await db.BacklogTasks.FirstOrDefaultAsync(t => t.Id == taskId && t.UserId == uid);
+                if (task is not null) task.Status = ItemStatus.Done;
+                var blocks = await db.TimeBlocks.Where(b => b.UserId == uid && b.Date == date && b.BacklogTaskId == taskId).ToListAsync();
+                foreach (var block in blocks)
+                {
+                    block.Status = ItemStatus.Done;
+                    block.ActualMinutes ??= block.PlannedMinutes;
+                }
+            }
             await db.SaveChangesAsync();
             return Results.Ok(ToResponse(outcome));
         });
@@ -117,5 +130,5 @@ public static class DayEndpoints
         DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday,
     ];
 
-    private static OutcomeResponse ToResponse(DailyOutcome o) => new(o.Rank, o.Result, o.FocusAreaId, o.NextAction, o.Status, o.MinutesNeeded);
+    internal static OutcomeResponse ToResponse(DailyOutcome o) => new(o.Rank, o.Result, o.FocusAreaId, o.NextAction, o.Status, o.MinutesNeeded, o.BacklogTaskId);
 }

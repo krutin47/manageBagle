@@ -6,6 +6,7 @@ using ManageBagle.Api.Data;
 using ManageBagle.Api.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.Authentication.MicrosoftAccount;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 
@@ -33,7 +34,22 @@ public record ConfirmRequest(string? Password, string? Code);
 
 public record ProfileRequest([Required, StringLength(80, MinimumLength = 1)] string DisplayName);
 
-public record UserResponse(Guid Id, string Email, string DisplayName, bool MfaEnabled, bool HasPassword, bool GoogleLinked, int RecoveryCodesLeft);
+public record UserResponse(Guid Id, string Email, string DisplayName, bool MfaEnabled, bool HasPassword, bool GoogleLinked, bool MicrosoftLinked, int RecoveryCodesLeft);
+
+/// <param name="Key">Name used in URLs and by the client.</param>
+/// <param name="TrustsEmailClaim">True when the provider states, per sign-in, that the email is verified.</param>
+public record ExternalProvider(string Key, string Scheme, bool TrustsEmailClaim);
+
+public static class ExternalProviders
+{
+    public static readonly ExternalProvider[] All =
+    [
+        new("google", GoogleDefaults.AuthenticationScheme, TrustsEmailClaim: true),
+        new("microsoft", MicrosoftAccountDefaults.AuthenticationScheme, TrustsEmailClaim: false),
+    ];
+
+    public static ExternalProvider? Find(string key) => All.FirstOrDefault(p => p.Key == key);
+}
 
 public static class AuthEndpoints
 {
@@ -45,7 +61,11 @@ public static class AuthEndpoints
         var limited = g.MapGroup("").RequireRateLimiting("auth");
 
         g.MapGet("/providers", async (IAuthenticationSchemeProvider schemes) =>
-            Results.Ok(new { google = await schemes.GetSchemeAsync(GoogleDefaults.AuthenticationScheme) is not null }));
+        {
+            var enabled = new Dictionary<string, bool>();
+            foreach (var p in ExternalProviders.All) enabled[p.Key] = await schemes.GetSchemeAsync(p.Scheme) is not null;
+            return Results.Ok(enabled);
+        });
 
         g.MapGet("/me", async (ClaimsPrincipal principal, UserManager<AppUser> users) =>
         {
@@ -92,22 +112,24 @@ public static class AuthEndpoints
             return Results.NoContent();
         });
 
-        // ---- Google ----------------------------------------------------------------------------
+        // ---- External providers (Google, Microsoft; an OIDC SSO provider would be one more entry) ----
 
-        g.MapGet("/external/google", async (string? returnUrl, SignInManager<AppUser> signIn, IAuthenticationSchemeProvider schemes) =>
+        g.MapGet("/external/{provider}", async (string provider, string? returnUrl, SignInManager<AppUser> signIn, IAuthenticationSchemeProvider schemes) =>
         {
-            if (await schemes.GetSchemeAsync(GoogleDefaults.AuthenticationScheme) is null) return Results.NotFound();
-            var callback = "/api/auth/external/callback?returnUrl=" + UrlEncoder.Default.Encode(SafeReturnUrl(returnUrl));
-            var props = signIn.ConfigureExternalAuthenticationProperties(GoogleDefaults.AuthenticationScheme, callback);
-            return Results.Challenge(props, [GoogleDefaults.AuthenticationScheme]);
+            var known = ExternalProviders.Find(provider);
+            if (known is null || await schemes.GetSchemeAsync(known.Scheme) is null) return Results.NotFound();
+            var callback = "/api/auth/external-callback?returnUrl=" + UrlEncoder.Default.Encode(SafeReturnUrl(returnUrl));
+            var props = signIn.ConfigureExternalAuthenticationProperties(known.Scheme, callback);
+            return Results.Challenge(props, [known.Scheme]);
         });
 
-        g.MapGet("/external/callback", async (string? returnUrl, string? remoteError, SignInManager<AppUser> signIn,
+        g.MapGet("/external-callback", async (string? returnUrl, string? remoteError, SignInManager<AppUser> signIn,
             UserManager<AppUser> users, AppDbContext db, ILoggerFactory logs) =>
         {
             var log = logs.CreateLogger("Auth.External");
             var info = remoteError is null ? await signIn.GetExternalLoginInfoAsync() : null;
-            if (info is null) return Results.Redirect("/login?error=google_failed");
+            var known = info is null ? null : ExternalProviders.All.FirstOrDefault(p => p.Scheme == info.LoginProvider);
+            if (info is null || known is null) return Results.Redirect("/login?error=external_failed");
 
             var result = await signIn.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: false, bypassTwoFactor: false);
             if (result.RequiresTwoFactor) return Results.Redirect("/login/verify");
@@ -116,44 +138,56 @@ public static class AuthEndpoints
             if (!result.Succeeded)
             {
                 var email = info.Principal.FindFirstValue(ClaimTypes.Email);
-                var verified = info.Principal.FindFirstValue("email_verified");
-                if (string.IsNullOrEmpty(email) || !string.Equals(verified, "true", StringComparison.OrdinalIgnoreCase))
-                {
-                    return Results.Redirect("/login?error=google_unverified");
-                }
+                if (string.IsNullOrEmpty(email)) return Results.Redirect("/login?error=external_no_email");
+
+                // Only some providers prove the person owns the mailbox. Google says so per sign-in;
+                // Microsoft work/school directories can carry any address, so theirs is never trusted.
+                var emailProven = known.TrustsEmailClaim &&
+                    string.Equals(info.Principal.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase);
+                if (known.TrustsEmailClaim && !emailProven) return Results.Redirect("/login?error=external_unverified");
 
                 var user = await users.FindByEmailAsync(email);
                 if (user is null)
                 {
                     user = new AppUser
                     {
-                        UserName = email, Email = email, EmailConfirmed = true,
-                        DisplayName = info.Principal.FindFirstValue(ClaimTypes.GivenName) ?? email.Split('@')[0],
+                        UserName = email, Email = email, EmailConfirmed = emailProven,
+                        DisplayName = info.Principal.FindFirstValue(ClaimTypes.GivenName)
+                                      ?? info.Principal.FindFirstValue(ClaimTypes.Name) ?? email.Split('@')[0],
                     };
                     var created = await users.CreateAsync(user);
-                    if (!created.Succeeded) return Results.Redirect("/login?error=google_failed");
+                    if (!created.Succeeded) return Results.Redirect("/login?error=external_failed");
                     DefaultData.AddFor(db, user.Id);
                     await db.SaveChangesAsync();
                 }
+                else if (!emailProven)
+                {
+                    // Without proof of the mailbox we never attach a new sign-in method to an existing account.
+                    return Results.Redirect("/login?error=external_account_exists");
+                }
                 else if (!user.EmailConfirmed)
                 {
-                    // The address was registered with a password but never proven. Whoever set that
-                    // password may not own the mailbox, so it must not survive the link to Google.
+                    // The account's address was never proven, so whoever created it may not own the
+                    // mailbox. None of its earlier ways in may survive the link to a proven identity.
                     await users.RemovePasswordAsync(user);
                     await users.SetTwoFactorEnabledAsync(user, false);
                     await users.ResetAuthenticatorKeyAsync(user);
+                    foreach (var old in await users.GetLoginsAsync(user))
+                    {
+                        await users.RemoveLoginAsync(user, old.LoginProvider, old.ProviderKey);
+                    }
                     user.EmailConfirmed = true;
                     await users.UpdateAsync(user);
                     await users.UpdateSecurityStampAsync(user);
-                    log.LogWarning("Unverified password credentials removed while linking Google for user {UserId}.", user.Id);
+                    log.LogWarning("Unproven credentials removed while linking {Provider} for user {UserId}.", known.Scheme, user.Id);
                 }
 
                 var linked = await users.AddLoginAsync(user, info);
-                if (!linked.Succeeded) return Results.Redirect("/login?error=google_failed");
+                if (!linked.Succeeded) return Results.Redirect("/login?error=external_failed");
 
                 result = await signIn.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: false, bypassTwoFactor: false);
                 if (result.RequiresTwoFactor) return Results.Redirect("/login/verify");
-                if (!result.Succeeded) return Results.Redirect("/login?error=google_failed");
+                if (!result.Succeeded) return Results.Redirect("/login?error=external_failed");
             }
 
             return Results.Redirect(SafeReturnUrl(returnUrl));
@@ -337,6 +371,7 @@ public static class AuthEndpoints
             user.Id, user.Email!, user.DisplayName, mfa,
             await users.HasPasswordAsync(user),
             logins.Any(l => l.LoginProvider == GoogleDefaults.AuthenticationScheme),
+            logins.Any(l => l.LoginProvider == MicrosoftAccountDefaults.AuthenticationScheme),
             mfa ? await users.CountRecoveryCodesAsync(user) : 0);
     }
 }

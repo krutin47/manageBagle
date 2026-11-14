@@ -71,17 +71,31 @@ foreach (var scheme in new[] { IdentityConstants.ExternalScheme, IdentityConstan
     });
 }
 
+// External sign-in providers switch on only when their credentials are configured.
+var external = builder.Services.AddAuthentication();
 var googleId = config["Authentication:Google:ClientId"];
 var googleSecret = config["Authentication:Google:ClientSecret"];
 if (!string.IsNullOrWhiteSpace(googleId) && !string.IsNullOrWhiteSpace(googleSecret))
 {
-    builder.Services.AddAuthentication().AddGoogle(o =>
+    external.AddGoogle(o =>
     {
         o.ClientId = googleId;
         o.ClientSecret = googleSecret;
         o.SignInScheme = IdentityConstants.ExternalScheme;
         o.CallbackPath = "/api/auth/external/google/callback";
         o.ClaimActions.MapJsonKey("email_verified", "email_verified", "boolean");
+    });
+}
+var microsoftId = config["Authentication:Microsoft:ClientId"];
+var microsoftSecret = config["Authentication:Microsoft:ClientSecret"];
+if (!string.IsNullOrWhiteSpace(microsoftId) && !string.IsNullOrWhiteSpace(microsoftSecret))
+{
+    external.AddMicrosoftAccount(o =>
+    {
+        o.ClientId = microsoftId;
+        o.ClientSecret = microsoftSecret;
+        o.SignInScheme = IdentityConstants.ExternalScheme;
+        o.CallbackPath = "/api/auth/external/microsoft/callback";
     });
 }
 
@@ -144,6 +158,7 @@ app.MapAreaEndpoints();
 app.MapBlockEndpoints();
 app.MapBacklogEndpoints();
 app.MapDayEndpoints();
+app.MapPlanEndpoints();
 app.MapSummaryEndpoints();
 
 app.MapFallback("/api/{**path}", () => Results.NotFound());

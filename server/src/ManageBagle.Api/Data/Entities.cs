@@ -45,6 +45,8 @@ public class TimeBlock
     /// <summary>Null means "not recorded yet", never zero minutes worked.</summary>
     public int? ActualMinutes { get; set; }
     public string Notes { get; set; } = "";
+    /// <summary>Happens out in the physical world (errands, travel, appointments), so it may overrun.</summary>
+    public bool IsOutside { get; set; }
     public Guid? BacklogTaskId { get; set; }
     public BacklogTask? BacklogTask { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -71,6 +73,8 @@ public class BacklogTask
     public DateOnly? DueDate { get; set; }
     public ItemStatus Status { get; set; } = ItemStatus.Planned;
     public string NextStep { get; set; } = "";
+    public WorkMode WorkMode { get; set; } = WorkMode.DeepFocus;
+    public bool IsOutside { get; set; }
     public DateOnly? ScheduledDate { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
@@ -88,6 +92,9 @@ public class DailyOutcome
     public string NextAction { get; set; } = "";
     public ItemStatus Status { get; set; } = ItemStatus.Planned;
     public int? MinutesNeeded { get; set; }
+    /// <summary>Set when the outcome came from a planned task, so finishing one finishes the other.</summary>
+    public Guid? BacklogTaskId { get; set; }
+    public BacklogTask? BacklogTask { get; set; }
 }
 
 public class DailyReview

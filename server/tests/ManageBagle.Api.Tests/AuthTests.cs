@@ -163,8 +163,14 @@ public class AuthTests(ApiFactory factory)
         (await client.PostAsync("/api/auth/logout", null)).EnsureSuccessStatusCode();
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/auth/me")).StatusCode);
 
-        Assert.False((await client.GetFromJsonAsync<JsonElement>("/api/auth/providers")).GetProperty("google").GetBoolean());
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/auth/external/google")).StatusCode);
+        // External providers stay switched off, and unreachable, until their credentials are configured.
+        var providers = await client.GetFromJsonAsync<JsonElement>("/api/auth/providers");
+        foreach (var provider in new[] { "google", "microsoft" })
+        {
+            Assert.False(providers.GetProperty(provider).GetBoolean());
+            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/auth/external/{provider}")).StatusCode);
+        }
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/auth/external/evil")).StatusCode);
     }
 
     [Fact]

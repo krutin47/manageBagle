@@ -13,16 +13,18 @@ public record TaskRequest(
     Priority Priority,
     DateOnly? DueDate,
     ItemStatus Status,
-    [StringLength(200)] string? NextStep);
+    [StringLength(200)] string? NextStep,
+    WorkMode WorkMode = WorkMode.DeepFocus,
+    bool IsOutside = false);
 
 public record ScheduleRequest(DateOnly Date, TimeOnly Start, TimeOnly End, WorkMode WorkMode);
 
 public record TaskResponse(
     Guid Id, string Title, Guid? FocusAreaId, int? EstimatedMinutes, Priority Priority, DateOnly? DueDate,
-    ItemStatus Status, string NextStep, DateOnly? ScheduledDate, DateTimeOffset CreatedAt)
+    ItemStatus Status, string NextStep, WorkMode WorkMode, bool IsOutside, DateOnly? ScheduledDate, DateTimeOffset CreatedAt)
 {
     public static TaskResponse From(BacklogTask t) => new(
-        t.Id, t.Title, t.FocusAreaId, t.EstimatedMinutes, t.Priority, t.DueDate, t.Status, t.NextStep, t.ScheduledDate, t.CreatedAt);
+        t.Id, t.Title, t.FocusAreaId, t.EstimatedMinutes, t.Priority, t.DueDate, t.Status, t.NextStep, t.WorkMode, t.IsOutside, t.ScheduledDate, t.CreatedAt);
 }
 
 public static class BacklogEndpoints
@@ -81,10 +83,11 @@ public static class BacklogEndpoints
             var block = new TimeBlock
             {
                 UserId = uid, Date = req.Date, Start = req.Start, End = req.End, Title = task.Title,
-                FocusAreaId = task.FocusAreaId, Priority = task.Priority, WorkMode = req.WorkMode,
+                FocusAreaId = task.FocusAreaId, Priority = task.Priority, WorkMode = req.WorkMode, IsOutside = task.IsOutside,
                 Notes = task.NextStep.Length > 0 ? $"Next step: {task.NextStep}" : "", BacklogTaskId = task.Id,
             };
             task.ScheduledDate = req.Date;
+            task.WorkMode = req.WorkMode;
             db.TimeBlocks.Add(block);
             await db.SaveChangesAsync();
             return Results.Created($"/api/blocks/{block.Id}", new { task = TaskResponse.From(task), block = BlockResponse.From(block) });
@@ -100,5 +103,7 @@ public static class BacklogEndpoints
         task.DueDate = req.DueDate;
         task.Status = req.Status;
         task.NextStep = req.NextStep?.Trim() ?? "";
+        task.WorkMode = req.WorkMode;
+        task.IsOutside = req.IsOutside;
     }
 }

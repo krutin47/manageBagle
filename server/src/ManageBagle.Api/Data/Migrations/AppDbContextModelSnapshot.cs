@@ -113,6 +113,9 @@ namespace ManageBagle.Api.Data.Migrations
                     b.Property<Guid?>("FocusAreaId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsOutside")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("NextStep")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -139,6 +142,13 @@ namespace ManageBagle.Api.Data.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("WorkMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("DeepFocus");
+
                     b.HasKey("Id");
 
                     b.HasIndex("FocusAreaId");
@@ -152,6 +162,9 @@ namespace ManageBagle.Api.Data.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BacklogTaskId")
                         .HasColumnType("uuid");
 
                     b.Property<DateOnly>("Date")
@@ -185,6 +198,8 @@ namespace ManageBagle.Api.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BacklogTaskId");
 
                     b.HasIndex("FocusAreaId");
 
@@ -318,6 +333,9 @@ namespace ManageBagle.Api.Data.Migrations
 
                     b.Property<Guid?>("FocusAreaId")
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("IsOutside")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Notes")
                         .IsRequired()
@@ -528,6 +546,11 @@ namespace ManageBagle.Api.Data.Migrations
 
             modelBuilder.Entity("ManageBagle.Api.Data.DailyOutcome", b =>
                 {
+                    b.HasOne("ManageBagle.Api.Data.BacklogTask", "BacklogTask")
+                        .WithMany()
+                        .HasForeignKey("BacklogTaskId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("ManageBagle.Api.Data.FocusArea", "FocusArea")
                         .WithMany()
                         .HasForeignKey("FocusAreaId")
@@ -538,6 +561,8 @@ namespace ManageBagle.Api.Data.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("BacklogTask");
 
                     b.Navigation("FocusArea");
                 });

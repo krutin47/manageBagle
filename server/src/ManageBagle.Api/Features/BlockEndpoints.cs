@@ -16,7 +16,8 @@ public record BlockRequest(
     WorkMode WorkMode,
     ItemStatus Status,
     [Range(0, 1440)] int? ActualMinutes,
-    [StringLength(2000)] string? Notes);
+    [StringLength(2000)] string? Notes,
+    bool IsOutside = false);
 
 /// <summary>Quick update from the timeline: status and/or logged minutes only.</summary>
 public record BlockProgressRequest(ItemStatus? Status, [Range(0, 1440)] int? ActualMinutes, bool ClearActual);
@@ -24,11 +25,11 @@ public record BlockProgressRequest(ItemStatus? Status, [Range(0, 1440)] int? Act
 public record BlockResponse(
     Guid Id, DateOnly Date, TimeOnly Start, TimeOnly End, string Title, Guid? FocusAreaId,
     Priority Priority, WorkMode WorkMode, ItemStatus Status, int? ActualMinutes, int PlannedMinutes,
-    int? VarianceMinutes, string Notes, Guid? BacklogTaskId)
+    int? VarianceMinutes, string Notes, bool IsOutside, Guid? BacklogTaskId)
 {
     public static BlockResponse From(TimeBlock b) => new(
         b.Id, b.Date, b.Start, b.End, b.Title, b.FocusAreaId, b.Priority, b.WorkMode, b.Status,
-        b.ActualMinutes, b.PlannedMinutes, b.ActualMinutes - b.PlannedMinutes, b.Notes, b.BacklogTaskId);
+        b.ActualMinutes, b.PlannedMinutes, b.ActualMinutes - b.PlannedMinutes, b.Notes, b.IsOutside, b.BacklogTaskId);
 }
 
 public static class BlockEndpoints
@@ -118,13 +119,20 @@ public static class BlockEndpoints
         block.Status = req.Status;
         block.ActualMinutes = req.ActualMinutes;
         block.Notes = req.Notes?.Trim() ?? "";
+        block.IsOutside = req.IsOutside;
     }
 
-    /// <summary>Finishing a block that came from the backlog finishes the backlog task too.</summary>
+    /// <summary>
+    /// A block booked from a task shares its fate: finishing the block finishes the task and, if the
+    /// task is one of that day's top three, ticks the outcome too. One tick, not three.
+    /// </summary>
     private static async Task SyncLinkedTask(AppDbContext db, TimeBlock block)
     {
         if (block.BacklogTaskId is null || block.Status != ItemStatus.Done) return;
         var task = await db.BacklogTasks.FirstOrDefaultAsync(t => t.Id == block.BacklogTaskId && t.UserId == block.UserId);
         if (task is not null) task.Status = ItemStatus.Done;
+        var outcomes = await db.DailyOutcomes
+            .Where(o => o.UserId == block.UserId && o.Date == block.Date && o.BacklogTaskId == block.BacklogTaskId).ToListAsync();
+        foreach (var outcome in outcomes) outcome.Status = ItemStatus.Done;
     }
 }
