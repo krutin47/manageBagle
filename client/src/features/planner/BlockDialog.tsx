@@ -1,6 +1,6 @@
 import { Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { AreaSelect, Button, Dialog, ErrorNote, Field, Input, Segmented, Textarea } from "../../components/ui";
+import { AreaSelect, Button, Dialog, ErrorNote, Field, Input, OutsideToggle, Segmented, Textarea } from "../../components/ui";
 import { useToast } from "../../components/toast";
 import { ApiError, errorMessage, type Area, type Block, type BlockInput } from "../../lib/api";
 import { modeLabel, PRIORITIES, STATUSES, statusLabel, WORK_MODES } from "../../lib/labels";
@@ -33,6 +33,7 @@ function BlockForm({ draft, areas, onClose }: { draft: BlockDraft; areas: Area[]
     status: draft.status ?? "Planned",
     actualMinutes: draft.actualMinutes ?? null,
     notes: draft.notes ?? "",
+    isOutside: draft.isOutside ?? false,
   });
   const [error, setError] = useState<ApiError | null>(null);
   const patch = (p: Partial<BlockInput>) => setForm((f) => ({ ...f, ...p }));
@@ -104,6 +105,8 @@ function BlockForm({ draft, areas, onClose }: { draft: BlockDraft; areas: Area[]
           <span className="field-label">Work mode</span>
           <Segmented size="sm" label="Work mode" value={form.workMode} onChange={(workMode) => patch({ workMode })} options={WORK_MODES.map((m) => ({ value: m, label: modeLabel[m] }))} />
         </div>
+
+        <OutsideToggle checked={form.isOutside} onChange={(isOutside) => patch({ isOutside })} />
 
         <fieldset className="reality">
           <legend>Reality</legend>

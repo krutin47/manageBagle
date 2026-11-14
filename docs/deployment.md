@@ -13,6 +13,7 @@ All settings are environment variables (double underscore = nesting).
 | `ConnectionStrings__Default` | yes | PostgreSQL, e.g. `Host=…;Database=managebagle;Username=…;Password=…;SSL Mode=Require` |
 | `App__PublicUrl` | yes | e.g. `https://app.example.com` – used in emailed links |
 | `Authentication__Google__ClientId` / `…ClientSecret` | no | enables Google sign-in |
+| `Authentication__Microsoft__ClientId` / `…ClientSecret` | no | enables Microsoft sign-in |
 | `Smtp__Host`, `Smtp__Port`, `Smtp__Username`, `Smtp__Password`, `Smtp__From` | recommended | password-reset email |
 | `Database__MigrateOnStartup` | no | default `true`. Set `false` if you run more than one instance and apply migrations as a release step. |
 | `RateLimits__AuthPerMinute` | no | default `20` |

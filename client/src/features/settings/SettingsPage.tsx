@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, Download, KeyRound, Plus, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
+import { Check, Copy, Download, KeyRound, Link2, Plus, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useState, type FormEvent } from "react";
@@ -9,7 +9,7 @@ import { Button, ConfirmDialog, cx, Dialog, ErrorNote, Field, IconButton, Input,
 import { api, ApiError, errorMessage, type Area, type AreaColor, type User } from "../../lib/api";
 import { useDocumentTitle, useTheme } from "../../lib/hooks";
 import { AREA_COLORS, colorLabel } from "../../lib/labels";
-import { useAreaMutations, useAreas, useUser } from "../../lib/queries";
+import { useAreaMutations, useAreas, useProviders, useUser } from "../../lib/queries";
 
 export function SettingsPage() {
   useDocumentTitle("Settings");
@@ -166,6 +166,7 @@ function AreaRow({ area, onDelete }: { area: Area; onDelete: () => void }) {
 
 function SecurityCard({ user }: { user: User }) {
   const [dialog, setDialog] = useState<"password" | "enable" | "disable" | "codes" | null>(null);
+  const providers = useProviders();
   return (
     <section className="card" aria-labelledby="security">
       <header className="card-head"><div><h2 id="security">Sign-in &amp; security</h2></div></header>
@@ -174,7 +175,7 @@ function SecurityCard({ user }: { user: User }) {
           <span className="sec-icon"><KeyRound size={18} aria-hidden /></span>
           <div>
             <h3>Password</h3>
-            <p>{user.hasPassword ? "You sign in with your email and a password." : "No password set — you sign in with Google. Add one to also sign in by email."}</p>
+            <p>{user.hasPassword ? "You sign in with your email and a password." : "No password set — you sign in with another account. Add one to also sign in by email."}</p>
           </div>
           <Button onClick={() => setDialog("password")}>{user.hasPassword ? "Change password" : "Set a password"}</Button>
         </li>
@@ -197,13 +198,17 @@ function SecurityCard({ user }: { user: User }) {
             <Button variant="primary" onClick={() => setDialog("enable")}>Turn on</Button>
           )}
         </li>
-        <li>
-          <span className={cx("sec-icon", user.googleLinked && "is-on")}><GoogleGlyph /></span>
-          <div>
-            <h3>Google <span className={cx("badge", user.googleLinked ? "badge-good" : "badge-neutral")}>{user.googleLinked ? "Connected" : "Not connected"}</span></h3>
-            <p>{user.googleLinked ? "You can sign in with your Google account." : `Choose “Continue with Google” at sign-in using ${user.email} to connect it.`}</p>
-          </div>
-        </li>
+        {([["google", "Google", user.googleLinked], ["microsoft", "Microsoft", user.microsoftLinked]] as const)
+          .filter(([key, , linked]) => linked || providers.data?.[key])
+          .map(([key, name, linked]) => (
+            <li key={key}>
+              <span className={cx("sec-icon", linked && "is-on")}><Link2 size={18} aria-hidden /></span>
+              <div>
+                <h3>{name} <span className={cx("badge", linked ? "badge-good" : "badge-neutral")}>{linked ? "Connected" : "Not connected"}</span></h3>
+                <p>{linked ? `You can sign in with your ${name} account.` : key === "google" ? `Choose “Continue with Google” at sign-in using ${user.email} to connect it.` : `Not connected. For your safety a ${name} account can only start a new manageBagle account, not attach to this one.`}</p>
+              </div>
+            </li>
+          ))}
       </ul>
 
       <Dialog open={dialog === "password"} onClose={() => setDialog(null)} title={user.hasPassword ? "Change password" : "Set a password"} width="sm">
@@ -219,14 +224,6 @@ function SecurityCard({ user }: { user: User }) {
         <RegenerateCodes user={user} onClose={() => setDialog(null)} />
       </Dialog>
     </section>
-  );
-}
-
-function GoogleGlyph() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
-      <path fill="currentColor" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7a5.4 5.4 0 0 1 0-3.44C4.68 5.16 6.66 3.58 9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.59A9 9 0 1 0 9 18c2.43 0 4.47-.8 5.96-2.18 1.7-1.57 2.68-3.88 2.68-6.62z" />
-    </svg>
   );
 }
 

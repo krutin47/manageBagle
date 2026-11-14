@@ -15,16 +15,17 @@ public record TaskRequest(
     ItemStatus Status,
     [StringLength(200)] string? NextStep,
     WorkMode WorkMode = WorkMode.DeepFocus,
-    bool IsOutside = false);
+    bool IsOutside = false,
+    Priority Impact = Priority.Medium);
 
 public record ScheduleRequest(DateOnly Date, TimeOnly Start, TimeOnly End, WorkMode WorkMode);
 
 public record TaskResponse(
     Guid Id, string Title, Guid? FocusAreaId, int? EstimatedMinutes, Priority Priority, DateOnly? DueDate,
-    ItemStatus Status, string NextStep, WorkMode WorkMode, bool IsOutside, DateOnly? ScheduledDate, DateTimeOffset CreatedAt)
+    ItemStatus Status, string NextStep, WorkMode WorkMode, bool IsOutside, Priority Impact, DateOnly? ScheduledDate, DateTimeOffset CreatedAt)
 {
     public static TaskResponse From(BacklogTask t) => new(
-        t.Id, t.Title, t.FocusAreaId, t.EstimatedMinutes, t.Priority, t.DueDate, t.Status, t.NextStep, t.WorkMode, t.IsOutside, t.ScheduledDate, t.CreatedAt);
+        t.Id, t.Title, t.FocusAreaId, t.EstimatedMinutes, t.Priority, t.DueDate, t.Status, t.NextStep, t.WorkMode, t.IsOutside, t.Impact, t.ScheduledDate, t.CreatedAt);
 }
 
 public static class BacklogEndpoints
@@ -105,5 +106,6 @@ public static class BacklogEndpoints
         task.NextStep = req.NextStep?.Trim() ?? "";
         task.WorkMode = req.WorkMode;
         task.IsOutside = req.IsOutside;
+        task.Impact = req.Impact;
     }
 }

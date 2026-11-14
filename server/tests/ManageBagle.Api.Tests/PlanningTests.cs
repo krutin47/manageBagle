@@ -159,7 +159,7 @@ public class PlanningTests(ApiFactory factory)
         {
             items = new object[]
             {
-                new { title = "Ship the importer", estimatedMinutes = 90, workMode = "DeepFocus", priority = "Medium", topRank = 1, start = "09:00:00", end = "10:30:00" },
+                new { title = "Ship the importer", estimatedMinutes = 90, workMode = "DeepFocus", priority = "Medium", impact = "High", dueDate = "2026-11-20", topRank = 1, start = "09:00:00", end = "10:30:00" },
                 new { taskId = existing.GetProperty("id").GetGuid(), title = "Renew passport", estimatedMinutes = 40, workMode = "Personal", isOutside = true, priority = "Low", topRank = 2, start = "10:35:00", end = "11:25:00" },
                 new { title = "Sort the garage", estimatedMinutes = 120, workMode = "Personal", priority = "Low" },
             },
@@ -175,7 +175,11 @@ public class PlanningTests(ApiFactory factory)
 
         var tasks = await client.GetFromJsonAsync<JsonElement>("/api/backlog");
         Assert.Equal(3, tasks.GetArrayLength()); // the existing task was reused, not duplicated
+        var shipped = tasks.EnumerateArray().Single(t => t.GetProperty("title").GetString() == "Ship the importer");
+        Assert.Equal("High", shipped.GetProperty("impact").GetString());
+        Assert.Equal("2026-11-20", shipped.GetProperty("dueDate").GetString());
         var garage = tasks.EnumerateArray().Single(t => t.GetProperty("title").GetString() == "Sort the garage");
+        Assert.Equal("Medium", garage.GetProperty("impact").GetString());
         Assert.Equal(JsonValueKind.Null, garage.GetProperty("scheduledDate").ValueKind);
 
         var outcomes = (await client.GetFromJsonAsync<JsonElement>($"/api/days/{day}")).GetProperty("outcomes");

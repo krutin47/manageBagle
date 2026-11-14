@@ -1,9 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { BookOpen, CalendarRange, ChartNoAxesColumn, Inbox, LogOut, Moon, Settings, Sun, Target } from "lucide-react";
+import { BookOpen, CalendarRange, ChartNoAxesColumn, Inbox, LogOut, Moon, NotebookPen, Settings, Sun, Target } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { DropdownMenu } from "radix-ui";
 import { NavLink, useLocation, useNavigate, useOutlet } from "react-router";
-import { Logo } from "../../components/ui";
+import { cx, Logo } from "../../components/ui";
 import { api } from "../../lib/api";
 import { useTheme } from "../../lib/hooks";
 import { useUser } from "../../lib/queries";
@@ -13,7 +13,8 @@ const NAV = [
   { to: "/planner", label: "Planner", icon: CalendarRange },
   { to: "/week", label: "Week", icon: ChartNoAxesColumn },
   { to: "/backlog", label: "Backlog", icon: Inbox },
-  { to: "/guide", label: "Guide", icon: BookOpen },
+  { to: "/review", label: "Review", icon: NotebookPen },
+  { to: "/guide", label: "Guide", icon: BookOpen, desktopOnly: true },
 ];
 
 function initials(name: string) {
@@ -47,8 +48,8 @@ export function AppShell() {
         </NavLink>
 
         <nav aria-label="Main" className="nav">
-          {NAV.map(({ to, label, icon: Icon, end }) => (
-            <NavLink key={to} to={to} end={end} className="nav-item">
+          {NAV.map(({ to, label, icon: Icon, end, desktopOnly }) => (
+            <NavLink key={to} to={to} end={end} className={({ isActive }) => cx("nav-item", isActive && "active", desktopOnly && "nav-desktop-only")}>
               {({ isActive }) => (
                 <>
                   {isActive && <motion.span layoutId="nav-active" className="nav-active" transition={{ type: "spring", stiffness: 520, damping: 42 }} />}
@@ -73,6 +74,9 @@ export function AppShell() {
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
               <DropdownMenu.Content className="menu" side="top" align="start" sideOffset={8}>
+                <DropdownMenu.Item className="menu-item" onSelect={() => navigate("/guide")}>
+                  <BookOpen size={16} aria-hidden /> Guide
+                </DropdownMenu.Item>
                 <DropdownMenu.Item className="menu-item" onSelect={() => navigate("/settings")}>
                   <Settings size={16} aria-hidden /> Settings
                 </DropdownMenu.Item>

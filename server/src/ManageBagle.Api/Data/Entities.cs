@@ -75,6 +75,8 @@ public class BacklogTask
     public string NextStep { get; set; } = "";
     public WorkMode WorkMode { get; set; } = WorkMode.DeepFocus;
     public bool IsOutside { get; set; }
+    /// <summary>How much finishing this moves things forward. Priority is urgency; impact is value.</summary>
+    public Priority Impact { get; set; } = Priority.Medium;
     public DateOnly? ScheduledDate { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

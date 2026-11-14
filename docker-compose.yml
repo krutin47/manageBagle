@@ -29,6 +29,8 @@ services:
       ConnectionStrings__Default: Host=db;Port=5432;Database=managebagle_dev;Username=managebagle;Password=managebagle
       Authentication__Google__ClientId: ${GOOGLE_CLIENT_ID:-}
       Authentication__Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
+      Authentication__Microsoft__ClientId: ${MICROSOFT_CLIENT_ID:-}
+      Authentication__Microsoft__ClientSecret: ${MICROSOFT_CLIENT_SECRET:-}
     ports:
       - "8080:8080"
 

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { api, type Area, type AreaColor, type Block, type BlockInput, type Day, type DayName, type Outcome, type Review, type Status, type Task, type TaskInput, type Theme, type User, type WeekSummary, type WorkMode } from "./api";
-import { addDays, weekStart } from "./time";
+import { api, type Area, type AreaColor, type Block, type BlockInput, type Day, type DayName, type Outcome, type PlanItem, type ProviderKey, type Review, type Status, type Task, type TaskInput, type Theme, type User, type WeekSummary, type WorkMode } from "./api";
+import { addDays, fromMinutes, toMinutes, weekStart } from "./time";
 
 const withSeconds = (t: string) => (t.length === 5 ? `${t}:00` : t);
 
@@ -30,7 +30,7 @@ export function useUser(): User {
 }
 
 export function useProviders() {
-  return useQuery({ queryKey: ["providers"], queryFn: () => api<{ google: boolean }>("/auth/providers"), staleTime: Infinity });
+  return useQuery({ queryKey: ["providers"], queryFn: () => api<Record<ProviderKey, boolean>>("/auth/providers"), staleTime: Infinity });
 }
 
 // ---- Focus areas -----------------------------------------------------------------------------
@@ -95,6 +95,26 @@ export function useBlockMutations() {
       mutationFn: ({ id, ...b }: BlockInput & { id: string }) => api<Block>(`/blocks/${id}`, { method: "PUT", body: blockBody(b) }),
       onSuccess: settle,
     }),
+    /** Optimistic: dragging a block to another day or time should land where it was dropped. */
+    move: useMutation({
+      mutationFn: ({ block, date, start }: { block: Block; date: string; start: string }) => {
+        const { title, focusAreaId, priority, workMode, status, actualMinutes, notes, isOutside } = block;
+        const end = fromMinutes(toMinutes(start) + block.plannedMinutes);
+        return api<Block>(`/blocks/${block.id}`, { method: "PUT", body: blockBody({ date, start, end, title, focusAreaId, priority, workMode, status, actualMinutes, notes, isOutside }) });
+      },
+      onMutate: async ({ block, date, start }) => {
+        const key = ["blocks", weekStart(block.date)];
+        await qc.cancelQueries({ queryKey: key });
+        const previous = qc.getQueryData<Block[]>(key);
+        const end = fromMinutes(toMinutes(start) + block.plannedMinutes);
+        qc.setQueryData<Block[]>(key, (list) =>
+          list?.map((b) => (b.id === block.id ? { ...b, date, start, end } : b)).sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start)),
+        );
+        return { key, previous };
+      },
+      onError: (_e, _v, ctx) => ctx && qc.setQueryData(ctx.key, ctx.previous),
+      onSettled: settle,
+    }),
     /** Optimistic: ticking a block off should feel instant. */
     progress: useMutation({
       mutationFn: ({ block, ...body }: { block: Block; status?: Status; actualMinutes?: number; clearActual?: boolean }) =>
@@ -113,7 +133,10 @@ export function useBlockMutations() {
         return { key, previous };
       },
       onError: (_e, _v, ctx) => ctx && qc.setQueryData(ctx.key, ctx.previous),
-      onSettled: settle,
+      onSettled: () => {
+        settle();
+        qc.invalidateQueries({ queryKey: ["day"] }); // a finished block may tick a top-three outcome
+      },
     }),
     remove: useMutation({ mutationFn: (id: string) => api(`/blocks/${id}`, { method: "DELETE" }), onSuccess: settle }),
   };
@@ -149,7 +172,11 @@ export function useDayMutations(date: string) {
         return { previous };
       },
       onError: (_e, _v, ctx) => qc.setQueryData(["day", date], ctx?.previous),
-      onSettled: done,
+      onSettled: () => {
+        done();
+        invalidatePlanning(qc); // a ticked outcome may finish its block and task
+        qc.invalidateQueries({ queryKey: ["backlog"] });
+      },
     }),
     removeOutcome: useMutation({ mutationFn: (rank: number) => api(`/days/${date}/outcomes/${rank}`, { method: "DELETE" }), onSuccess: done }),
     saveReview: useMutation({
@@ -157,6 +184,23 @@ export function useDayMutations(date: string) {
       onSuccess: (review) => qc.setQueryData<Day>(["day", date], (d) => d && { ...d, review }),
     }),
   };
+}
+
+/** Saves a whole day plan (new tasks, booked blocks, top three) in one request. */
+export function usePlanDay(date: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: PlanItem[]) =>
+      api<{ tasksCreated: number; blocksBooked: number; leftInBacklog: number }>(`/days/${date}/plan`, {
+        method: "POST",
+        body: { items: items.map((i) => ({ ...i, start: i.start && withSeconds(i.start), end: i.end && withSeconds(i.end) })) },
+      }),
+    onSuccess: () => {
+      invalidatePlanning(qc);
+      qc.invalidateQueries({ queryKey: ["day", date] });
+      qc.invalidateQueries({ queryKey: ["backlog"] });
+    },
+  });
 }
 
 export function useThemes() {

@@ -11,6 +11,7 @@ export interface User {
   mfaEnabled: boolean;
   hasPassword: boolean;
   googleLinked: boolean;
+  microsoftLinked: boolean;
   recoveryCodesLeft: number;
 }
 
@@ -30,6 +31,8 @@ export interface Block {
   plannedMinutes: number;
   varianceMinutes: number | null;
   notes: string;
+  /** Out in the physical world (errands, travel, appointments): may overrun. */
+  isOutside: boolean;
   backlogTaskId: string | null;
 }
 
@@ -44,6 +47,10 @@ export interface Task {
   dueDate: string | null;
   status: Status;
   nextStep: string;
+  workMode: WorkMode;
+  isOutside: boolean;
+  /** How much finishing this moves things forward (priority is urgency). */
+  impact: Priority;
   scheduledDate: string | null;
   createdAt: string;
 }
@@ -57,6 +64,25 @@ export interface Outcome {
   nextAction: string;
   status: Status;
   minutesNeeded: number | null;
+  /** Present when the outcome came from a planned task; ticking either finishes both. */
+  backlogTaskId?: string | null;
+}
+
+export type ProviderKey = "google" | "microsoft";
+
+export interface PlanItem {
+  taskId: string | null;
+  title: string;
+  estimatedMinutes: number;
+  focusAreaId: string | null;
+  workMode: WorkMode;
+  isOutside: boolean;
+  priority: Priority;
+  impact: Priority;
+  dueDate: string | null;
+  topRank: number | null;
+  start: string | null;
+  end: string | null;
 }
 
 export interface Review { biggestWin: string; interruptions: string; changeTomorrow: string }

@@ -113,6 +113,13 @@ namespace ManageBagle.Api.Data.Migrations
                     b.Property<Guid?>("FocusAreaId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Impact")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Medium");
+
                     b.Property<bool>("IsOutside")
                         .HasColumnType("boolean");
 

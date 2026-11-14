@@ -20,7 +20,9 @@ public record PlanItem(
     Priority Priority,
     [Range(1, 3)] int? TopRank,
     TimeOnly? Start,
-    TimeOnly? End);
+    TimeOnly? End,
+    Priority Impact = Priority.Medium,
+    DateOnly? DueDate = null);
 
 public record PlanRequest([Required, MinLength(1), MaxLength(40)] PlanItem[] Items);
 
@@ -76,7 +78,9 @@ public static class PlanEndpoints
                 task.FocusAreaId = item.FocusAreaId;
                 task.WorkMode = item.WorkMode;
                 task.IsOutside = item.IsOutside;
-                task.Priority = item.TopRank is not null ? Priority.High : item.Priority;
+                task.Priority = item.Priority;
+                task.Impact = item.Impact;
+                task.DueDate = item.DueDate;
 
                 if (item.Start is { } start && item.End is { } end)
                 {

@@ -6,6 +6,7 @@ import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyP
 import { BacklogPage } from "./features/backlog/BacklogPage";
 import { GuidePage } from "./features/guide/GuidePage";
 import { PlannerPage } from "./features/planner/PlannerPage";
+import { ReviewPage } from "./features/review/ReviewPage";
 import { AppShell } from "./features/shell/AppShell";
 import { TodayPage } from "./features/today/TodayPage";
 import { WeekPage } from "./features/week/WeekPage";
@@ -76,6 +77,7 @@ export function App() {
         <Route path="/week" element={<WeekPage />} />
         <Route path="/planner" element={<PlannerPage />} />
         <Route path="/backlog" element={<BacklogPage />} />
+        <Route path="/review" element={<ReviewPage />} />
         <Route path="/guide" element={<GuidePage />} />
         <Route path="/settings" element={<Suspense fallback={null}><SettingsPage /></Suspense>} />
         <Route path="*" element={<Navigate to="/" replace />} />

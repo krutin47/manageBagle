@@ -1,17 +1,18 @@
-import { CalendarPlus, Check, CircleCheck, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarClock, CalendarPlus, Check, Clock, ListPlus, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { DropdownMenu } from "radix-ui";
 import { useMemo, useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useToast } from "../../components/toast";
-import { AreaChip, AreaSelect, Button, cx, DateNav, Dialog, EmptyState, ErrorNote, Field, IconButton, Input, PageHeader, Segmented, Skeleton, StatusIcon, Textarea } from "../../components/ui";
-import { errorMessage, type Area, type Block, type DayName, type Outcome, type Review, type Status } from "../../lib/api";
+import { AreaChip, AreaSelect, Button, cx, DateNav, Dialog, EmptyState, ErrorNote, Field, IconButton, Input, PageHeader, Segmented, Skeleton, StatusIcon } from "../../components/ui";
+import { errorMessage, type Area, type Block, type DayName, type Outcome, type Status, type Task } from "../../lib/api";
 import { useDocumentTitle, useNowMinutes } from "../../lib/hooks";
 import { modeLabel, STATUSES, statusLabel } from "../../lib/labels";
-import { useAreas, useBlockMutations, useDay, useDayMutations, useThemes, useUser, useWeekBlocks } from "../../lib/queries";
-import { formatDate, formatDuration, formatHours, fromMinutes, isValidISODate, parseISODate, snap, todayISO, toMinutes } from "../../lib/time";
+import { useAreas, useBacklog, useBlockMutations, useDay, useDayMutations, useThemes, useUser, useWeekBlocks } from "../../lib/queries";
+import { addDays, formatDate, formatDuration, formatHours, fromMinutes, isValidISODate, parseISODate, snap, todayISO, toMinutes } from "../../lib/time";
 import { BlockDialog, type BlockDraft } from "../planner/BlockDialog";
 import { Variance } from "../planner/PlannerPage";
+import { BrainDumpDialog, dueLabel, valueScore } from "./BrainDumpDialog";
 
 const DAY_NAMES: DayName[] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -33,15 +34,26 @@ export function TodayPage() {
   const themes = useThemes();
   const [draft, setDraft] = useState<BlockDraft | null>(null);
   const [editing, setEditing] = useState<Outcome | null>(null);
+  // null = closed; otherwise the tasks to start the brain dump with (possibly none).
+  const [dumping, setDumping] = useState<Task[] | null>(null);
+  const backlog = useBacklog();
 
   const areaById = useMemo(() => new Map((areas.data ?? []).map((a) => [a.id, a])), [areas.data]);
   const blocks = useMemo(() => (blocksQuery.data ?? []).filter((b) => b.date === date), [blocksQuery.data, date]);
+  const outcomes = useMemo(() => day.data?.outcomes ?? [], [day.data]);
   const theme = themes.data?.find((t) => t.day === DAY_NAMES[parseISODate(date).getDay()]);
+
+  // A top-three outcome and its booked block are the same piece of work; show them as one.
+  const rankByTask = useMemo(() => new Map(outcomes.filter((o) => o.backlogTaskId).map((o) => [o.backlogTaskId!, o.rank])), [outcomes]);
+  const blockFor = (o: Outcome) => (o.backlogTaskId ? blocks.find((b) => b.backlogTaskId === o.backlogTaskId) : undefined);
 
   const planned = blocks.reduce((s, b) => s + b.plannedMinutes, 0);
   const logged = blocks.reduce((s, b) => s + (b.actualMinutes ?? 0), 0);
   const deep = blocks.filter((b) => b.workMode === "DeepFocus").reduce((s, b) => s + b.plannedMinutes, 0);
   const done = blocks.filter((b) => b.status === "Done").length;
+
+  const loading = blocksQuery.isPending || day.isPending;
+  const blank = !loading && !blocksQuery.isError && !day.isError && blocks.length === 0 && outcomes.length === 0;
 
   const newBlock = (seed: Partial<BlockDraft> = {}, minutes = 60) => {
     const last = blocks.at(-1);
@@ -56,76 +68,110 @@ export function TodayPage() {
         title={formatDate(date, "long")}
         sub={theme?.primaryFocus ? <><span className="theme-tag">{theme.primaryFocus}</span>{theme.outcome && <span className="theme-outcome">{theme.outcome}</span>}</> : undefined}
         actions={
-          <DateNav label="Day" value={date} step={1} onChange={(d) => setParams(d === todayISO() ? {} : { date: d }, { replace: true })}>
-            <Input type="date" className="date-jump" aria-label="Jump to date" value={date} onChange={(e) => e.target.value && setParams({ date: e.target.value }, { replace: true })} />
-          </DateNav>
+          <>
+            <DateNav label="Day" value={date} step={1} onChange={(d) => setParams(d === todayISO() ? {} : { date: d }, { replace: true })}>
+              <Input type="date" className="date-jump" aria-label="Jump to date" value={date} onChange={(e) => e.target.value && setParams({ date: e.target.value }, { replace: true })} />
+            </DateNav>
+            {!blank && (
+              <Button variant="primary" icon={<ListPlus size={18} aria-hidden />} onClick={() => setDumping([])}>
+                Brain dump
+              </Button>
+            )}
+          </>
         }
       />
 
-      <section className="stat-row" aria-label="Day totals">
-        <Stat label="Planned" value={formatHours(planned)} unit="h" />
-        <Stat label="Logged" value={formatHours(logged)} unit="h" note={planned > 0 && logged > 0 ? `${Math.round((logged / planned) * 100)}% of plan` : "what you record"} />
-        <Stat label="Deep focus" value={formatHours(deep)} unit="h" />
-        <Stat label="Blocks done" value={String(done)} unit={`/ ${blocks.length}`} />
-      </section>
-
-      <div className="today-grid">
-        <section className="card" aria-labelledby="big3">
-          <header className="card-head">
-            <div>
-              <h2 id="big3">Your big three</h2>
-              <p>Three finished results, not three vague intentions.</p>
+      {blank ? (
+        <motion.section className="plan-hero" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
+          <div>
+            <h2>{isToday ? "What does today need to hold?" : "Nothing planned for this day yet"}</h2>
+            <p>Brain dump everything on your mind, pick the three with the highest value, and it gets fitted into the day for you.</p>
+            <div className="plan-hero-actions">
+              <Button variant="primary" size="lg" icon={<ListPlus size={18} aria-hidden />} onClick={() => setDumping([])}>
+                Start a brain dump
+              </Button>
+              <button type="button" className="link-btn" onClick={() => newBlock()}>or add a single block</button>
             </div>
-          </header>
-          {day.isError ? (
-            <ErrorNote onRetry={() => day.refetch()}>We could not load this day.</ErrorNote>
-          ) : (
-            <ol className="outcomes">
-              {[1, 2, 3].map((rank) => {
-                const outcome = day.data?.outcomes.find((o) => o.rank === rank);
-                return (
-                  <OutcomeSlot
-                    key={rank}
-                    rank={rank}
-                    loading={day.isPending}
-                    outcome={outcome}
-                    area={outcome?.focusAreaId ? areaById.get(outcome.focusAreaId) : undefined}
-                    date={date}
-                    onEdit={() => setEditing(outcome ?? { rank, result: "", focusAreaId: null, nextAction: "", status: "Planned", minutesNeeded: null })}
-                    onSchedule={(o) => newBlock({ title: o.result, focusAreaId: o.focusAreaId, priority: "High" }, o.minutesNeeded ?? 60)}
-                  />
-                );
-              })}
-            </ol>
-          )}
-        </section>
+          </div>
+          <ol className="plan-hero-steps" aria-hidden>
+            <li><b>1</b> Brain dump</li>
+            <li><b>2</b> Pick your top three</li>
+            <li><b>3</b> Fit it into the day</li>
+          </ol>
+        </motion.section>
+      ) : (
+        <>
+          <section className="stat-row" aria-label="Day totals">
+            <Stat label="Planned" value={formatHours(planned)} unit="h" />
+            <Stat label="Logged" value={formatHours(logged)} unit="h" note={planned > 0 && logged > 0 ? `${Math.round((logged / planned) * 100)}% of plan` : "what you record"} />
+            <Stat label="Deep focus" value={formatHours(deep)} unit="h" />
+            <Stat label="Blocks done" value={String(done)} unit={`/ ${blocks.length}`} />
+          </section>
 
-        <section className="card" aria-labelledby="schedule">
-          <header className="card-head">
-            <div>
-              <h2 id="schedule">Schedule</h2>
-              <p>Tick blocks off and log the real minutes.</p>
+          <section aria-labelledby="big3" className="today-section">
+            <header className="section-head">
+              <span className="section-step">1</span>
+              <div>
+                <h2 id="big3">Top three</h2>
+                <p>If only these get done, today was a good day.</p>
+              </div>
+            </header>
+            {day.isError ? (
+              <ErrorNote onRetry={() => day.refetch()}>We could not load this day.</ErrorNote>
+            ) : (
+              <ol className="outcomes">
+                {[1, 2, 3].map((rank) => {
+                  const outcome = outcomes.find((o) => o.rank === rank);
+                  return (
+                    <OutcomeSlot
+                      key={rank}
+                      rank={rank}
+                      loading={day.isPending}
+                      outcome={outcome}
+                      block={outcome && blockFor(outcome)}
+                      area={outcome?.focusAreaId ? areaById.get(outcome.focusAreaId) : undefined}
+                      date={date}
+                      onEdit={() => setEditing(outcome ?? { rank, result: "", focusAreaId: null, nextAction: "", status: "Planned", minutesNeeded: null })}
+                      onSchedule={(o) => newBlock({ title: o.result, focusAreaId: o.focusAreaId, priority: "High" }, o.minutesNeeded ?? 60)}
+                    />
+                  );
+                })}
+              </ol>
+            )}
+          </section>
+
+          <section aria-labelledby="schedule" className="today-section">
+            <header className="section-head">
+              <span className="section-step">2</span>
+              <div>
+                <h2 id="schedule">Schedule</h2>
+                <p>Work down the list. Tick a block when it is done and note how long it really took.</p>
+              </div>
+              <Button size="sm" icon={<Plus size={16} aria-hidden />} onClick={() => newBlock()}>
+                Add block
+              </Button>
+            </header>
+            <div className="card card-flush">
+              {blocksQuery.isError ? (
+                <ErrorNote onRetry={() => blocksQuery.refetch()}>We could not load your blocks.</ErrorNote>
+              ) : blocksQuery.isPending ? (
+                <div className="stack"><Skeleton height={56} radius={10} /><Skeleton height={56} radius={10} /><Skeleton height={56} radius={10} /></div>
+              ) : blocks.length === 0 ? (
+                <EmptyState icon={<CalendarPlus size={22} />} title="Nothing has a time yet" body="An outcome without a slot is a wish. Give your top three real time on the clock." action={<Button variant="primary" onClick={() => setDumping([])}>Brain dump</Button>} />
+              ) : (
+                <Agenda blocks={blocks} areaById={areaById} rankByTask={rankByTask} showNow={isToday} onOpen={setDraft} />
+              )}
             </div>
-            <Button size="sm" icon={<Plus size={16} aria-hidden />} onClick={() => newBlock()}>
-              Add block
-            </Button>
-          </header>
-          {blocksQuery.isError ? (
-            <ErrorNote onRetry={() => blocksQuery.refetch()}>We could not load your blocks.</ErrorNote>
-          ) : blocksQuery.isPending ? (
-            <div className="stack"><Skeleton height={56} radius={10} /><Skeleton height={56} radius={10} /><Skeleton height={56} radius={10} /></div>
-          ) : blocks.length === 0 ? (
-            <EmptyState icon={<CalendarPlus size={22} />} title={isToday ? "Nothing booked yet" : "Nothing booked for this day"} body="Give your first outcome a real slot. One protected block beats a long to-do list." action={<Button variant="primary" onClick={() => newBlock()}>Plan a block</Button>} />
-          ) : (
-            <Agenda blocks={blocks} areaById={areaById} showNow={isToday} onOpen={setDraft} />
-          )}
-        </section>
-      </div>
+          </section>
 
-      <ReviewCard key={date} date={date} review={day.data?.review} />
+        </>
+      )}
+
+      <DueSoon tasks={backlog.data ?? []} areaById={areaById} date={date} onAdd={(t) => setDumping([t])} />
 
       <BlockDialog draft={draft} areas={areas.data ?? []} onClose={() => setDraft(null)} />
       <OutcomeDialog date={date} outcome={editing} areas={areas.data ?? []} onClose={() => setEditing(null)} />
+      <BrainDumpDialog open={dumping !== null} seed={dumping ?? undefined} date={date} areas={areas.data ?? []} blocks={blocks} takenRanks={outcomes.map((o) => o.rank)} onClose={() => setDumping(null)} />
     </>
   );
 }
@@ -147,7 +193,7 @@ function Stat({ label, value, unit, note }: { label: string; value: string; unit
 
 // ---- Big three -------------------------------------------------------------------------------
 
-function OutcomeSlot({ rank, outcome, area, loading, date, onEdit, onSchedule }: { rank: number; outcome?: Outcome; area?: Area; loading: boolean; date: string; onEdit: () => void; onSchedule: (o: Outcome) => void }) {
+function OutcomeSlot({ rank, outcome, block, area, loading, date, onEdit, onSchedule }: { rank: number; outcome?: Outcome; block?: Block; area?: Area; loading: boolean; date: string; onEdit: () => void; onSchedule: (o: Outcome) => void }) {
   const { saveOutcome } = useDayMutations(date);
   if (loading) {
     return (
@@ -192,12 +238,15 @@ function OutcomeSlot({ rank, outcome, area, loading, date, onEdit, onSchedule }:
         {outcome.nextAction && <p className="outcome-next"><span>Next:</span> {outcome.nextAction}</p>}
         <div className="outcome-meta">
           <AreaChip area={area} compact />
-          {outcome.minutesNeeded && <span className="meta-mono">{formatDuration(outcome.minutesNeeded)} needed</span>}
+          {block ? (
+            <span className="outcome-when"><Clock size={13} aria-hidden /> {block.start.slice(0, 5)}–{block.end.slice(0, 5)}</span>
+          ) : outcome.status !== "Done" ? (
+            <button type="button" className="outcome-book" onClick={() => onSchedule(outcome)}><CalendarPlus size={13} aria-hidden /> Book time{outcome.minutesNeeded ? ` · ${formatDuration(outcome.minutesNeeded)}` : ""}</button>
+          ) : null}
           {outcome.status !== "Planned" && outcome.status !== "Done" && <span className="status-pill" data-status={outcome.status}><StatusIcon status={outcome.status} size={12} />{statusLabel[outcome.status]}</span>}
         </div>
       </div>
       <div className="outcome-actions">
-        <IconButton size="sm" label="Book time for this outcome" onClick={() => onSchedule(outcome)}><CalendarPlus size={16} /></IconButton>
         <IconButton size="sm" label="Edit outcome" onClick={onEdit}><Pencil size={16} /></IconButton>
       </div>
     </li>
@@ -258,7 +307,7 @@ function OutcomeForm({ date, outcome, areas, onClose }: { date: string; outcome:
 
 // ---- Agenda ----------------------------------------------------------------------------------
 
-function Agenda({ blocks, areaById, showNow, onOpen }: { blocks: Block[]; areaById: Map<string, Area>; showNow: boolean; onOpen: (b: Block) => void }) {
+function Agenda({ blocks, areaById, rankByTask, showNow, onOpen }: { blocks: Block[]; areaById: Map<string, Area>; rankByTask: Map<string, number>; showNow: boolean; onOpen: (b: Block) => void }) {
   const now = useNowMinutes();
   const nowIndex = showNow ? blocks.findIndex((b) => toMinutes(b.start) + b.plannedMinutes > now) : -1;
   return (
@@ -271,7 +320,7 @@ function Agenda({ blocks, areaById, showNow, onOpen }: { blocks: Block[]; areaBy
                 <span>{toMinutes(b.start) <= now ? "Now" : `Next · in ${formatDuration(toMinutes(b.start) - now)}`}</span>
               </div>
             )}
-            <AgendaRow block={b} area={b.focusAreaId ? areaById.get(b.focusAreaId) : undefined} onOpen={() => onOpen(b)} />
+            <AgendaRow block={b} rank={b.backlogTaskId ? rankByTask.get(b.backlogTaskId) : undefined} area={b.focusAreaId ? areaById.get(b.focusAreaId) : undefined} onOpen={() => onOpen(b)} />
           </motion.li>
         ))}
       </AnimatePresence>
@@ -279,7 +328,7 @@ function Agenda({ blocks, areaById, showNow, onOpen }: { blocks: Block[]; areaBy
   );
 }
 
-function AgendaRow({ block, area, onOpen }: { block: Block; area?: Area; onOpen: () => void }) {
+function AgendaRow({ block, rank, area, onOpen }: { block: Block; rank?: number; area?: Area; onOpen: () => void }) {
   const toast = useToast();
   const { progress } = useBlockMutations();
 
@@ -300,10 +349,12 @@ function AgendaRow({ block, area, onOpen }: { block: Block; area?: Area; onOpen:
       <span className="agenda-bar" aria-hidden />
       <div className="agenda-main">
         <button type="button" className="row-link agenda-title" onClick={onOpen}>
+          {rank !== undefined && <b className="rank-badge" title={`Top three: #${rank}`}><span className="sr-only">Top three, number </span>{rank}</b>}
           {block.title}
         </button>
         <span className="agenda-meta">
           {area?.name ?? "No area"} · {modeLabel[block.workMode]} · {formatDuration(block.plannedMinutes)}
+          {block.isOutside && <> · <span className="outside-tag"><MapPin size={12} aria-hidden /> outside</span></>}
           {block.varianceMinutes !== null && <> · <Variance minutes={block.varianceMinutes} /></>}
         </span>
       </div>
@@ -344,51 +395,49 @@ function ActualInput({ label, saved, onCommit }: { label: string; saved: number 
   );
 }
 
-// ---- End-of-day review -----------------------------------------------------------------------
+// ---- Due soon ---------------------------------------------------------------------------------
 
-const PROMPTS: { key: keyof Review; label: string; placeholder: string }[] = [
-  { key: "biggestWin", label: "Biggest win", placeholder: "What moved forward today?" },
-  { key: "interruptions", label: "What interrupted me?", placeholder: "Name it without judging it." },
-  { key: "changeTomorrow", label: "What will I change tomorrow?", placeholder: "One small adjustment." },
-];
-
-function ReviewCard({ date, review }: { date: string; review?: Review }) {
-  const toast = useToast();
-  const { saveReview } = useDayMutations(date);
-  const [form, setForm] = useState<Review | null>(null);
-  const [savedAt, setSavedAt] = useState(0);
-  const value = form ?? review;
-
-  const save = () => {
-    if (!form || !review || PROMPTS.every((p) => form[p.key].trim() === review[p.key])) return;
-    saveReview.mutate(form, { onSuccess: () => setSavedAt(Date.now()), onError: (err) => toast.error(errorMessage(err)) });
-  };
+/** Open tasks that are overdue or due within a week and have no time booked yet. */
+function DueSoon({ tasks, areaById, date, onAdd }: { tasks: Task[]; areaById: Map<string, Area>; date: string; onAdd: (t: Task) => void }) {
+  const today = todayISO();
+  const horizon = addDays(today, 7);
+  const due = tasks
+    .filter((t) => t.status !== "Done" && t.status !== "Skipped" && !t.scheduledDate && t.dueDate !== null && t.dueDate <= horizon)
+    .sort((a, b) => a.dueDate!.localeCompare(b.dueDate!) || valueScore(b, today) - valueScore(a, today));
+  if (due.length === 0) return null;
 
   return (
-    <section className="card" aria-labelledby="review">
-      <header className="card-head">
+    <section aria-labelledby="due-soon" className="today-section">
+      <header className="section-head">
+        <span className="section-step"><CalendarClock size={15} aria-hidden /></span>
         <div>
-          <h2 id="review">End-of-day review</h2>
-          <p>Be honest, not perfect. Five minutes is enough.</p>
+          <h2 id="due-soon">Due soon</h2>
+          <p>Not booked yet and due within a week. Give them a slot before they become urgent.</p>
         </div>
-        <AnimatePresence>
-          {savedAt > 0 && (
-            <motion.span key={savedAt} className="saved" role="status" initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
-              <CircleCheck size={14} aria-hidden /> Saved
-            </motion.span>
-          )}
-        </AnimatePresence>
+        <Link to="/backlog" className="section-link">Open backlog</Link>
       </header>
-      <div className="review-grid">
-        {PROMPTS.map((p) => (
-          <Field key={p.key} label={p.label}>
-            {(props) => (
-              <Textarea {...props} rows={4} maxLength={1000} placeholder={p.placeholder} disabled={!value} value={value?.[p.key] ?? ""}
-                onChange={(e) => value && setForm({ ...value, [p.key]: e.target.value })} onBlur={save} />
-            )}
-          </Field>
-        ))}
-      </div>
+      <ul className="card card-flush due-list">
+        <AnimatePresence initial={false}>
+          {due.slice(0, 6).map((t) => (
+            <motion.li key={t.id} layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, height: 0 }} className="due-row" data-area={(t.focusAreaId && areaById.get(t.focusAreaId)?.color) || "none"}>
+              <span className={cx("due-when", t.dueDate! <= today && "is-late")}>{dueLabel(t.dueDate!, today)}</span>
+              <span className="agenda-bar" aria-hidden />
+              <div className="agenda-main">
+                <span className="due-title">{t.title}</span>
+                <span className="agenda-meta">
+                  {(t.focusAreaId && areaById.get(t.focusAreaId)?.name) || "No area"}
+                  {t.estimatedMinutes !== null && <> · {formatDuration(t.estimatedMinutes)}</>}
+                  {t.impact === "High" && <> · <span className="impact-tag is-high">High impact</span></>}
+                </span>
+              </div>
+              <Button size="sm" icon={<Plus size={15} aria-hidden />} onClick={() => onAdd(t)}>
+                Add to {date === today ? "today" : formatDate(date, "weekdayShort")}
+              </Button>
+            </motion.li>
+          ))}
+        </AnimatePresence>
+      </ul>
+      {due.length > 6 && <p className="plan-hint">And {due.length - 6} more in your <Link to="/backlog">backlog</Link>.</p>}
     </section>
   );
 }

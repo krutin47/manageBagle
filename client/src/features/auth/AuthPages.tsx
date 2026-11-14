@@ -4,15 +4,17 @@ import { motion } from "motion/react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { Button, ErrorNote, Field, Input, Logo } from "../../components/ui";
-import { api, ApiError, errorMessage } from "../../lib/api";
+import { api, ApiError, errorMessage, type ProviderKey } from "../../lib/api";
 import { useDocumentTitle } from "../../lib/hooks";
 import { useProviders } from "../../lib/queries";
 
 const safeNext = (next: string | null) => (next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
 
 const URL_ERRORS: Record<string, string> = {
-  google_failed: "Google sign-in did not complete. Try again.",
-  google_unverified: "Your Google account's email address is not verified, so we cannot use it to sign you in.",
+  external_failed: "That sign-in did not complete. Try again.",
+  external_unverified: "That account's email address is not verified, so we cannot use it to sign you in.",
+  external_no_email: "That account did not share an email address, so we cannot sign you in with it.",
+  external_account_exists: "An account with that email already exists. Sign in the way you usually do.",
   locked: "Too many attempts. Try again in a few minutes.",
 };
 
@@ -94,20 +96,48 @@ function AuthLayout({ title, lead, children, footer }: { title: string; lead: st
   );
 }
 
-function GoogleButton({ next, label }: { next: string; label: string }) {
+const PROVIDERS: { key: ProviderKey; name: string; logo: ReactNode }[] = [
+  {
+    key: "google",
+    name: "Google",
+    logo: (
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
+        <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z" />
+        <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z" />
+        <path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z" />
+        <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.59A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z" />
+      </svg>
+    ),
+  },
+  {
+    key: "microsoft",
+    name: "Microsoft",
+    logo: (
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
+        <path fill="#F25022" d="M1 1h7.5v7.5H1z" />
+        <path fill="#7FBA00" d="M9.5 1H17v7.5H9.5z" />
+        <path fill="#00A4EF" d="M1 9.5h7.5V17H1z" />
+        <path fill="#FFB900" d="M9.5 9.5H17V17H9.5z" />
+      </svg>
+    ),
+  },
+];
+
+/** One button per sign-in provider the server has credentials for; nothing at all when there are none. */
+function ProviderButtons({ next, verb }: { next: string; verb: string }) {
   const providers = useProviders();
-  if (!providers.data?.google) return null;
+  const enabled = PROVIDERS.filter((p) => providers.data?.[p.key]);
+  if (enabled.length === 0) return null;
   return (
     <>
-      <a className="btn btn-secondary btn-lg btn-block" href={`/api/auth/external/google?returnUrl=${encodeURIComponent(next)}`}>
-        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
-          <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z" />
-          <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z" />
-          <path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z" />
-          <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.59A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z" />
-        </svg>
-        {label}
-      </a>
+      <div className="provider-buttons">
+        {enabled.map((p) => (
+          <a key={p.key} className="btn btn-secondary btn-lg btn-block" href={`/api/auth/external/${p.key}?returnUrl=${encodeURIComponent(next)}`}>
+            {p.logo}
+            {verb} with {p.name}
+          </a>
+        ))}
+      </div>
       <div className="auth-divider">
         <span>or with email</span>
       </div>
@@ -146,7 +176,7 @@ export function LoginPage() {
 
   return (
     <AuthLayout title="Welcome back" lead="Sign in to pick up your day where you left it." footer={<>New here? <Link to="/register">Create an account</Link></>}>
-      <GoogleButton next={next} label="Continue with Google" />
+      <ProviderButtons next={next} verb="Continue" />
       <form onSubmit={submit} className="form" noValidate>
         {error && <ErrorNote>{error}</ErrorNote>}
         <Field label="Email">{(p) => <Input {...p} type="email" autoComplete="username" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />}</Field>
@@ -251,7 +281,7 @@ export function RegisterPage() {
   const hasFieldErrors = error && Object.keys(error.fieldErrors).length > 0;
   return (
     <AuthLayout title="Own your time" lead="Ten minutes to plan, five to review. Create your account to start." footer={<>Already have an account? <Link to="/login">Sign in</Link></>}>
-      <GoogleButton next="/guide?welcome=1" label="Sign up with Google" />
+      <ProviderButtons next="/guide?welcome=1" verb="Sign up" />
       <form onSubmit={submit} className="form" noValidate>
         {error && !hasFieldErrors && <ErrorNote>{error.message}</ErrorNote>}
         {error?.field("form") && <ErrorNote>{error.field("form")}</ErrorNote>}

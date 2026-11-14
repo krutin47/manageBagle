@@ -170,3 +170,35 @@
   .dialog { border-radius: var(--r-3) var(--r-3) 0 0; max-height: 92dvh; max-width: none !important; }
   .toasts { bottom: 84px; }
 }
+
+/* ---- Outside work ---- */
+.outside-toggle { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-2); cursor: pointer; font-size: 14px; font-weight: 550; transition: border-color var(--t-fast), background-color var(--t-fast); }
+.outside-toggle:hover { border-color: var(--line-strong); }
+.outside-toggle input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--ink); flex-shrink: 0; }
+.outside-toggle svg { margin-top: 3px; color: var(--ink-2); }
+.outside-toggle small { display: block; font-weight: 400; font-size: 13px; color: var(--ink-2); margin-top: 1px; }
+.outside-toggle.is-on { border-color: var(--warn); background: var(--warn-tint); }
+.outside-toggle.is-on svg { color: var(--warn); }
+.outside-toggle:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.outside-tag { display: inline-flex; align-items: center; gap: 3px; color: var(--warn); font-weight: 550; white-space: nowrap; }
+.outside-chip { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); font-size: 13px; color: var(--ink-2); white-space: nowrap; transition: all var(--t-fast); }
+.outside-chip:hover { border-color: var(--line-strong); color: var(--ink); }
+.outside-chip.is-on { background: var(--warn-tint); border-color: var(--warn); color: var(--warn); font-weight: 600; }
+
+.rank-badge { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: var(--on-ink); font-family: var(--font-display); font-size: 11px; font-weight: 650; margin-right: 7px; vertical-align: 1px; flex-shrink: 0; }
+.dialog-lg { max-width: 820px; }
+.chev { transition: transform var(--t-med) var(--ease-out); }
+.chev.is-open { transform: rotate(180deg); }
+.provider-buttons { display: grid; gap: 10px; }
+
+/* ---- Stepper ---- */
+.stepper { display: flex; gap: 6px; padding: 12px 24px 4px; }
+.stepper li { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-3); font-weight: 500; flex: 1; min-width: 0; }
+.stepper li:not(:last-child)::after { content: ""; flex: 1; height: 1px; background: var(--line); min-width: 8px; }
+.stepper-dot { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--line-strong); font-size: 12px; font-weight: 650; flex-shrink: 0; transition: all var(--t-med); }
+.stepper-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stepper .is-current { color: var(--ink); font-weight: 650; }
+.stepper .is-current .stepper-dot { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+.stepper .is-done { color: var(--ink-2); }
+.stepper .is-done .stepper-dot { background: var(--good); border-color: var(--good); color: var(--surface); }
+@media (max-width: 560px) { .stepper li:not(.is-current) .stepper-label { display: none; } .stepper li:not(.is-current) { flex: 0 1 auto; } }

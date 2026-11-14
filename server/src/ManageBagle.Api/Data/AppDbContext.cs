@@ -51,6 +51,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.Priority).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.WorkMode).HasConversion<string>().HasMaxLength(16).HasDefaultValue(WorkMode.DeepFocus);
+            e.Property(x => x.Impact).HasConversion<string>().HasMaxLength(16).HasDefaultValue(Priority.Medium).HasSentinel(Priority.Medium);
             e.HasIndex(x => new { x.UserId, x.Status });
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.FocusArea).WithMany().HasForeignKey(x => x.FocusAreaId).OnDelete(DeleteBehavior.SetNull);
