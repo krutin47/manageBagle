@@ -17,6 +17,7 @@ code follows, what exists today, and what is still open. Deeper detail lives in 
 | Colours, type, motion | [design-system.md](design-system.md) |
 | The brain-dump design and its follow-ups | [plan-brain-dump.md](plan-brain-dump.md) |
 | Binding decisions and how far each is built | [adr/](adr/README.md) |
+| Phase 2 product requirements | [requirements/phase-2-product.md](requirements/phase-2-product.md) |
 | Rules for anyone changing the code | [AGENTS.md](../AGENTS.md) |
 | Release, rollback, backup, restore | [runbooks/](runbooks/) |
 | The API contract | [api/openapi.json](api/openapi.json) |
@@ -277,6 +278,10 @@ The detailed, phase-by-phase list is **[handbook-status.md](handbook-status.md)*
 - No **hosted environment** exists, so nothing about a real deployment, a real redeploy, or a
   production backup has been demonstrated.
 - No performance measurements. No testing on real phones or with a screen reader.
+
+### Agreed for Phase 2 (product)
+Brain-dump refinements, a focus timer, daily routines with recovery breaks and reminders, and calendar
+export/import — specified in [requirements/phase-2-product.md](requirements/phase-2-product.md).
 
 ### Still open from the handbook
 - Phase 2's main item: use-case classes (PlanDay first) and moving database access out of endpoints.

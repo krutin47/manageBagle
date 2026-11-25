@@ -3,6 +3,9 @@
 Tracks the *Production Architecture Handbook* (`docs/handbook/`) roadmap against what is actually in
 the repository. Branch: `feature/handbook-phase-1`. Last updated: 2026-11-14.
 
+Product features requested for Phase 2 are specified in
+[requirements/phase-2-product.md](requirements/phase-2-product.md) and tracked at the end of the Phase 2 section.
+
 Legend: **Done** = built and covered by a test that was run · **Partial** = some of it built, the
 gap is stated · **Not done** = nothing built · **Needs you** = cannot be done from code.
 
@@ -68,6 +71,19 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | Route lazy loading | Partial | Settings only |
 | Targeted stale times, key factory, request cancellation | Done | ADR-003 |
 | Architecture dependency test | Done | `ArchitectureTests` |
+
+### Phase 2 — product (requirements in [requirements/phase-2-product.md](requirements/phase-2-product.md))
+
+| ID | Item | State | Notes |
+|---|---|---|---|
+| P2-A1–A7 | Brain dump: priority from due date, deep focus = 2 h, area as tag, working sort modes, distinct suggestion chips, one row of options, outside-work icon | Not started | |
+| P2-B1–B5 | Focus timer: play/pause/stop, one at a time, time recorded, time's-up prompt, stop reasons | Not started | ADR-013 |
+| P2-C1–C3 | Routines with task policies; fitting respects them and a day window | Not started | ADR-014 |
+| P2-C4 | Recovery breaks per focus area and per task | Not started | ADR-014 |
+| P2-C5 | Water and meal reminders (app open) | Not started | Push when the app is closed: Phase 3 |
+| P2-D1 | Calendar export (subscription feed and .ics) | Not started | ADR-015 |
+| P2-D2 | Read busy time from an existing calendar | Not started | ADR-015 |
+| P2-D3 | Write into Google Calendar, two-way sync | Phase 3 | needs Google OAuth credentials |
 
 ## Handbook requirements not yet met anywhere
 

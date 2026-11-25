@@ -16,3 +16,6 @@ Decisions that are binding unless a later record supersedes them. Each states wh
 | [010](010-measure-before-scaling-no-redis-or-kubernetes-yet.md) | Measure before scaling; no Redis or Kubernetes yet | Accepted |
 | [011](011-atomic-day-plan-and-optimistic-concurrency.md) | Atomic day plan and optimistic concurrency | Accepted — implemented |
 | [012](012-ai-suggests-the-person-confirms-the-scheduler-decides.md) | AI suggests, the person confirms, the scheduler decides | Accepted — deferred |
+| [013](013-focus-timer-state-lives-on-the-server.md) | Focus timer state lives on the server | Accepted — in build |
+| [014](014-routines-are-rules-not-rows.md) | Routines are rules, expanded on read | Accepted — in build |
+| [015](015-calendars-start-with-icalendar-feeds.md) | Calendar interoperability starts with iCalendar feeds | Accepted — in build; write-back in Phase 3 |
