@@ -202,3 +202,51 @@
 .stepper .is-done { color: var(--ink-2); }
 .stepper .is-done .stepper-dot { background: var(--good); border-color: var(--good); color: var(--surface); }
 @media (max-width: 560px) { .stepper li:not(.is-current) .stepper-label { display: none; } .stepper li:not(.is-current) { flex: 0 1 auto; } }
+
+/* ---- Option chips (P2-A6): one control for every task option ---- */
+.opt-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px 0 10px; border-radius: var(--r-pill);
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font-size: 13px; font-weight: 500; white-space: nowrap;
+  max-width: 220px; transition: border-color var(--t-fast), background-color var(--t-fast), color var(--t-fast);
+}
+.opt-chip:hover { border-color: var(--line-strong); color: var(--ink); }
+.opt-chip[data-state="open"] { border-color: var(--ink-2); color: var(--ink); }
+.opt-chip-text { overflow: hidden; text-overflow: ellipsis; }
+.opt-chip-caret { opacity: 0.6; flex-shrink: 0; }
+.opt-chip svg:first-child:not(.opt-chip-caret) { flex-shrink: 0; }
+.opt-chip.is-empty { color: var(--ink-3); border-style: dashed; }
+.opt-chip.is-strong { background: var(--accent-tint); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+.opt-chip.is-warn { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); font-weight: 600; }
+/* Focus area: a coloured tag bubble (P2-A3) */
+.opt-chip.is-tag { background: var(--a-tint); color: var(--a-ink); border-color: transparent; font-weight: 600; padding-left: 9px; }
+.opt-chip.is-tag .area-dot { width: 8px; height: 8px; border-radius: 50%; }
+.opt-chip.is-tag:hover { border-color: var(--a-solid); }
+/* Outside work: icon only, with a tooltip (P2-A7) */
+.opt-chip.opt-icon { width: 30px; padding: 0; justify-content: center; }
+.opt-chip.opt-icon.is-on { background: var(--warn-tint); color: var(--warn); border-color: var(--warn); }
+
+.opt-menu { min-width: 200px; max-height: min(360px, var(--radix-dropdown-menu-content-available-height, 360px)); overflow-y: auto; }
+.menu-label { display: block; padding: 6px 10px 4px; font-size: 12px; font-weight: 600; color: var(--ink-3); }
+.menu-item-text { flex: 1; }
+.menu-check { margin-left: auto; color: var(--ink); }
+.menu-item .area-dot { width: 9px; height: 9px; border-radius: 50%; }
+.date-pop { display: grid; padding: 5px; width: 230px; }
+.date-pop .menu-item { width: 100%; text-align: left; }
+.date-pop .menu-item.is-on { font-weight: 600; background: var(--sunken); }
+.date-pop-pick { display: grid; gap: 4px; padding: 8px 10px; border-top: 1px solid var(--line); margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--ink-3); }
+.date-pop-pick .input { height: 34px; }
+.date-pop-clear { color: var(--ink-2); border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; }
+
+.tip { z-index: 90; max-width: 260px; padding: 8px 10px; border-radius: 8px; background: var(--ink); color: var(--on-ink); font-size: 13px; line-height: 1.4; box-shadow: var(--shadow-2); animation: menu-in 0.14s var(--ease-out); }
+.tip-arrow { fill: var(--ink); }
+
+/* Backlog suggestions: rounded rectangles with a soft light border, unlike pill tags (P2-A5) */
+.suggest-chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 5px 11px; border-radius: 10px; max-width: 100%;
+  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); background: color-mix(in srgb, var(--ink) 4%, var(--surface));
+  color: var(--ink); font-size: 13px; font-weight: 500; text-align: left; transition: border-color var(--t-fast), background-color var(--t-fast), transform var(--t-fast);
+}
+.suggest-chip:hover { border-color: color-mix(in srgb, var(--ink) 55%, transparent); background: var(--hover); }
+.suggest-chip:active { transform: scale(0.97); }
+.suggest-chip em { font-style: normal; font-size: 11.5px; color: var(--ink-3); }
+.suggest-chip em.is-late { color: var(--bad); font-weight: 600; }

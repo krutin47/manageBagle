@@ -436,3 +436,21 @@
 .activity li:first-child { border-top: 0; }
 .activity time { color: var(--ink-3); white-space: nowrap; font-size: 13px; }
 .activity li.is-warning span { color: var(--warn); font-weight: 550; }
+
+/* ---- Brain dump rows, v2 ---- */
+.dump-rows .dump-row { grid-template-columns: 4px minmax(0, 1fr) auto; gap: 6px 10px; padding: 10px 0; }
+.dump-row .agenda-bar { grid-row: 1 / span 2; align-self: stretch; }
+.dump-row .plan-title { grid-column: 2; font-weight: 600; }
+.dump-row > .icon-btn { grid-column: 3; grid-row: 1; }
+.dump-chips { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 6px; padding-left: 2px; }
+.dump-group { display: flex; align-items: center; gap: 8px; padding: 14px 2px 4px; font-size: 13px; font-weight: 650; color: var(--a-ink); border-top: 1px solid var(--line); }
+.dump-group:first-child { border-top: 0; padding-top: 4px; }
+.dump-group .area-dot { width: 8px; height: 8px; border-radius: 50%; }
+.dump-group-count { margin-left: auto; font-weight: 500; color: var(--ink-3); font-family: var(--font-mono); font-size: 12px; }
+.dump-group + .dump-row { border-top: 0; }
+.plan-suggest-list { gap: 8px; }
+@media (max-width: 860px) {
+  .dump-rows .dump-row { grid-template-columns: 4px minmax(0, 1fr) auto; }
+  .dump-row .agenda-bar { grid-row: 1 / span 2; }
+  .dump-row .plan-title { grid-column: 2; }
+}

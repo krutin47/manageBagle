@@ -58,7 +58,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 
 | Item | State | Notes |
 |---|---|---|
-| Application/use-case boundary for PlanDay, TimeBlock/Finish, Tasks/ChangeStatus | **Not done** | endpoints still orchestrate and use `DbContext` directly |
+| Application/use-case boundary for PlanDay, TimeBlock/Finish, Tasks/ChangeStatus | Partial | PlanDay done (`Application/Planning`, typed `Result`, architecture test); the timer use cases follow the same pattern |
 | Pure domain time logic | Done | `Domain/CivilTime.cs` |
 | Task lifecycle; no false completion of multi-session tasks | Done | `Domain/TaskCompletion.cs` |
 | Built-in OpenAPI | Done | ADR-002 |
@@ -78,7 +78,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 
 | ID | Item | State | Notes |
 |---|---|---|---|
-| P2-A1–A7 | Brain dump: priority from due date, deep focus = 2 h, area as tag, working sort modes, distinct suggestion chips, one row of options, outside-work icon | Not started | |
+| P2-A1–A7 | Brain dump: priority from due date, deep focus = 2 h, area as tag, working sort modes, distinct suggestion chips, one row of options, outside-work icon | Done | rules in `features/today/brainDump.ts` (21 unit tests); browser test covers A1, A2, A4, A7 |
 | P2-B1–B5 | Focus timer: play/pause/stop, one at a time, time recorded, time's-up prompt, stop reasons | Not started | ADR-013 |
 | P2-C1–C3 | Routines with task policies; fitting respects them and a day window | Not started | ADR-014 |
 | P2-C4 | Recovery breaks per focus area and per task | Not started | ADR-014 |

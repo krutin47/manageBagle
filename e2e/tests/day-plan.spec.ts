@@ -13,9 +13,36 @@ test("a new person can plan a day from a brain dump, work it, and find it again 
     await box.fill(task);
     await box.press("Enter");
   }
-  await page.getByLabel("Outcome impact of “Ship the importer”").selectOption("High");
-  await page.getByLabel("How long will “Ship the importer” take?").selectOption("90");
-  await page.locator(".dump-row", { has: page.locator('input[value="Pick up suit from tailor"]') }).getByRole("button", { name: "Outside work" }).click();
+  const options = (task: string) => page.getByRole("group", { name: `Options for ${task}` });
+  await options("Ship the importer").getByRole("button", { name: "Outcome impact: Medium impact" }).click();
+  await page.getByRole("menuitemradio", { name: "High impact" }).click();
+  // Choosing deep focus suggests two hours (P2-A2)…
+  await options("Ship the importer").getByRole("button", { name: "Kind of work: Shallow work" }).click();
+  await page.getByRole("menuitemradio", { name: "Deep focus" }).click();
+  await expect(options("Ship the importer").getByRole("button", { name: "Length: 2h" })).toBeVisible();
+  // …but a length chosen by hand wins.
+  await options("Ship the importer").getByRole("button", { name: "Length: 2h" }).click();
+  await page.getByRole("menuitemradio", { name: "1h 30m" }).click();
+  await expect(options("Ship the importer").getByRole("button", { name: "Length: 1h 30m" })).toBeVisible();
+
+  // Outside work is an icon with a tooltip that explains it (P2-A7).
+  const outside = options("Pick up suit from tailor").getByRole("button", { name: "Outside work" });
+  await outside.focus();
+  await expect(page.getByRole("tooltip")).toContainText("errands, travel, appointments");
+  await outside.click();
+  await expect(outside).toHaveAttribute("aria-pressed", "true");
+
+  // A due date sets urgency; there is no priority control any more (P2-A1).
+  await options("Pay electricity bill").getByRole("button", { name: /Due date/ }).click();
+  await page.getByRole("button", { name: "Tomorrow" }).click();
+  await expect(options("Pay electricity bill").getByRole("button", { name: "Due date: Due tomorrow" })).toBeVisible();
+  await expect(page.getByRole("dialog").getByText("Priority", { exact: true })).toHaveCount(0);
+
+  // Sorting is a mode that stays on and visibly reorders (P2-A4).
+  await page.getByRole("radiogroup", { name: "Sort the list by" }).getByRole("radio", { name: "Due date" }).check();
+  await expect(page.locator(".dump-row .plan-title").first()).toHaveValue("Pay electricity bill");
+  await page.getByRole("radiogroup", { name: "Sort the list by" }).getByRole("radio", { name: "Impact" }).check();
+  await expect(page.locator(".dump-row .plan-title").first()).toHaveValue("Ship the importer");
 
   await page.getByRole("button", { name: /Next: top three/ }).click();
   await page.getByRole("button", { name: "Suggest for me" }).click();

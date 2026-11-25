@@ -47,11 +47,12 @@ export default defineConfig({
       },
     },
     {
-      command: "npm run dev -- --port 5173 --strictPort",
+      // The built app, as users get it: no on-the-fly dependency optimisation reloading pages mid-test.
+      command: "npm run build && npm run preview -- --port 5173 --strictPort",
       cwd: "../client",
       url: "http://localhost:5173",
       reuseExistingServer: !process.env.CI,
-      timeout: 60_000,
+      timeout: 120_000,
     },
   ],
 });

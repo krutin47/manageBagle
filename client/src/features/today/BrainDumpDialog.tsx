@@ -1,44 +1,27 @@
-import { ArrowLeft, ArrowRight, Check, CornerDownLeft, Inbox, MapPin, Plus, Sparkles, Wand2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, Check, Clock, CornerDownLeft, Gauge, Inbox, MapPin, Plus, Sparkles, Wand2, X, Zap } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useToast } from "../../components/toast";
-import { Button, cx, Dialog, ErrorNote, IconButton, Segmented, Select } from "../../components/ui";
+import { DateChip, OptionChip, Tip } from "../../components/OptionChip";
+import { Button, cx, Dialog, ErrorNote, IconButton, Segmented } from "../../components/ui";
 import { errorMessage, type Area, type Block, type PlanItem, type Priority, type Task, type WorkMode } from "../../lib/api";
+import { dueQuickPicks, priorityOf, rowFromTask, sortRows, topicGroups, valueScore, withWorkMode, type Row, type SortMode } from "./brainDump";
+
+export { valueScore };
 import { modeLabel, PRIORITIES, WORK_MODES } from "../../lib/labels";
 import { useBacklog, usePlanDay } from "../../lib/queries";
 import { proposeSchedule } from "../../lib/schedule";
 import { addDays, formatDate, formatDuration, fromMinutes, nowMinutes, snap, todayISO, toMinutes } from "../../lib/time";
 
-interface Row {
-  key: string;
-  taskId: string | null;
-  title: string;
-  minutes: number;
-  focusAreaId: string | null;
-  workMode: WorkMode;
-  isOutside: boolean;
-  priority: Priority;
-  impact: Priority;
-  dueDate: string | null;
-  top: number | null;
-}
-
-type SortKey = "written" | "topic" | "impact" | "due";
-
 const LENGTHS = [15, 30, 45, 60, 90, 120, 180, 240];
 const STEPS = ["Brain dump", "Pick your top three", "Fit it into the day"];
-const LEVEL = { High: 0, Medium: 1, Low: 2 };
-
-const fromTask = (t: Task): Row => ({
-  key: t.id, taskId: t.id, title: t.title, minutes: t.estimatedMinutes ?? 30, focusAreaId: t.focusAreaId, workMode: t.workMode,
-  isOutside: t.isOutside, priority: t.priority, impact: t.impact, dueDate: t.dueDate, top: null,
-});
-
-/** Higher is more worth doing today: impact counts most, then priority, then how soon it is due. */
-export function valueScore(row: Pick<Row, "impact" | "priority" | "dueDate">, today: string): number {
-  const due = row.dueDate === null ? 0 : row.dueDate <= today ? 3 : row.dueDate <= addDays(today, 2) ? 2 : row.dueDate <= addDays(today, 7) ? 1 : 0;
-  return (2 - LEVEL[row.impact]) * 5 + (2 - LEVEL[row.priority]) * 2 + due;
-}
+const SORTS: { value: SortMode; label: string }[] = [
+  { value: "written", label: "As written" },
+  { value: "topic", label: "Topic" },
+  { value: "impact", label: "Impact" },
+  { value: "due", label: "Due date" },
+];
+const OUTSIDE_TIP = "Outside work — errands, travel, appointments. Adds a buffer because the physical world runs late.";
 
 export function dueLabel(due: string, today = todayISO()): string {
   if (due < today) return "Overdue";
@@ -76,7 +59,8 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
   const backlog = useBacklog();
   const plan = usePlanDay(date);
   const [step, setStep] = useState(0);
-  const [rows, setRows] = useState<Row[]>(() => (seed ?? []).map(fromTask));
+  const [rows, setRows] = useState<Row[]>(() => (seed ?? []).map(rowFromTask));
+  const [sort, setSort] = useState<SortMode>("written");
   const [batch, setBatch] = useState(true);
   const [text, setText] = useState("");
   const [from, setFrom] = useState(() => fromMinutes(defaultStart(date, blocks)));
@@ -95,12 +79,13 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
     if (!title) return;
     const last = rows.at(-1);
     // A new line inherits topic and kind of work from the one above: people dump related things in runs.
-    setRows([...rows, { key: `n${nextKey.current++}`, taskId: null, title, minutes: 30, focusAreaId: last?.focusAreaId ?? null, workMode: last?.workMode ?? "ShallowWork", isOutside: false, priority: "Medium", impact: "Medium", dueDate: null, top: null }]);
+    const fresh: Row = { key: `n${nextKey.current++}`, taskId: null, title, minutes: 30, minutesChosen: false, focusAreaId: last?.focusAreaId ?? null, workMode: "ShallowWork", isOutside: false, impact: "Medium", dueDate: null, priorityOverride: null, top: null };
+    setRows([...rows, withWorkMode(fresh, last?.workMode ?? "ShallowWork")]);
     setText("");
     input.current?.focus();
   };
 
-  const addTask = (t: Task) => setRows((list) => [...list, fromTask(t)]);
+  const addTask = (t: Task) => setRows((list) => [...list, rowFromTask(t)]);
 
   // Suggestions: open, unbooked backlog tasks — what is due soonest first, then what is worth most.
   const today = todayISO();
@@ -108,15 +93,9 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
     .filter((t) => t.status !== "Done" && t.status !== "Skipped" && !t.scheduledDate && !rows.some((r) => r.taskId === t.id))
     .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999") || valueScore(b, today) - valueScore(a, today));
 
-  const areaOrder = (id: string | null) => (id === null ? 999 : areas.findIndex((a) => a.id === id));
-  const sortRows = (key: SortKey) =>
-    setRows((list) => {
-      const original = [...list].sort((a, b) => list.indexOf(a) - list.indexOf(b));
-      if (key === "topic") return original.sort((a, b) => areaOrder(a.focusAreaId) - areaOrder(b.focusAreaId) || WORK_MODES.indexOf(a.workMode) - WORK_MODES.indexOf(b.workMode));
-      if (key === "impact") return original.sort((a, b) => valueScore(b, today) - valueScore(a, today));
-      if (key === "due") return original.sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
-      return original;
-    });
+  const view = sortRows(rows, sort, areas);
+  const areaOf = (id: string | null) => areas.find((a) => a.id === id);
+  const areaOptions = [{ value: "", label: "No focus area", area: "none" }, ...areas.map((a) => ({ value: a.id, label: a.name, area: a.color as string }))];
 
   const suggestTop = () =>
     setRows((list) => {
@@ -154,7 +133,7 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
       const slot = onlyTop && r.top === null ? undefined : proposal.slots.get(r.key);
       return {
         taskId: r.taskId, title: r.title, estimatedMinutes: r.minutes, focusAreaId: r.focusAreaId, workMode: r.workMode, isOutside: r.isOutside,
-        priority: r.priority, impact: r.impact, dueDate: r.dueDate, topRank: r.top, start: slot ? fromMinutes(slot.start) : null, end: slot ? fromMinutes(slot.end) : null,
+        priority: priorityOf(r, today), impact: r.impact, dueDate: r.dueDate, topRank: r.top, start: slot ? fromMinutes(slot.start) : null, end: slot ? fromMinutes(slot.end) : null,
       };
     });
     try {
@@ -200,50 +179,55 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
                   <p className="plan-hint">Write everything down first — one line each, no sorting, no judging. You will pick your top three next.</p>
                 ) : (
                   <>
-                    {rows.length > 2 && (
+                    {rows.length > 1 && (
                       <div className="dump-sort">
-                        <span className="field-label">Sort</span>
-                        <div className="dump-sort-btns" role="group" aria-label="Sort the list">
-                          <button type="button" className="chip-btn" onClick={() => sortRows("topic")} title="Group by focus area so you switch context less">By topic</button>
-                          <button type="button" className="chip-btn" onClick={() => sortRows("impact")}>By impact</button>
-                          <button type="button" className="chip-btn" onClick={() => sortRows("due")}>By due date</button>
-                        </div>
+                        <span className="field-label" id="dump-sort-label">Sort by</span>
+                        <Segmented size="sm" label="Sort the list by" value={sort} onChange={setSort} options={SORTS} />
+                        <span className="sr-only" aria-live="polite">{`Sorted ${SORTS.find((x) => x.value === sort)!.label.toLowerCase()}`}</span>
                       </div>
                     )}
                     <ul className="dump-rows">
-                      <li className="dump-head" aria-hidden>
-                        <span /><span>Task</span><span>Duration</span><span>Priority</span><span>Impact</span><span>Due</span><span />
-                      </li>
                       <AnimatePresence initial={false}>
-                        {rows.map((r) => (
-                          <motion.li key={r.key} layout="position" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.18 }} className="dump-row" data-area={areas.find((a) => a.id === r.focusAreaId)?.color ?? "none"}>
-                            <span className="agenda-bar" aria-hidden />
-                            <input className="cell-input plan-title" aria-label="Task" maxLength={200} value={r.title} onChange={(e) => patch(r.key, { title: e.target.value })} />
-                            <Select data-label="Duration" className="plan-sel" aria-label={`How long will “${r.title}” take?`} value={r.minutes} onChange={(e) => patch(r.key, { minutes: Number(e.target.value) })}>
-                              {[...new Set([...LENGTHS, r.minutes])].sort((a, b) => a - b).map((m) => <option key={m} value={m}>{formatDuration(m)}</option>)}
-                            </Select>
-                            <Select data-label="Priority" className="plan-sel" aria-label={`Priority of “${r.title}”`} value={r.priority} onChange={(e) => patch(r.key, { priority: e.target.value as Priority })}>
-                              {PRIORITIES.map((v) => <option key={v} value={v}>{v}</option>)}
-                            </Select>
-                            <Select data-label="Impact" className={cx("plan-sel", r.impact === "High" && "is-high")} aria-label={`Outcome impact of “${r.title}”`} value={r.impact} onChange={(e) => patch(r.key, { impact: e.target.value as Priority })}>
-                              {PRIORITIES.map((v) => <option key={v} value={v}>{v}</option>)}
-                            </Select>
-                            <input type="date" className="input plan-due" aria-label={`Due date of “${r.title}”`} value={r.dueDate ?? ""} onChange={(e) => patch(r.key, { dueDate: e.target.value || null })} />
-                            <IconButton size="sm" label={`Remove ${r.title}`} onClick={() => setRows(rows.filter((x) => x.key !== r.key))}><X size={15} /></IconButton>
-                            <div className="dump-more">
-                              <Select className="plan-sel" aria-label={`Kind of work for “${r.title}”`} value={r.workMode} onChange={(e) => patch(r.key, { workMode: e.target.value as WorkMode })}>
-                                {WORK_MODES.map((m) => <option key={m} value={m}>{modeLabel[m]}</option>)}
-                              </Select>
-                              <Select className="plan-sel" aria-label={`Focus area for “${r.title}”`} value={r.focusAreaId ?? ""} onChange={(e) => patch(r.key, { focusAreaId: e.target.value || null })}>
-                                <option value="">No focus area</option>
-                                {areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                              </Select>
-                              <button type="button" className={cx("outside-chip", r.isOutside && "is-on")} aria-pressed={r.isOutside} title="Outside work: errands, travel, appointments. A buffer is added because it may run long." onClick={() => patch(r.key, { isOutside: !r.isOutside })}>
-                                <MapPin size={14} aria-hidden /> Outside work
-                              </button>
-                            </div>
-                          </motion.li>
-                        ))}
+                        {(sort === "topic" ? topicGroups(view) : [{ focusAreaId: undefined, rows: view }]).flatMap((group) => [
+                          ...(group.focusAreaId !== undefined ? [
+                            <motion.li layout="position" key={`h-${group.focusAreaId ?? "none"}`} className="dump-group" data-area={areaOf(group.focusAreaId)?.color ?? "none"}>
+                              <span className="area-dot" aria-hidden />{areaOf(group.focusAreaId)?.name ?? "No focus area"}
+                              <span className="dump-group-count">{group.rows.length} · {formatDuration(group.rows.reduce((t, r) => t + r.minutes, 0))}</span>
+                            </motion.li>,
+                          ] : []),
+                          ...group.rows.map((r) => {
+                            const area = areaOf(r.focusAreaId);
+                            const late = r.dueDate !== null && r.dueDate <= today;
+                            return (
+                              <motion.li key={r.key} layout="position" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.18 }} className="dump-row" data-area={area?.color ?? "none"}>
+                                <span className="agenda-bar" aria-hidden />
+                                <input className="cell-input plan-title" aria-label="Task" maxLength={200} value={r.title} onChange={(e) => patch(r.key, { title: e.target.value })} />
+                                <IconButton size="sm" label={`Remove ${r.title}`} onClick={() => setRows(rows.filter((x) => x.key !== r.key))}><X size={15} /></IconButton>
+                                <div className="dump-chips" role="group" aria-label={`Options for ${r.title}`}>
+                                  <OptionChip label="Length" icon={<Clock size={13} aria-hidden />} value={String(r.minutes)}
+                                    options={[...new Set([...LENGTHS, r.minutes])].sort((x, y) => x - y).map((m) => ({ value: String(m), label: formatDuration(m) }))}
+                                    onChange={(v) => patch(r.key, { minutes: Number(v), minutesChosen: true })} />
+                                  <OptionChip label="Kind of work" icon={<Zap size={13} aria-hidden />} value={r.workMode}
+                                    options={WORK_MODES.map((m) => ({ value: m, label: modeLabel[m] }))}
+                                    onChange={(v) => setRows((list) => list.map((x) => (x.key === r.key ? withWorkMode(x, v as WorkMode) : x)))} />
+                                  <OptionChip label="Focus area" area={area?.color ?? "none"} value={r.focusAreaId ?? ""} options={areaOptions}
+                                    onChange={(v) => patch(r.key, { focusAreaId: v || null })} />
+                                  <OptionChip label="Outcome impact" icon={<Gauge size={13} aria-hidden />} strong={r.impact === "High"} value={r.impact}
+                                    options={PRIORITIES.map((v) => ({ value: v, label: `${v} impact` }))}
+                                    onChange={(v) => patch(r.key, { impact: v as Priority })} />
+                                  <DateChip label="Due date" icon={<CalendarDays size={13} aria-hidden />} value={r.dueDate} warn={late}
+                                    display={r.dueDate ? dueLabel(r.dueDate, today) : "No due date"} quickPicks={dueQuickPicks(today)}
+                                    onChange={(v) => patch(r.key, { dueDate: v, priorityOverride: null })} />
+                                  <Tip content={OUTSIDE_TIP}>
+                                    <button type="button" className={cx("opt-chip opt-icon", r.isOutside && "is-on")} aria-pressed={r.isOutside} aria-label="Outside work" onClick={() => patch(r.key, { isOutside: !r.isOutside })}>
+                                      <MapPin size={15} aria-hidden />
+                                    </button>
+                                  </Tip>
+                                </div>
+                              </motion.li>
+                            );
+                          }),
+                        ])}
                       </AnimatePresence>
                     </ul>
                   </>
@@ -254,7 +238,7 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
                     <span className="field-label"><Inbox size={14} aria-hidden /> Suggested from your backlog — due soonest first</span>
                     <div className="plan-suggest-list">
                       {suggestions.slice(0, 8).map((t) => (
-                        <button key={t.id} type="button" className="chip-btn plan-suggest-chip" onClick={() => addTask(t)}>
+                        <button key={t.id} type="button" className="suggest-chip" onClick={() => addTask(t)}>
                           <Plus size={12} aria-hidden /> {t.title}
                           {t.dueDate && <em className={cx(t.dueDate <= today && "is-late")}>{dueLabel(t.dueDate, today)}</em>}
                         </button>
@@ -275,7 +259,7 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
                 {freeRanks.length > 0 && rows.length > freeRanks.length && (
                   <div>
                     <Button size="sm" icon={<Wand2 size={15} aria-hidden />} onClick={suggestTop}>Suggest for me</Button>
-                    <span className="plan-hint plan-hint-inline">Ranks by impact, then priority, then what is due soonest.</span>
+                    <span className="plan-hint plan-hint-inline">Ranks by impact first, then by how soon it is due.</span>
                   </div>
                 )}
                 <ul className="plan-pick">
@@ -288,7 +272,7 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
                           <span className="pick-title">{r.title}</span>
                           <span className="pick-meta">
                             <span className={cx("impact-tag", `is-${r.impact.toLowerCase()}`)}>{r.impact} impact</span>
-                            {r.priority} priority · {formatDuration(r.minutes)}{r.dueDate && <> · <span className={cx(r.dueDate <= today && "due is-late")}>{dueLabel(r.dueDate, today)}</span></>}
+                            {formatDuration(r.minutes)} · {modeLabel[r.workMode]}{r.dueDate && <> · <span className={cx(r.dueDate <= today && "due is-late")}>{dueLabel(r.dueDate, today)}</span></>}
                           </span>
                         </button>
                       </li>

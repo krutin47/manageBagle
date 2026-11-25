@@ -54,6 +54,10 @@ const pairs: [string, string, number][] = [
   ["surface", "good", 4.5],
   ["surface", "bad", 4.5],
   ["accent", "sunken", 3],
+  // Option chips: warning text on surfaces, strong (high impact) chips.
+  ["warn", "warn-tint", 4.5],
+  ["accent-ink", "surface", 4.5],
+  ["bad", "surface", 4.5],
   ["good", "good-tint", 4.5],
   ["warn", "warn-tint", 4.5],
   ["bad", "bad-tint", 4.5],
