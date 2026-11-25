@@ -3,13 +3,45 @@ import type { Block, Outcome } from "../../lib/api";
 import { rollingTopThree } from "./topThree";
 
 let n = 0;
-const block = (p: Partial<Block>): Block => ({
-  id: `b${n++}`, date: "2026-11-25", start: "09:00", end: "10:00", title: "t", focusAreaId: null, priority: "Medium", workMode: "ShallowWork",
-  status: "Planned", actualMinutes: null, plannedMinutes: 60, varianceMinutes: null, notes: "", isOutside: false, backlogTaskId: null, timeZone: null,
-  version: 1, timerStartedAt: null, trackedSeconds: 0, extendedMinutes: 0, stopNote: "", breakBeforeMinutes: 0, breakAfterMinutes: 0, ...p,
-} as Block);
-const outcome = (rank: number, p: Partial<Outcome> = {}): Outcome => ({ rank, result: `#${rank}`, focusAreaId: null, nextAction: "", status: "Planned", minutesNeeded: null, backlogTaskId: null, ...p });
-const names = (items: ReturnType<typeof rollingTopThree>["current"]) => items.map((i) => (i.kind === "outcome" ? i.outcome.result : i.block.title));
+const block = (p: Partial<Block>): Block =>
+  ({
+    id: `b${n++}`,
+    date: "2026-11-25",
+    start: "09:00",
+    end: "10:00",
+    title: "t",
+    focusAreaId: null,
+    priority: "Medium",
+    workMode: "ShallowWork",
+    status: "Planned",
+    actualMinutes: null,
+    plannedMinutes: 60,
+    varianceMinutes: null,
+    notes: "",
+    isOutside: false,
+    backlogTaskId: null,
+    timeZone: null,
+    version: 1,
+    timerStartedAt: null,
+    trackedSeconds: 0,
+    extendedMinutes: 0,
+    stopNote: "",
+    breakBeforeMinutes: 0,
+    breakAfterMinutes: 0,
+    ...p,
+  }) as Block;
+const outcome = (rank: number, p: Partial<Outcome> = {}): Outcome => ({
+  rank,
+  result: `#${rank}`,
+  focusAreaId: null,
+  nextAction: "",
+  status: "Planned",
+  minutesNeeded: null,
+  backlogTaskId: null,
+  ...p,
+});
+const names = (items: ReturnType<typeof rollingTopThree>["current"]) =>
+  items.map((i) => (i.kind === "outcome" ? i.outcome.result : i.block.title));
 
 describe("rolling top three (P2-F2)", () => {
   const blocks = [
@@ -27,7 +59,10 @@ describe("rolling top three (P2-F2)", () => {
   });
 
   it("moves the next task in line up when one is finished or dropped, by priority then start time", () => {
-    const { current, done } = rollingTopThree([outcome(1, { status: "Done", backlogTaskId: "t1" }), outcome(2, { status: "Skipped" }), outcome(3)], blocks);
+    const { current, done } = rollingTopThree(
+      [outcome(1, { status: "Done", backlogTaskId: "t1" }), outcome(2, { status: "Skipped" }), outcome(3)],
+      blocks,
+    );
     expect(names(current)).toEqual(["#3", "High early", "High late"]);
     expect(names(done)).toEqual(["#1", "#2"]);
   });
@@ -38,7 +73,10 @@ describe("rolling top three (P2-F2)", () => {
   });
 
   it("shows a task spread over several blocks once, at its next open session", () => {
-    const split = [block({ title: "Write", backlogTaskId: "w", start: "09:00", status: "Done" }), block({ title: "Write", backlogTaskId: "w", start: "14:00" })];
+    const split = [
+      block({ title: "Write", backlogTaskId: "w", start: "09:00", status: "Done" }),
+      block({ title: "Write", backlogTaskId: "w", start: "14:00" }),
+    ];
     const { current, done } = rollingTopThree([], split);
     expect(current).toHaveLength(1);
     expect(current[0]!.kind === "block" && current[0]!.block.start).toBe("14:00");
@@ -46,7 +84,10 @@ describe("rolling top three (P2-F2)", () => {
   });
 
   it("lists finished blocks as done for the day", () => {
-    const { current, done } = rollingTopThree([], [block({ title: "Gym", status: "Done" }), block({ title: "Call", status: "InProgress" })]);
+    const { current, done } = rollingTopThree(
+      [],
+      [block({ title: "Gym", status: "Done" }), block({ title: "Call", status: "InProgress" })],
+    );
     expect(names(current)).toEqual(["Call"]);
     expect(names(done)).toEqual(["Gym"]);
   });

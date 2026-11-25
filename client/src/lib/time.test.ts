@@ -1,5 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { nowMinutes, setTimeZone, todayISO, addDays, formatDuration, formatHours, fromMinutes, isValidISODate, plannedMinutes, snap, toMinutes, weekDays, weekStart } from "./time";
+import {
+  nowMinutes,
+  setTimeZone,
+  todayISO,
+  addDays,
+  formatDuration,
+  formatHours,
+  fromMinutes,
+  isValidISODate,
+  plannedMinutes,
+  snap,
+  toMinutes,
+  weekDays,
+  weekStart,
+} from "./time";
 
 describe("time helpers", () => {
   it("finds the Monday of any week", () => {
@@ -74,4 +88,3 @@ describe("the account's time zone", () => {
     expect(nowMinutes()).toBe(3 * 60); // the clock jumps straight to 03:00
   });
 });
-

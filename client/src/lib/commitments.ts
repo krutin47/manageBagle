@@ -2,7 +2,8 @@ import type { Block, Commitment as ApiCommitment } from "./api";
 import type { Commitment } from "./schedule";
 import { parseISODate, toMinutes } from "./time";
 
-const dayGap = (from: string, to: string) => Math.round((parseISODate(to).getTime() - parseISODate(from).getTime()) / 86_400_000);
+const dayGap = (from: string, to: string) =>
+  Math.round((parseISODate(to).getTime() - parseISODate(from).getTime()) / 86_400_000);
 
 /**
  * Commitments that touch `date`, in minutes from that date's midnight: today's routines, and the tail
@@ -20,19 +21,29 @@ export function commitmentsOn(date: string, all: ApiCommitment[]): (Commitment &
 
 /** Existing blocks as busy time, including the recovery breaks they reserve. */
 export const busyFromBlocks = (blocks: Block[]): [number, number][] =>
-  blocks.map((b) => [toMinutes(b.start) - b.breakBeforeMinutes, Math.min(toMinutes(b.start) + b.plannedMinutes, 1440) + b.breakAfterMinutes]);
+  blocks.map((b) => [
+    toMinutes(b.start) - b.breakBeforeMinutes,
+    Math.min(toMinutes(b.start) + b.plannedMinutes, 1440) + b.breakAfterMinutes,
+  ]);
 
 /**
  * Fixed time a block runs into (handbook §1: a block over a fixed appointment is rejected or visibly
  * reconciled). Planning refuses these; a block placed by hand is allowed but flagged. A clash is a
  * meeting, a protected routine, or a routine that only takes other focus areas.
  */
-export function clashesFor(block: Pick<Block, "start" | "plannedMinutes" | "focusAreaId">, fixed: (Commitment & { source: ApiCommitment })[]): (Commitment & { source: ApiCommitment })[] {
+export function clashesFor(
+  block: Pick<Block, "start" | "plannedMinutes" | "focusAreaId">,
+  fixed: (Commitment & { source: ApiCommitment })[],
+): (Commitment & { source: ApiCommitment })[] {
   const start = toMinutes(block.start);
   const end = start + block.plannedMinutes;
-  return fixed.filter((c) => c.start < end && c.end > start && (
-    c.policy === "NoTasks" || (c.policy === "SelectedAreas" && (block.focusAreaId === null || !c.areaIds.includes(block.focusAreaId)))
-  ));
+  return fixed.filter(
+    (c) =>
+      c.start < end &&
+      c.end > start &&
+      (c.policy === "NoTasks" ||
+        (c.policy === "SelectedAreas" && (block.focusAreaId === null || !c.areaIds.includes(block.focusAreaId)))),
+  );
 }
 
 /** "Overlaps Lunch", "Overlaps Lunch and Team sync". */

@@ -9,7 +9,9 @@ test("writing freely turns a paragraph into suggested lines the person checks be
   await page.getByRole("button", { name: "Brain dump", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("radiogroup", { name: "How to write" }).getByRole("radio", { name: "Write freely" }).check();
-  await dialog.getByLabel("Write everything on your mind").fill("Finish the important deck for Monday. Book the dentist.");
+  await dialog
+    .getByLabel("Write everything on your mind")
+    .fill("Finish the important deck for Monday. Book the dentist.");
   await expect(dialog).toContainText("left today");
   await dialog.getByRole("button", { name: "Turn into tasks" }).click();
 
@@ -19,7 +21,9 @@ test("writing freely turns a paragraph into suggested lines the person checks be
   const deck = dialog.getByRole("group", { name: "Options for Finish the important deck for Monday" });
   await expect(deck.getByRole("button", { name: "Kind of work: Deep focus" })).toBeVisible();
   await expect(deck.getByRole("button", { name: "Outcome impact: High impact" })).toBeVisible();
-  await expect(dialog.getByRole("group", { name: "Options for Book the dentist" }).getByRole("button", { name: "Outside work" })).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    dialog.getByRole("group", { name: "Options for Book the dentist" }).getByRole("button", { name: "Outside work" }),
+  ).toHaveAttribute("aria-pressed", "true");
 
   // The person can drop a suggestion before saving.
   await dialog.getByRole("button", { name: "Remove Book the dentist" }).click();

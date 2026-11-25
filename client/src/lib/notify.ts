@@ -19,7 +19,8 @@ export async function askForNotificationsOnce(): Promise<void> {
 
 /** Shows a system notification if the tab is hidden and permission was given. Returns whether it did. */
 export function notifyInBackground(title: string, body: string, tag: string): boolean {
-  if (!notificationsSupported() || Notification.permission !== "granted" || document.visibilityState === "visible") return false;
+  if (!notificationsSupported() || Notification.permission !== "granted" || document.visibilityState === "visible")
+    return false;
   try {
     const n = new Notification(title, { body, tag, icon: "/favicon.svg" });
     n.onclick = () => {

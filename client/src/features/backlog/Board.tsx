@@ -1,4 +1,19 @@
-import { DndContext, DragOverlay, KeyboardCode, KeyboardSensor, PointerSensor, pointerWithin, rectIntersection, useDraggable, useDroppable, useSensor, useSensors, type CollisionDetection, type DragEndEvent, type KeyboardCoordinateGetter } from "@dnd-kit/core";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardCode,
+  KeyboardSensor,
+  PointerSensor,
+  pointerWithin,
+  rectIntersection,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type DragEndEvent,
+  type KeyboardCoordinateGetter,
+} from "@dnd-kit/core";
 import { CalendarPlus, MapPin } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
@@ -43,14 +58,18 @@ const columnByColumn: KeyboardCoordinateGetter = (event, { context, currentCoord
   const id = order[Math.max(0, Math.min(order.length - 1, from + step))]!;
   // Columns are measured just after a card is picked up; an arrow pressed before that (a quick
   // keyboard user, a busy device) measures the column itself instead of being ignored.
-  const target = context.droppableRects.get(id) ?? context.droppableContainers.get(id)?.node.current?.getBoundingClientRect();
+  const target =
+    context.droppableRects.get(id) ?? context.droppableContainers.get(id)?.node.current?.getBoundingClientRect();
   return target ? { x: target.left + 12, y: currentCoordinates.y } : undefined;
 };
 
 export function Board({ tasks, areaById, onMove, onOpen, onSchedule }: BoardProps) {
   const [dragging, setDragging] = useState<Task | null>(null);
   // A small drag distance keeps a plain click (open the task) from starting a drag.
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: columnByColumn }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: columnByColumn }),
+  );
 
   const onDragEnd = (e: DragEndEvent) => {
     setDragging(null);
@@ -70,39 +89,91 @@ export function Board({ tasks, areaById, onMove, onOpen, onSchedule }: BoardProp
         announcements: {
           onDragStart: ({ active }) => `Picked up ${tasks.find((t) => t.id === active.id)?.title}.`,
           onDragOver: ({ over }) => (over ? `Over ${COLUMNS.find((c) => c.status === over.id)?.title}.` : ""),
-          onDragEnd: ({ over }) => (over ? `Dropped in ${COLUMNS.find((c) => c.status === over.id)?.title}.` : "Dropped."),
+          onDragEnd: ({ over }) =>
+            over ? `Dropped in ${COLUMNS.find((c) => c.status === over.id)?.title}.` : "Dropped.",
           onDragCancel: () => "Move cancelled.",
         },
-        screenReaderInstructions: { draggable: "Press space to pick up the task, left or right arrow to move it one column, space to drop, escape to cancel." },
+        screenReaderInstructions: {
+          draggable:
+            "Press space to pick up the task, left or right arrow to move it one column, space to drop, escape to cancel.",
+        },
       }}
     >
       <div className="board">
         {COLUMNS.map((col) => {
-          const items = tasks.filter((t) => t.status === col.status).sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || a.createdAt.localeCompare(b.createdAt));
+          const items = tasks
+            .filter((t) => t.status === col.status)
+            .sort(
+              (a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || a.createdAt.localeCompare(b.createdAt),
+            );
           return (
-            <Column key={col.status} status={col.status} title={col.title} empty={col.empty} count={items.length} minutes={items.reduce((s, t) => s + (t.estimatedMinutes ?? 0), 0)} active={!!dragging && dragging.status !== col.status}>
+            <Column
+              key={col.status}
+              status={col.status}
+              title={col.title}
+              empty={col.empty}
+              count={items.length}
+              minutes={items.reduce((s, t) => s + (t.estimatedMinutes ?? 0), 0)}
+              active={!!dragging && dragging.status !== col.status}
+            >
               {items.map((t) => (
-                <Card key={t.id} task={t} area={t.focusAreaId ? areaById.get(t.focusAreaId) : undefined} hidden={dragging?.id === t.id} onOpen={() => onOpen(t)} onSchedule={() => onSchedule(t)} />
+                <Card
+                  key={t.id}
+                  task={t}
+                  area={t.focusAreaId ? areaById.get(t.focusAreaId) : undefined}
+                  hidden={dragging?.id === t.id}
+                  onOpen={() => onOpen(t)}
+                  onSchedule={() => onSchedule(t)}
+                />
               ))}
             </Column>
           );
         })}
       </div>
       <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }}>
-        {dragging && <CardBody task={dragging} area={dragging.focusAreaId ? areaById.get(dragging.focusAreaId) : undefined} lifted />}
+        {dragging && (
+          <CardBody
+            task={dragging}
+            area={dragging.focusAreaId ? areaById.get(dragging.focusAreaId) : undefined}
+            lifted
+          />
+        )}
       </DragOverlay>
     </DndContext>
   );
 }
 
-function Column({ status, title, empty, count, minutes, active, children }: { status: Status; title: string; empty: string; count: number; minutes: number; active: boolean; children: React.ReactNode }) {
+function Column({
+  status,
+  title,
+  empty,
+  count,
+  minutes,
+  active,
+  children,
+}: {
+  status: Status;
+  title: string;
+  empty: string;
+  count: number;
+  minutes: number;
+  active: boolean;
+  children: React.ReactNode;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
-    <section ref={setNodeRef} className={cx("board-col", active && "is-target", isOver && "is-over")} data-status={status} aria-label={`${title}, ${count} task${count === 1 ? "" : "s"}`}>
+    <section
+      ref={setNodeRef}
+      className={cx("board-col", active && "is-target", isOver && "is-over")}
+      data-status={status}
+      aria-label={`${title}, ${count} task${count === 1 ? "" : "s"}`}
+    >
       <header className="board-col-head">
         <h2>{title}</h2>
         <span className="board-count">{count}</span>
-        {minutes > 0 && status !== "Done" && status !== "Skipped" && <span className="board-mins">{formatDuration(minutes)}</span>}
+        {minutes > 0 && status !== "Done" && status !== "Skipped" && (
+          <span className="board-mins">{formatDuration(minutes)}</span>
+        )}
       </header>
       <div className="board-cards">
         {children}
@@ -112,20 +183,57 @@ function Column({ status, title, empty, count, minutes, active, children }: { st
   );
 }
 
-function Card({ task, area, hidden, onOpen, onSchedule }: { task: Task; area?: Area; hidden: boolean; onOpen: () => void; onSchedule: () => void }) {
+function Card({
+  task,
+  area,
+  hidden,
+  onOpen,
+  onSchedule,
+}: {
+  task: Task;
+  area?: Area;
+  hidden: boolean;
+  onOpen: () => void;
+  onSchedule: () => void;
+}) {
   const { attributes, listeners, setNodeRef } = useDraggable({ id: task.id, data: { status: task.status } });
   return (
-    <motion.div ref={setNodeRef} layout="position" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: hidden ? 0.25 : 1, scale: 1 }} transition={{ duration: 0.18 }} {...attributes} {...listeners} aria-roledescription="draggable task" className="board-card-wrap">
+    <motion.div
+      ref={setNodeRef}
+      layout="position"
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: hidden ? 0.25 : 1, scale: 1 }}
+      transition={{ duration: 0.18 }}
+      {...attributes}
+      {...listeners}
+      aria-roledescription="draggable task"
+      className="board-card-wrap"
+    >
       <CardBody task={task} area={area} onOpen={onOpen} onSchedule={onSchedule} />
     </motion.div>
   );
 }
 
-function CardBody({ task, area, lifted, onOpen, onSchedule }: { task: Task; area?: Area; lifted?: boolean; onOpen?: () => void; onSchedule?: () => void }) {
+function CardBody({
+  task,
+  area,
+  lifted,
+  onOpen,
+  onSchedule,
+}: {
+  task: Task;
+  area?: Area;
+  lifted?: boolean;
+  onOpen?: () => void;
+  onSchedule?: () => void;
+}) {
   const open = task.status === "Planned" || task.status === "InProgress";
   const late = open && task.dueDate !== null && task.dueDate < todayISO();
   return (
-    <article className={cx("board-card", lifted && "is-lifted", !open && "is-closed")} data-area={area?.color ?? "none"}>
+    <article
+      className={cx("board-card", lifted && "is-lifted", !open && "is-closed")}
+      data-area={area?.color ?? "none"}
+    >
       <button type="button" className="row-link board-card-title" onClick={onOpen} tabIndex={lifted ? -1 : 0}>
         {task.title}
       </button>
@@ -139,15 +247,29 @@ function CardBody({ task, area, lifted, onOpen, onSchedule }: { task: Task; area
         <span>
           {task.estimatedMinutes !== null && <>{formatDuration(task.estimatedMinutes)} · </>}
           {modeLabel[task.workMode]}
-          {task.isOutside && <span className="outside-tag"> · <MapPin size={12} aria-hidden /> outside</span>}
+          {task.isOutside && (
+            <span className="outside-tag">
+              {" "}
+              · <MapPin size={12} aria-hidden /> outside
+            </span>
+          )}
         </span>
-        {task.dueDate && <span className={cx("due", late && "is-late")}>{late ? "Overdue" : "Due"} {formatDate(task.dueDate, "short")}</span>}
+        {task.dueDate && (
+          <span className={cx("due", late && "is-late")}>
+            {late ? "Overdue" : "Due"} {formatDate(task.dueDate, "short")}
+          </span>
+        )}
       </div>
-      {open && (task.scheduledDate ? (
-        <span className="scheduled board-card-when"><CalendarPlus size={12} aria-hidden /> {formatDate(task.scheduledDate, "medium")}</span>
-      ) : (
-        <button type="button" className="board-card-book" onClick={onSchedule} tabIndex={lifted ? -1 : 0}><CalendarPlus size={13} aria-hidden /> Schedule</button>
-      ))}
+      {open &&
+        (task.scheduledDate ? (
+          <span className="scheduled board-card-when">
+            <CalendarPlus size={12} aria-hidden /> {formatDate(task.scheduledDate, "medium")}
+          </span>
+        ) : (
+          <button type="button" className="board-card-book" onClick={onSchedule} tabIndex={lifted ? -1 : 0}>
+            <CalendarPlus size={13} aria-hidden /> Schedule
+          </button>
+        ))}
     </article>
   );
 }

@@ -1,6 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { Area, Task } from "../../lib/api";
-import { dueQuickPicks, newRow, planSuggestions, priorityFromDue, similarTask, priorityOf, rowFromTask, sortRows, topicGroups, valueScore, withWorkMode, type Row } from "./rows";
+import {
+  dueQuickPicks,
+  newRow,
+  planSuggestions,
+  priorityFromDue,
+  similarTask,
+  priorityOf,
+  rowFromTask,
+  sortRows,
+  topicGroups,
+  valueScore,
+  withWorkMode,
+  type Row,
+} from "./rows";
 
 const TODAY = "2026-11-25"; // a Wednesday
 const areas: Area[] = [
@@ -9,8 +22,20 @@ const areas: Area[] = [
 ];
 let n = 0;
 const row = (p: Partial<Row> = {}): Row => ({
-  key: `k${n++}`, taskId: null, title: "t", minutes: 30, minutesChosen: false, focusAreaId: null, workMode: "ShallowWork",
-  isOutside: false, impact: "Medium", dueDate: null, priorityOverride: null, breakMinutes: null, top: null, ...p,
+  key: `k${n++}`,
+  taskId: null,
+  title: "t",
+  minutes: 30,
+  minutesChosen: false,
+  focusAreaId: null,
+  workMode: "ShallowWork",
+  isOutside: false,
+  impact: "Medium",
+  dueDate: null,
+  priorityOverride: null,
+  breakMinutes: null,
+  top: null,
+  ...p,
 });
 const titles = (rows: Row[]) => rows.map((r) => r.title);
 
@@ -38,10 +63,28 @@ describe("priority from the due date (P2-A1)", () => {
 
 describe("deep focus default (P2-A2)", () => {
   it("suggests two hours for deep focus", () => expect(withWorkMode(row(), "DeepFocus").minutes).toBe(120));
-  it("never overrides a length the person chose", () => expect(withWorkMode(row({ minutes: 45, minutesChosen: true }), "DeepFocus").minutes).toBe(45));
-  it("leaves the length alone for other kinds of work", () => expect(withWorkMode(row({ minutes: 30 }), "Meeting").minutes).toBe(30));
+  it("never overrides a length the person chose", () =>
+    expect(withWorkMode(row({ minutes: 45, minutesChosen: true }), "DeepFocus").minutes).toBe(45));
+  it("leaves the length alone for other kinds of work", () =>
+    expect(withWorkMode(row({ minutes: 30 }), "Meeting").minutes).toBe(30));
   it("treats a backlog estimate as chosen", () => {
-    const fromBacklog = rowFromTask({ id: "x", title: "x", focusAreaId: null, estimatedMinutes: 50, priority: "Low", dueDate: null, status: "Planned", nextStep: "", workMode: "ShallowWork", isOutside: false, impact: "Medium", scheduledDate: null, createdAt: "", version: 1, breakMinutes: null });
+    const fromBacklog = rowFromTask({
+      id: "x",
+      title: "x",
+      focusAreaId: null,
+      estimatedMinutes: 50,
+      priority: "Low",
+      dueDate: null,
+      status: "Planned",
+      nextStep: "",
+      workMode: "ShallowWork",
+      isOutside: false,
+      impact: "Medium",
+      scheduledDate: null,
+      createdAt: "",
+      version: 1,
+      breakMinutes: null,
+    });
     expect(withWorkMode(fromBacklog, "DeepFocus").minutes).toBe(50);
   });
 });
@@ -55,7 +98,8 @@ describe("sort modes (P2-A4)", () => {
     row({ title: "tests", focusAreaId: "build", impact: "Medium", workMode: "DeepFocus", dueDate: "2026-11-26" }),
   ];
 
-  it("as written keeps the order of entry", () => expect(titles(sortRows(list, "written", areas))).toEqual(["email", "ship", "bills", "walk", "tests"]));
+  it("as written keeps the order of entry", () =>
+    expect(titles(sortRows(list, "written", areas))).toEqual(["email", "ship", "bills", "walk", "tests"]));
   it("topic groups by focus area, deep focus first, with no area last", () =>
     expect(titles(sortRows(list, "topic", areas))).toEqual(["tests", "ship", "email", "bills", "walk"]));
   it("impact puts high impact first, then the sooner due date", () =>
@@ -64,7 +108,8 @@ describe("sort modes (P2-A4)", () => {
     expect(titles(sortRows(list, "due", areas))).toEqual(["bills", "tests", "ship", "walk", "email"]));
   it("is stable: equal rows keep their written order", () => {
     const same = [row({ title: "a" }), row({ title: "b" }), row({ title: "c" })];
-    for (const mode of ["topic", "impact", "due"] as const) expect(titles(sortRows(same, mode, areas))).toEqual(["a", "b", "c"]);
+    for (const mode of ["topic", "impact", "due"] as const)
+      expect(titles(sortRows(same, mode, areas))).toEqual(["a", "b", "c"]);
   });
   it("topic view produces one heading per focus area", () => {
     const groups = topicGroups(sortRows(list, "topic", areas));
@@ -75,12 +120,27 @@ describe("sort modes (P2-A4)", () => {
 describe("due-date quick picks (P2-A6)", () => {
   it("offers today, tomorrow, this Friday and next Monday", () =>
     expect(dueQuickPicks(TODAY).map((p) => p.date)).toEqual(["2026-11-25", "2026-11-26", "2026-11-27", "2026-11-30"]));
-  it("on a Friday, 'this Friday' means next week's", () => expect(dueQuickPicks("2026-11-27")[2]!.date).toBe("2026-12-04"));
+  it("on a Friday, 'this Friday' means next week's", () =>
+    expect(dueQuickPicks("2026-11-27")[2]!.date).toBe("2026-12-04"));
 });
 
 const task = (p: Partial<Task>): Task => ({
-  id: `t${n++}`, title: "task", focusAreaId: null, estimatedMinutes: 30, priority: "Low", dueDate: null, status: "Planned", nextStep: "", workMode: "ShallowWork",
-  isOutside: false, impact: "Medium", scheduledDate: null, createdAt: "2026-11-01T00:00:00Z", version: 1, breakMinutes: null, ...p,
+  id: `t${n++}`,
+  title: "task",
+  focusAreaId: null,
+  estimatedMinutes: 30,
+  priority: "Low",
+  dueDate: null,
+  status: "Planned",
+  nextStep: "",
+  workMode: "ShallowWork",
+  isOutside: false,
+  impact: "Medium",
+  scheduledDate: null,
+  createdAt: "2026-11-01T00:00:00Z",
+  version: 1,
+  breakMinutes: null,
+  ...p,
 });
 
 describe("plan my day suggests from the backlog (P2-E2)", () => {
@@ -99,7 +159,8 @@ describe("plan my day suggests from the backlog (P2-E2)", () => {
       ["rest", ["Someday"]],
     ]);
   });
-  it("leaves out empty groups", () => expect(planSuggestions([task({ title: "Someday" })], TODAY).map((g) => g.id)).toEqual(["rest"]));
+  it("leaves out empty groups", () =>
+    expect(planSuggestions([task({ title: "Someday" })], TODAY).map((g) => g.id)).toEqual(["rest"]));
 });
 
 describe("brain dump capture (P2-E1)", () => {

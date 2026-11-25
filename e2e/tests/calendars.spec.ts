@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { dayFromToday, signUp } from "./helpers";
 
-test("the plan can be subscribed to from another calendar app, and unsafe calendar addresses are explained", async ({ page, browser }) => {
+test("the plan can be subscribed to from another calendar app, and unsafe calendar addresses are explained", async ({
+  page,
+  browser,
+}) => {
   await signUp(page);
   const day = await dayFromToday(page, 1);
   await page.goto(`/planner?date=${day}`);

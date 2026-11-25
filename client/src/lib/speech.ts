@@ -5,8 +5,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * In Chrome and Edge the audio is processed by the browser maker's speech service; Safari processes
  * it on Apple's. Firefox has none, so the microphone button is simply not shown there.
  */
-interface RecognitionResult { isFinal: boolean; 0: { transcript: string } }
-interface RecognitionEvent { resultIndex: number; results: ArrayLike<RecognitionResult> }
+interface RecognitionResult {
+  isFinal: boolean;
+  0: { transcript: string };
+}
+interface RecognitionEvent {
+  resultIndex: number;
+  results: ArrayLike<RecognitionResult>;
+}
 interface Recognition {
   lang: string;
   continuous: boolean;
@@ -21,7 +27,10 @@ type RecognitionConstructor = new () => Recognition;
 
 const recognitionClass = (): RecognitionConstructor | undefined => {
   if (typeof window === "undefined") return undefined;
-  const w = window as unknown as { SpeechRecognition?: RecognitionConstructor; webkitSpeechRecognition?: RecognitionConstructor };
+  const w = window as unknown as {
+    SpeechRecognition?: RecognitionConstructor;
+    webkitSpeechRecognition?: RecognitionConstructor;
+  };
   return w.SpeechRecognition ?? w.webkitSpeechRecognition;
 };
 
@@ -50,7 +59,12 @@ export function useDictation(onText: (text: string) => void, onError?: (reason: 
         if (result?.isFinal) handler.current(result[0].transcript.trim());
       }
     };
-    r.onerror = (event) => onError?.(event.error === "not-allowed" ? "The microphone is blocked for this site." : "Speech could not be recognised. Try again, or type.");
+    r.onerror = (event) =>
+      onError?.(
+        event.error === "not-allowed"
+          ? "The microphone is blocked for this site."
+          : "Speech could not be recognised. Try again, or type.",
+      );
     r.onend = () => {
       recognition.current = null;
       setListening(false);

@@ -14,14 +14,45 @@ export default tseslint.config(
     // never the other way round.
     files: ["src/lib/**", "src/components/**"],
     rules: {
-      "no-restricted-imports": ["error", { patterns: [{ group: ["**/features/**"], message: "Shared code must not depend on a feature. Move what is shared into lib/ or components/." }] }],
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/features/**"],
+              message: "Shared code must not depend on a feature. Move what is shared into lib/ or components/.",
+            },
+          ],
+        },
+      ],
     },
   },
   {
     // Building blocks used by several pages (capture, timer) depend on no other feature.
     files: ["src/features/capture/**", "src/features/timer/**"],
     rules: {
-      "no-restricted-imports": ["error", { patterns: [{ group: ["../today/**", "../planner/**", "../backlog/**", "../routines/**", "../settings/**", "../review/**", "../week/**", "../guide/**", "../auth/**", "../shell/**"], message: "capture/ and timer/ are shared building blocks: they must not depend on a page feature." }] }],
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "../today/**",
+                "../planner/**",
+                "../backlog/**",
+                "../routines/**",
+                "../settings/**",
+                "../review/**",
+                "../week/**",
+                "../guide/**",
+                "../auth/**",
+                "../shell/**",
+              ],
+              message: "capture/ and timer/ are shared building blocks: they must not depend on a page feature.",
+            },
+          ],
+        },
+      ],
     },
   },
   {
@@ -29,10 +60,28 @@ export default tseslint.config(
     files: ["src/features/**"],
     ignores: ["src/features/capture/**", "src/features/timer/**", "src/features/shell/**"],
     rules: {
-      "no-restricted-imports": ["error", { patterns: [{
-        group: ["../today/**", "../backlog/**", "../routines/**", "../settings/**", "../review/**", "../week/**", "../guide/**", "../auth/**", "../shell/**"],
-        message: "Pages do not import each other. Move what is shared into a building block (capture/, timer/) or into lib/ / components/.",
-      }] }],
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "../today/**",
+                "../backlog/**",
+                "../routines/**",
+                "../settings/**",
+                "../review/**",
+                "../week/**",
+                "../guide/**",
+                "../auth/**",
+                "../shell/**",
+              ],
+              message:
+                "Pages do not import each other. Move what is shared into a building block (capture/, timer/) or into lib/ / components/.",
+            },
+          ],
+        },
+      ],
     },
   },
 );

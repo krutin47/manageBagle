@@ -26,7 +26,9 @@ export function ReviewPage() {
   const planned = blocks.reduce((s, b) => s + b.plannedMinutes, 0);
   const logged = blocks.reduce((s, b) => s + (b.actualMinutes ?? 0), 0);
   const done = blocks.filter((b) => b.status === "Done").length;
-  const overran = blocks.filter((b) => (b.varianceMinutes ?? 0) > 0).sort((a, b) => b.varianceMinutes! - a.varianceMinutes!);
+  const overran = blocks
+    .filter((b) => (b.varianceMinutes ?? 0) > 0)
+    .sort((a, b) => b.varianceMinutes! - a.varianceMinutes!);
   const outcomes = day.data?.outcomes ?? [];
   const putOff = blocks.filter((b) => b.status === "Skipped");
 
@@ -37,8 +39,19 @@ export function ReviewPage() {
         title={formatDate(date, "long")}
         sub="Be honest, not perfect. The point is one small adjustment for tomorrow."
         actions={
-          <DateNav label="Day" value={date} step={1} onChange={(d) => setParams(d === todayISO() ? {} : { date: d }, { replace: true })}>
-            <Input type="date" className="date-jump" aria-label="Jump to date" value={date} onChange={(e) => e.target.value && setParams({ date: e.target.value }, { replace: true })} />
+          <DateNav
+            label="Day"
+            value={date}
+            step={1}
+            onChange={(d) => setParams(d === todayISO() ? {} : { date: d }, { replace: true })}
+          >
+            <Input
+              type="date"
+              className="date-jump"
+              aria-label="Jump to date"
+              value={date}
+              onChange={(e) => e.target.value && setParams({ date: e.target.value }, { replace: true })}
+            />
           </DateNav>
         }
       />
@@ -48,9 +61,14 @@ export function ReviewPage() {
           <div>
             <h2 id="how-it-went">How the day went</h2>
             <p>
-              {blocks.length === 0
-                ? "Nothing was planned for this day."
-                : <>{done} of {blocks.length} blocks done · {formatHours(planned)}h planned · {formatHours(logged)}h logged</>}
+              {blocks.length === 0 ? (
+                "Nothing was planned for this day."
+              ) : (
+                <>
+                  {done} of {blocks.length} blocks done · {formatHours(planned)}h planned · {formatHours(logged)}h
+                  logged
+                </>
+              )}
             </p>
           </div>
           <Link to={date === todayISO() ? "/" : `/?date=${date}`}>Open this day</Link>
@@ -58,7 +76,11 @@ export function ReviewPage() {
         <div className="review-facts">
           <div>
             <h3>Top three</h3>
-            {day.isPending ? <Skeleton height={60} /> : outcomes.length === 0 ? <p className="muted">None were chosen.</p> : (
+            {day.isPending ? (
+              <Skeleton height={60} />
+            ) : outcomes.length === 0 ? (
+              <p className="muted">None were chosen.</p>
+            ) : (
               <ul className="fact-list">
                 {outcomes.map((o) => (
                   <li key={o.rank} className={o.status === "Done" ? "is-done" : undefined}>
@@ -72,7 +94,13 @@ export function ReviewPage() {
           </div>
           <div>
             <h3>Ran over</h3>
-            {overran.length === 0 ? <p className="muted">{logged > 0 ? "Nothing ran over what you planned." : "Log actual minutes on Today to see what ran over."}</p> : (
+            {overran.length === 0 ? (
+              <p className="muted">
+                {logged > 0
+                  ? "Nothing ran over what you planned."
+                  : "Log actual minutes on Today to see what ran over."}
+              </p>
+            ) : (
               <ul className="fact-list">
                 {overran.slice(0, 4).map((b) => (
                   <li key={b.id}>
@@ -85,11 +113,16 @@ export function ReviewPage() {
           </div>
           <div className="review-facts-wide">
             <h3>Put off or dropped</h3>
-            {putOff.length === 0 ? <p className="muted">Nothing was put off or dropped.</p> : (
+            {putOff.length === 0 ? (
+              <p className="muted">Nothing was put off or dropped.</p>
+            ) : (
               <ul className="fact-list">
                 {putOff.map((b) => (
                   <li key={b.id}>
-                    <span>{b.title}{b.stopNote && <q className="fact-note">{b.stopNote}</q>}</span>
+                    <span>
+                      {b.title}
+                      {b.stopNote && <q className="fact-note">{b.stopNote}</q>}
+                    </span>
                     <em>{b.actualMinutes ? `${formatDuration(b.actualMinutes)} worked` : "not started"}</em>
                   </li>
                 ))}
@@ -99,7 +132,11 @@ export function ReviewPage() {
         </div>
       </section>
 
-      {day.isError ? <ErrorNote onRetry={() => day.refetch()}>We could not load this day.</ErrorNote> : <ReviewForm key={date} date={date} review={day.data?.review} />}
+      {day.isError ? (
+        <ErrorNote onRetry={() => day.refetch()}>We could not load this day.</ErrorNote>
+      ) : (
+        <ReviewForm key={date} date={date} review={day.data?.review} />
+      )}
     </>
   );
 }
@@ -113,7 +150,10 @@ function ReviewForm({ date, review }: { date: string; review?: Review }) {
 
   const save = () => {
     if (!form || !review || PROMPTS.every((p) => form[p.key].trim() === review[p.key])) return;
-    saveReview.mutate(form, { onSuccess: () => setSavedAt(Date.now()), onError: (err) => toast.error(errorMessage(err)) });
+    saveReview.mutate(form, {
+      onSuccess: () => setSavedAt(Date.now()),
+      onError: (err) => toast.error(errorMessage(err)),
+    });
   };
 
   return (
@@ -125,7 +165,14 @@ function ReviewForm({ date, review }: { date: string; review?: Review }) {
         </div>
         <AnimatePresence>
           {savedAt > 0 && (
-            <motion.span key={savedAt} className="saved" role="status" initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
+            <motion.span
+              key={savedAt}
+              className="saved"
+              role="status"
+              initial={{ opacity: 0, x: 6 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0 }}
+            >
               <CircleCheck size={14} aria-hidden /> Saved
             </motion.span>
           )}
@@ -135,8 +182,16 @@ function ReviewForm({ date, review }: { date: string; review?: Review }) {
         {PROMPTS.map((p) => (
           <Field key={p.key} label={p.label}>
             {(props) => (
-              <Textarea {...props} rows={5} maxLength={1000} placeholder={p.placeholder} disabled={!value} value={value?.[p.key] ?? ""}
-                onChange={(e) => value && setForm({ ...value, [p.key]: e.target.value })} onBlur={save} />
+              <Textarea
+                {...props}
+                rows={5}
+                maxLength={1000}
+                placeholder={p.placeholder}
+                disabled={!value}
+                value={value?.[p.key] ?? ""}
+                onChange={(e) => value && setForm({ ...value, [p.key]: e.target.value })}
+                onBlur={save}
+              />
             )}
           </Field>
         ))}

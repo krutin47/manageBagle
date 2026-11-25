@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { dayFromToday, signUp } from "./helpers";
 
-test("the brain dump only captures; Plan my day chooses from the backlog, and the three roll on as work is finished", async ({ page }) => {
+test("the brain dump only captures; Plan my day chooses from the backlog, and the three roll on as work is finished", async ({
+  page,
+}) => {
   await signUp(page);
   // Plan tomorrow: a whole empty day, so the result does not depend on what time the test runs.
   const tomorrow = await dayFromToday(page, 1);
@@ -10,7 +12,12 @@ test("the brain dump only captures; Plan my day chooses from the backlog, and th
   await page.goto("/planner");
   await page.getByRole("button", { name: "Brain dump", exact: true }).click();
   const box = page.getByLabel("What is on your mind?");
-  for (const task of ["Ship the importer", "Reply to recruiter emails", "Pick up suit from tailor", "Pay electricity bill"]) {
+  for (const task of [
+    "Ship the importer",
+    "Reply to recruiter emails",
+    "Pick up suit from tailor",
+    "Pay electricity bill",
+  ]) {
     await box.fill(task);
     await box.press("Enter");
   }
@@ -34,7 +41,9 @@ test("the brain dump only captures; Plan my day chooses from the backlog, and th
   await expect(outside).toHaveAttribute("aria-pressed", "true");
 
   // A due date sets urgency; there is no priority control any more (P2-A1).
-  await options("Pay electricity bill").getByRole("button", { name: /Due date/ }).click();
+  await options("Pay electricity bill")
+    .getByRole("button", { name: /Due date/ })
+    .click();
   await page.getByRole("button", { name: "Tomorrow" }).click();
   await expect(options("Pay electricity bill").getByRole("button", { name: "Due date: Due tomorrow" })).toBeVisible();
   await expect(page.getByRole("dialog").getByText("Priority", { exact: true })).toHaveCount(0);
@@ -55,7 +64,12 @@ test("the brain dump only captures; Plan my day chooses from the backlog, and th
   await page.getByRole("button", { name: "Plan my day" }).click();
   const plan = page.getByRole("dialog");
   await expect(plan.getByRole("region", { name: "Overdue and due this week" })).toContainText("Pay electricity bill");
-  for (const task of ["Ship the importer", "Reply to recruiter emails", "Pick up suit from tailor", "Pay electricity bill"]) {
+  for (const task of [
+    "Ship the importer",
+    "Reply to recruiter emails",
+    "Pick up suit from tailor",
+    "Pay electricity bill",
+  ]) {
     await plan.getByRole("button", { name: new RegExp(`^${task}`) }).click();
   }
   await expect(plan.getByRole("button", { name: /^Ship the importer/ })).toHaveAttribute("aria-pressed", "true");
@@ -102,7 +116,9 @@ test("a double click on the final button saves the plan once", async ({ page }) 
   await page.getByRole("button", { name: /Next: fit into the day/ }).click();
   await page.getByRole("button", { name: "Add to the day" }).dblclick();
 
-  await expect(page.getByRole("region", { name: "Schedule" }).locator(".agenda-title", { hasText: "Write the report" })).toHaveCount(1);
+  await expect(
+    page.getByRole("region", { name: "Schedule" }).locator(".agenda-title", { hasText: "Write the report" }),
+  ).toHaveCount(1);
   await page.goto("/backlog?view=list");
   await expect(page.getByRole("button", { name: "Write the report", exact: true })).toHaveCount(1);
 });
@@ -117,7 +133,9 @@ test("the day plan works on a phone with the keyboard and without sideways scrol
   await page.getByRole("button", { name: /Next: top three/ }).click();
   await page.getByRole("button", { name: /Next: fit into the day/ }).click();
   await page.getByRole("button", { name: "Add to the day" }).click();
-  await expect(page.getByRole("region", { name: "Schedule" }).locator(".agenda-title", { hasText: "Call the bank" })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Schedule" }).locator(".agenda-title", { hasText: "Call the bank" }),
+  ).toBeVisible();
 
   // Moving a block needs no drag: open it and change the time in the form.
   await page.getByRole("region", { name: "Schedule" }).locator(".agenda-title", { hasText: "Call the bank" }).click();
@@ -130,7 +148,9 @@ test("the day plan works on a phone with the keyboard and without sideways scrol
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });
 
-test("a brain dump left unsaved is still there when it is opened again, and a pasted list becomes one task per line", async ({ page }) => {
+test("a brain dump left unsaved is still there when it is opened again, and a pasted list becomes one task per line", async ({
+  page,
+}) => {
   await signUp(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Brain dump", exact: true }).click();
@@ -138,7 +158,9 @@ test("a brain dump left unsaved is still there when it is opened again, and a pa
   await page.evaluate(() => {
     const data = new DataTransfer();
     data.setData("text/plain", "- Book dentist\n- Renew passport\n3. Call mum");
-    document.activeElement!.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+    document.activeElement!.dispatchEvent(
+      new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }),
+    );
   });
   await expect(page.locator(".dump-row .plan-title")).toHaveCount(3);
   await expect(page.locator(".dump-row .plan-title").last()).toHaveValue("Call mum");

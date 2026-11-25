@@ -27,11 +27,23 @@ interface OptionChipProps<T extends string> {
  * The one control used for every option on a brain-dump task (P2-A6): a compact chip that opens a
  * short list. Same look, same keyboard behaviour (Enter/Space opens, arrows move, Enter picks).
  */
-export function OptionChip<T extends string>({ label, value, options, onChange, icon, area, strong }: OptionChipProps<T>) {
+export function OptionChip<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  icon,
+  area,
+  strong,
+}: OptionChipProps<T>) {
   const current = options.find((o) => o.value === value);
   return (
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger className={cx("opt-chip", area && "is-tag", strong && "is-strong")} data-area={area} aria-label={`${label}: ${current?.label ?? value}`}>
+      <DropdownMenu.Trigger
+        className={cx("opt-chip", area && "is-tag", strong && "is-strong")}
+        data-area={area}
+        aria-label={`${label}: ${current?.label ?? value}`}
+      >
         {area ? <span className="area-dot" aria-hidden /> : icon}
         <span className="opt-chip-text">{current?.label ?? value}</span>
         <ChevronDown size={13} aria-hidden className="opt-chip-caret" />
@@ -44,7 +56,9 @@ export function OptionChip<T extends string>({ label, value, options, onChange, 
               <DropdownMenu.RadioItem key={o.value} value={o.value} className="menu-item" data-area={o.area}>
                 {o.area !== undefined && <span className="area-dot" aria-hidden />}
                 <span className="menu-item-text">{o.label}</span>
-                <DropdownMenu.ItemIndicator className="menu-check"><Check size={14} aria-hidden /></DropdownMenu.ItemIndicator>
+                <DropdownMenu.ItemIndicator className="menu-check">
+                  <Check size={14} aria-hidden />
+                </DropdownMenu.ItemIndicator>
               </DropdownMenu.RadioItem>
             ))}
           </DropdownMenu.RadioGroup>
@@ -74,7 +88,10 @@ export function DateChip({ label, value, display, quickPicks, onChange, icon, wa
   };
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger className={cx("opt-chip", value === null && "is-empty", warn && "is-warn")} aria-label={`${label}: ${value ? display : "none"}`}>
+      <Popover.Trigger
+        className={cx("opt-chip", value === null && "is-empty", warn && "is-warn")}
+        aria-label={`${label}: ${value ? display : "none"}`}
+      >
         {icon}
         <span className="opt-chip-text">{display}</span>
         <ChevronDown size={13} aria-hidden className="opt-chip-caret" />
@@ -83,16 +100,31 @@ export function DateChip({ label, value, display, quickPicks, onChange, icon, wa
         <Popover.Content className="menu opt-menu date-pop" align="start" sideOffset={6} aria-label={label}>
           <span className="menu-label">{label}</span>
           {quickPicks.map((p) => (
-            <button type="button" key={p.label} className={cx("menu-item", p.date === value && "is-on")} onClick={() => choose(p.date)}>
+            <button
+              type="button"
+              key={p.label}
+              className={cx("menu-item", p.date === value && "is-on")}
+              onClick={() => choose(p.date)}
+            >
               <span className="menu-item-text">{p.label}</span>
               {p.date === value && <Check size={14} aria-hidden className="menu-check" />}
             </button>
           ))}
           <label className="date-pop-pick">
             <span>Pick a date</span>
-            <input type="date" className="input" value={value ?? ""} onChange={(e) => onChange(e.target.value || null)} onKeyDown={(e) => e.key === "Enter" && setOpen(false)} />
+            <input
+              type="date"
+              className="input"
+              value={value ?? ""}
+              onChange={(e) => onChange(e.target.value || null)}
+              onKeyDown={(e) => e.key === "Enter" && setOpen(false)}
+            />
           </label>
-          {value !== null && <button type="button" className="menu-item date-pop-clear" onClick={() => choose(null)}>No due date</button>}
+          {value !== null && (
+            <button type="button" className="menu-item date-pop-clear" onClick={() => choose(null)}>
+              No due date
+            </button>
+          )}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

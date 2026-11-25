@@ -25,10 +25,19 @@ export const browserTimeZone = (): string => Intl.DateTimeFormat().resolvedOptio
 
 function clock(): { date: string; minutes: number } {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: appZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    timeZone: appZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
   }).formatToParts(new Date());
   const get = (type: string) => parts.find((p) => p.type === type)!.value;
-  return { date: `${get("year")}-${get("month")}-${get("day")}`, minutes: Number(get("hour")) * 60 + Number(get("minute")) };
+  return {
+    date: `${get("year")}-${get("month")}-${get("day")}`,
+    minutes: Number(get("hour")) * 60 + Number(get("minute")),
+  };
 }
 
 export const todayISO = () => clock().date;
@@ -53,7 +62,10 @@ export const weekDays = (start: string) => Array.from({ length: 7 }, (_, i) => a
 export const isValidISODate = (s: string | null | undefined): s is string =>
   !!s && /^\d{4}-\d{2}-\d{2}$/.test(s) && toISODate(parseISODate(s)) === s;
 
-export function formatDate(iso: string, style: "long" | "medium" | "short" | "weekday" | "day" | "weekdayShort" = "medium"): string {
+export function formatDate(
+  iso: string,
+  style: "long" | "medium" | "short" | "weekday" | "day" | "weekdayShort" = "medium",
+): string {
   const d = parseISODate(iso);
   const options: Record<string, Intl.DateTimeFormatOptions> = {
     long: { weekday: "long", day: "numeric", month: "long" },
@@ -68,7 +80,10 @@ export function formatDate(iso: string, style: "long" | "medium" | "short" | "we
 
 export function formatWeekRange(start: string): string {
   // formatRange collapses the shared parts for the locale: "Nov 9 – 15, 2026", "30 Nov – 6 Dec 2026".
-  return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" }).formatRange(parseISODate(start), parseISODate(addDays(start, 6)));
+  return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" }).formatRange(
+    parseISODate(start),
+    parseISODate(addDays(start, 6)),
+  );
 }
 
 /** "09:30" or "09:30:00" → 570 */
@@ -112,4 +127,5 @@ export function formatTime(time: string): string {
   return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(2000, 0, 1, h, m));
 }
 
-export const formatVariance = (minutes: number) => (minutes > 0 ? `+${formatDuration(minutes)}` : minutes === 0 ? "on time" : formatDuration(minutes));
+export const formatVariance = (minutes: number) =>
+  minutes > 0 ? `+${formatDuration(minutes)}` : minutes === 0 ? "on time" : formatDuration(minutes);

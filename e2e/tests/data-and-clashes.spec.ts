@@ -39,7 +39,10 @@ test("a person can download all of their data, and see older finished work on th
   await expect(page.locator(".board-card-wrap", { hasText: "Export me" })).toBeVisible();
 
   await page.goto("/settings");
-  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Download my data" }).click()]);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("link", { name: "Download my data" }).click(),
+  ]);
   expect(download.suggestedFilename()).toMatch(/^managebagle-export-\d{4}-\d{2}-\d{2}\.json$/);
   const data = JSON.parse(readFileSync((await download.path())!, "utf8"));
   expect(data.tasks.map((t: { title: string }) => t.title)).toContain("Export me");

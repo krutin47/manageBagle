@@ -1,7 +1,26 @@
-import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDashed, CircleDot, Loader2, MapPin, Minus, X } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CircleDashed,
+  CircleDot,
+  Loader2,
+  MapPin,
+  Minus,
+  X,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { Dialog as RDialog } from "radix-ui";
-import { forwardRef, useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import {
+  forwardRef,
+  useId,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from "react";
 import type { Area, Priority, Status } from "../lib/api";
 import { statusLabel } from "../lib/labels";
 import { addDays, todayISO } from "../lib/time";
@@ -47,7 +66,14 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   ref,
 ) {
   return (
-    <button ref={ref} type={type} className={cx("icon-btn", `icon-btn-${size}`, className)} aria-label={label} title={label} {...rest}>
+    <button
+      ref={ref}
+      type={type}
+      className={cx("icon-btn", `icon-btn-${size}`, className)}
+      aria-label={label}
+      title={label}
+      {...rest}
+    >
       {children}
     </button>
   );
@@ -76,7 +102,15 @@ export function Field({ label, hint, error, optional, className, children }: Fie
       {children({ id, "aria-describedby": describedBy, "aria-invalid": error ? true : undefined })}
       <AnimatePresence initial={false}>
         {error ? (
-          <motion.p key="error" id={`${id}-error`} className="field-error" role="alert" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
+          <motion.p
+            key="error"
+            id={`${id}-error`}
+            className="field-error"
+            role="alert"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+          >
             {error}
           </motion.p>
         ) : hint ? (
@@ -89,15 +123,24 @@ export function Field({ label, hint, error, optional, className, children }: Fie
   );
 }
 
-export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...rest }, ref) {
+export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input(
+  { className, ...rest },
+  ref,
+) {
   return <input ref={ref} className={cx("input", className)} {...rest} />;
 });
 
-export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className, ...rest }, ref) {
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea(
+  { className, ...rest },
+  ref,
+) {
   return <textarea ref={ref} className={cx("input textarea", className)} {...rest} />;
 });
 
-export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, children, ...rest }, ref) {
+export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select(
+  { className, children, ...rest },
+  ref,
+) {
   return (
     <span className={cx("select", className)}>
       <select ref={ref} className="input" {...rest}>
@@ -108,7 +151,15 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
   );
 });
 
-export function AreaSelect({ areas, value, onChange, ...rest }: { areas: Area[]; value: string | null; onChange: (id: string | null) => void } & Omit<SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange">) {
+export function AreaSelect({
+  areas,
+  value,
+  onChange,
+  ...rest
+}: { areas: Area[]; value: string | null; onChange: (id: string | null) => void } & Omit<
+  SelectHTMLAttributes<HTMLSelectElement>,
+  "value" | "onChange"
+>) {
   const color = areas.find((a) => a.id === value)?.color ?? "none";
   return (
     <span className="area-select" data-area={color}>
@@ -140,8 +191,20 @@ export function Segmented<T extends string>({ label, value, options, onChange, s
     <div className={cx("segmented", `segmented-${size}`)} role="radiogroup" aria-label={label}>
       {options.map((o) => (
         <label key={o.value} className={cx("segment", o.value === value && "is-on")}>
-          <input type="radio" name={name} value={o.value} checked={o.value === value} onChange={() => onChange(o.value)} />
-          {o.value === value && <motion.span layoutId={`${name}-thumb`} className="segment-thumb" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
+          <input
+            type="radio"
+            name={name}
+            value={o.value}
+            checked={o.value === value}
+            onChange={() => onChange(o.value)}
+          />
+          {o.value === value && (
+            <motion.span
+              layoutId={`${name}-thumb`}
+              className="segment-thumb"
+              transition={{ type: "spring", stiffness: 500, damping: 40 }}
+            />
+          )}
           <span className="segment-label">{o.label}</span>
         </label>
       ))}
@@ -150,9 +213,20 @@ export function Segmented<T extends string>({ label, value, options, onChange, s
 }
 
 /** Marks work that happens out in the physical world, where queues and travel stretch the clock. */
-export function OutsideToggle({ checked, onChange, compact }: { checked: boolean; onChange: (next: boolean) => void; compact?: boolean }) {
+export function OutsideToggle({
+  checked,
+  onChange,
+  compact,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  compact?: boolean;
+}) {
   return (
-    <label className={cx("outside-toggle", checked && "is-on", compact && "is-compact")} title="Outside work: errands, travel, appointments. It may take longer than planned.">
+    <label
+      className={cx("outside-toggle", checked && "is-on", compact && "is-compact")}
+      title="Outside work: errands, travel, appointments. It may take longer than planned."
+    >
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       <MapPin size={15} aria-hidden />
       <span>
@@ -181,7 +255,13 @@ export function Dialog({ open, onClose, title, description, children, width = "m
         {open && (
           <RDialog.Portal forceMount>
             <RDialog.Overlay asChild forceMount>
-              <motion.div className="scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} />
+              <motion.div
+                className="scrim"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18 }}
+              />
             </RDialog.Overlay>
             <div className="dialog-positioner">
               <RDialog.Content asChild forceMount aria-describedby={description ? undefined : undefined}>
@@ -195,7 +275,11 @@ export function Dialog({ open, onClose, title, description, children, width = "m
                   <header className="dialog-head">
                     <div>
                       <RDialog.Title className="dialog-title">{title}</RDialog.Title>
-                      {description ? <RDialog.Description className="dialog-desc">{description}</RDialog.Description> : <RDialog.Description className="sr-only">{title}</RDialog.Description>}
+                      {description ? (
+                        <RDialog.Description className="dialog-desc">{description}</RDialog.Description>
+                      ) : (
+                        <RDialog.Description className="sr-only">{title}</RDialog.Description>
+                      )}
                     </div>
                     <RDialog.Close asChild>
                       <IconButton label="Close">
@@ -214,7 +298,23 @@ export function Dialog({ open, onClose, title, description, children, width = "m
   );
 }
 
-export function ConfirmDialog({ open, onClose, onConfirm, title, body, confirmLabel, loading }: { open: boolean; onClose: () => void; onConfirm: () => void; title: string; body: string; confirmLabel: string; loading?: boolean }) {
+export function ConfirmDialog({
+  open,
+  onClose,
+  onConfirm,
+  title,
+  body,
+  confirmLabel,
+  loading,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  body: string;
+  confirmLabel: string;
+  loading?: boolean;
+}) {
   return (
     <Dialog open={open} onClose={onClose} title={title} description={body} width="sm">
       <footer className="dialog-foot">
@@ -230,7 +330,12 @@ export function ConfirmDialog({ open, onClose, onConfirm, title, body, confirmLa
 // ---- Small display pieces --------------------------------------------------------------------
 
 export function AreaChip({ area, compact }: { area: Area | undefined; compact?: boolean }) {
-  if (!area) return compact ? null : <span className="chip" data-area="none">No area</span>;
+  if (!area)
+    return compact ? null : (
+      <span className="chip" data-area="none">
+        No area
+      </span>
+    );
   return (
     <span className="chip" data-area={area.color}>
       <span className="area-dot" aria-hidden />
@@ -270,7 +375,19 @@ export function PriorityMark({ priority }: { priority: Priority }) {
   );
 }
 
-export function DateNav({ value, onChange, step, label, children }: { value: string; onChange: (iso: string) => void; step: 1 | 7; label: string; children?: ReactNode }) {
+export function DateNav({
+  value,
+  onChange,
+  step,
+  label,
+  children,
+}: {
+  value: string;
+  onChange: (iso: string) => void;
+  step: 1 | 7;
+  label: string;
+  children?: ReactNode;
+}) {
   const unit = step === 1 ? "day" : "week";
   return (
     <div className="date-nav" role="group" aria-label={label}>
@@ -288,7 +405,17 @@ export function DateNav({ value, onChange, step, label, children }: { value: str
   );
 }
 
-export function PageHeader({ eyebrow, title, sub, actions }: { eyebrow?: string; title: ReactNode; sub?: ReactNode; actions?: ReactNode }) {
+export function PageHeader({
+  eyebrow,
+  title,
+  sub,
+  actions,
+}: {
+  eyebrow?: string;
+  title: ReactNode;
+  sub?: ReactNode;
+  actions?: ReactNode;
+}) {
   return (
     <header className="page-head">
       <div className="page-head-text">
@@ -301,7 +428,17 @@ export function PageHeader({ eyebrow, title, sub, actions }: { eyebrow?: string;
   );
 }
 
-export function EmptyState({ icon, title, body, action }: { icon: ReactNode; title: string; body: string; action?: ReactNode }) {
+export function EmptyState({
+  icon,
+  title,
+  body,
+  action,
+}: {
+  icon: ReactNode;
+  title: string;
+  body: string;
+  action?: ReactNode;
+}) {
   return (
     <div className="empty">
       <span className="empty-icon" aria-hidden>
@@ -314,7 +451,15 @@ export function EmptyState({ icon, title, body, action }: { icon: ReactNode; tit
   );
 }
 
-export function Skeleton({ height = 16, width = "100%", radius }: { height?: number | string; width?: number | string; radius?: number }) {
+export function Skeleton({
+  height = 16,
+  width = "100%",
+  radius,
+}: {
+  height?: number | string;
+  width?: number | string;
+  radius?: number;
+}) {
   return <span className="skeleton" style={{ height, width, borderRadius: radius }} aria-hidden />;
 }
 
@@ -337,7 +482,13 @@ export function Logo({ size = 28, wordmark = true }: { size?: number; wordmark?:
       <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden>
         <rect width="32" height="32" rx="8" className="logo-bg" />
         <circle cx="16" cy="16" r="7.5" fill="none" className="logo-ring" strokeWidth="5" />
-        <path d="M16 8.5a7.5 7.5 0 0 1 7.5 7.5" fill="none" className="logo-arc" strokeWidth="5" strokeLinecap="round" />
+        <path
+          d="M16 8.5a7.5 7.5 0 0 1 7.5 7.5"
+          fill="none"
+          className="logo-arc"
+          strokeWidth="5"
+          strokeLinecap="round"
+        />
       </svg>
       {wordmark && (
         <span className="logo-word">

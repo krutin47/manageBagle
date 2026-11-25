@@ -55,7 +55,9 @@ test("the account's time zone is taken from the device at sign-up and can be cha
   await expect(page.getByText("You seem to be in America/Halifax.")).toHaveCount(0);
 });
 
-test("someone who lost their authenticator and recovery codes can recover by email and see it in their activity", async ({ page }) => {
+test("someone who lost their authenticator and recovery codes can recover by email and see it in their activity", async ({
+  page,
+}) => {
   const email = await signUp(page, "Morgan Locked");
 
   // Turn on two-step verification through Settings, as a person would.
@@ -86,7 +88,9 @@ test("someone who lost their authenticator and recovery codes can recover by ema
   await page.getByRole("button", { name: "Lost your phone? Use a recovery code" }).click();
   await page.getByRole("button", { name: "Turn off two-step verification and sign in" }).click();
   await expect(page).toHaveURL("/");
-  await expect(async () => expect(await latestEmail(email, "Two-step verification was turned off")).toBeTruthy()).toPass();
+  await expect(async () =>
+    expect(await latestEmail(email, "Two-step verification was turned off")).toBeTruthy(),
+  ).toPass();
 
   await page.goto("/settings");
   const activity = page.getByRole("region", { name: "Account activity" });

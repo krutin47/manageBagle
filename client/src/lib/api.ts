@@ -74,7 +74,23 @@ export interface TimerSnapshot {
   pausedBlockId: string | null;
 }
 
-export type BlockInput = Omit<Block, "id" | "plannedMinutes" | "varianceMinutes" | "backlogTaskId" | "timeZone" | "version" | "timerStartedAt" | "trackedSeconds" | "extendedMinutes" | "stopNote" | "breakBeforeMinutes" | "breakAfterMinutes" | "firstStartedAt" | "finishedAt"> & { breakBeforeMinutes?: number; breakAfterMinutes?: number };
+export type BlockInput = Omit<
+  Block,
+  | "id"
+  | "plannedMinutes"
+  | "varianceMinutes"
+  | "backlogTaskId"
+  | "timeZone"
+  | "version"
+  | "timerStartedAt"
+  | "trackedSeconds"
+  | "extendedMinutes"
+  | "stopNote"
+  | "breakBeforeMinutes"
+  | "breakAfterMinutes"
+  | "firstStartedAt"
+  | "finishedAt"
+> & { breakBeforeMinutes?: number; breakAfterMinutes?: number };
 
 export interface Task {
   id: string;
@@ -97,7 +113,10 @@ export interface Task {
 }
 
 /** AI brain dump (ADR-020). */
-export interface AiStatus { enabled: boolean; remainingToday: number }
+export interface AiStatus {
+  enabled: boolean;
+  remainingToday: number;
+}
 export interface TaskSuggestion {
   title: string;
   estimatedMinutes: number | null;
@@ -109,9 +128,22 @@ export interface TaskSuggestion {
 }
 
 /** One line of a brain dump. */
-export type CaptureItem = Pick<Task, "title" | "estimatedMinutes" | "focusAreaId" | "workMode" | "isOutside" | "priority" | "impact" | "dueDate" | "breakMinutes">;
+export type CaptureItem = Pick<
+  Task,
+  | "title"
+  | "estimatedMinutes"
+  | "focusAreaId"
+  | "workMode"
+  | "isOutside"
+  | "priority"
+  | "impact"
+  | "dueDate"
+  | "breakMinutes"
+>;
 
-export type TaskInput = Omit<Task, "id" | "scheduledDate" | "createdAt" | "version" | "breakMinutes"> & { breakMinutes?: number | null };
+export type TaskInput = Omit<Task, "id" | "scheduledDate" | "createdAt" | "version" | "breakMinutes"> & {
+  breakMinutes?: number | null;
+};
 
 export interface Outcome {
   rank: number;
@@ -200,9 +232,22 @@ export interface Preferences {
   breakColor: AreaColor | null;
 }
 
-export interface Review { biggestWin: string; interruptions: string; changeTomorrow: string }
-export interface Day { date: string; outcomes: Outcome[]; review: Review }
-export interface Theme { day: DayName; primaryFocus: string; outcome: string; review: string }
+export interface Review {
+  biggestWin: string;
+  interruptions: string;
+  changeTomorrow: string;
+}
+export interface Day {
+  date: string;
+  outcomes: Outcome[];
+  review: Review;
+}
+export interface Theme {
+  day: DayName;
+  primaryFocus: string;
+  outcome: string;
+  review: string;
+}
 
 export interface DaySummary {
   date: string;
@@ -276,7 +321,8 @@ interface Problem {
 
 function toError(status: number, problem: Problem): ApiError {
   const firstFieldError = problem.errors ? Object.values(problem.errors)[0]?.[0] : undefined;
-  const message = firstFieldError ?? problem.detail ?? FALLBACK[status] ?? "Something went wrong on our side. Try again.";
+  const message =
+    firstFieldError ?? problem.detail ?? FALLBACK[status] ?? "Something went wrong on our side. Try again.";
   const args = [status, message, problem.code, problem.errors ?? {}, problem.traceId] as const;
   if (status === 401) return new UnauthorizedError(...args);
   if (status === 400 || status === 422) return new ValidationError(...args);
@@ -368,7 +414,8 @@ export async function api<T = void>(path: string, init: Options = {}): Promise<T
   if (response.ok) {
     // Signing in, out, or confirming an email changes who the token belongs to.
     if (path.startsWith("/auth/") && (init.method ?? "GET") !== "GET") resetCsrfToken();
-    if (response.status === 204 || response.status === 202 && response.headers.get("Content-Length") === "0") return undefined as T;
+    if (response.status === 204 || (response.status === 202 && response.headers.get("Content-Length") === "0"))
+      return undefined as T;
     const text = await response.text();
     return (text ? JSON.parse(text) : undefined) as T;
   }

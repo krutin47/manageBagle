@@ -2,7 +2,19 @@ import { CalendarPlus, Coffee, MapPin, MoonStar, Plus, TriangleAlert } from "luc
 import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import { Link, useSearchParams } from "react-router";
-import { AreaChip, Button, cx, DateNav, EmptyState, ErrorNote, PageHeader, PriorityMark, Segmented, StatusIcon, StatusPill } from "../../components/ui";
+import {
+  AreaChip,
+  Button,
+  cx,
+  DateNav,
+  EmptyState,
+  ErrorNote,
+  PageHeader,
+  PriorityMark,
+  Segmented,
+  StatusIcon,
+  StatusPill,
+} from "../../components/ui";
 import { errorMessage, type Area, type Block } from "../../lib/api";
 import { useToast } from "../../components/toast";
 import { Variance } from "../../components/Variance";
@@ -10,7 +22,20 @@ import { useDocumentTitle, useMediaQuery, useNowMinutes } from "../../lib/hooks"
 import { modeLabel, statusLabel } from "../../lib/labels";
 import { clashesFor, clashLabel, commitmentsOn } from "../../lib/commitments";
 import { useAreas, useBlockMutations, useCommitments, usePreferences, useWeekBlocks } from "../../lib/queries";
-import { formatDate, formatDuration, formatTime, formatWeekRange, fromMinutes, isValidISODate, nowMinutes, snap, todayISO, toMinutes, weekDays, weekStart } from "../../lib/time";
+import {
+  formatDate,
+  formatDuration,
+  formatTime,
+  formatWeekRange,
+  fromMinutes,
+  isValidISODate,
+  nowMinutes,
+  snap,
+  todayISO,
+  toMinutes,
+  weekDays,
+  weekStart,
+} from "../../lib/time";
 import { BlockDialog, type BlockDraft } from "./BlockDialog";
 import { placeBlocks } from "./layout";
 
@@ -30,7 +55,8 @@ export function PlannerPage() {
   const [draft, setDraft] = useState<BlockDraft | null>(null);
 
   const setParam = (next: Record<string, string>) => setParams({ date, view, ...next }, { replace: true });
-  const newBlock = (d = date, startMin = defaultStart(d)) => setDraft({ date: d, start: fromMinutes(startMin), end: fromMinutes(startMin + 60) });
+  const newBlock = (d = date, startMin = defaultStart(d)) =>
+    setDraft({ date: d, start: fromMinutes(startMin), end: fromMinutes(startMin + 60) });
 
   const areaById = useMemo(() => new Map((areas.data ?? []).map((a) => [a.id, a])), [areas.data]);
   const days = narrow ? [date] : weekDays(start);
@@ -42,8 +68,22 @@ export function PlannerPage() {
         title={formatWeekRange(start)}
         actions={
           <>
-            <Segmented label="View" size="sm" value={view} onChange={(v) => setParam({ view: v })} options={[{ value: "calendar", label: "Calendar" }, { value: "list", label: "List" }]} />
-            <DateNav label="Week" value={date} step={narrow && view === "calendar" ? 1 : 7} onChange={(d) => setParam({ date: d })} />
+            <Segmented
+              label="View"
+              size="sm"
+              value={view}
+              onChange={(v) => setParam({ view: v })}
+              options={[
+                { value: "calendar", label: "Calendar" },
+                { value: "list", label: "List" },
+              ]}
+            />
+            <DateNav
+              label="Week"
+              value={date}
+              step={narrow && view === "calendar" ? 1 : 7}
+              onChange={(d) => setParam({ date: d })}
+            />
             <Button variant="primary" icon={<Plus size={18} aria-hidden />} onClick={() => newBlock()}>
               New block
             </Button>
@@ -51,17 +91,39 @@ export function PlannerPage() {
         }
       />
 
-      {view === "calendar" && !narrow && <p className="cal-tip">Click an empty slot to add a block. Drag a block to move it to another time or day.</p>}
+      {view === "calendar" && !narrow && (
+        <p className="cal-tip">Click an empty slot to add a block. Drag a block to move it to another time or day.</p>
+      )}
       {blocks.isError && <ErrorNote onRetry={() => blocks.refetch()}>We could not load your blocks.</ErrorNote>}
 
       {view === "calendar" ? (
         <>
-          {narrow && <DayStrip days={weekDays(start)} selected={date} blocks={blocks.data ?? []} onSelect={(d) => setParam({ date: d })} />}
+          {narrow && (
+            <DayStrip
+              days={weekDays(start)}
+              selected={date}
+              blocks={blocks.data ?? []}
+              onSelect={(d) => setParam({ date: d })}
+            />
+          )}
           <CalendarLegend />
-          <WeekGrid days={days} blocks={blocks.data ?? []} loading={blocks.isPending} areaById={areaById} onCreate={newBlock} onOpen={(b) => setDraft(b)} />
+          <WeekGrid
+            days={days}
+            blocks={blocks.data ?? []}
+            loading={blocks.isPending}
+            areaById={areaById}
+            onCreate={newBlock}
+            onOpen={(b) => setDraft(b)}
+          />
         </>
       ) : (
-        <BlockTable blocks={blocks.data ?? []} loading={blocks.isPending} areaById={areaById} onOpen={(b) => setDraft(b)} onCreate={() => newBlock()} />
+        <BlockTable
+          blocks={blocks.data ?? []}
+          loading={blocks.isPending}
+          areaById={areaById}
+          onOpen={(b) => setDraft(b)}
+          onCreate={() => newBlock()}
+        />
       )}
 
       <BlockDialog draft={draft} areas={areas.data ?? []} onClose={() => setDraft(null)} />
@@ -75,12 +137,29 @@ function defaultStart(date: string) {
   return Math.min(snap(nowMinutes() + 15, 30), 23 * 60);
 }
 
-function DayStrip({ days, selected, blocks, onSelect }: { days: string[]; selected: string; blocks: Block[]; onSelect: (d: string) => void }) {
+function DayStrip({
+  days,
+  selected,
+  blocks,
+  onSelect,
+}: {
+  days: string[];
+  selected: string;
+  blocks: Block[];
+  onSelect: (d: string) => void;
+}) {
   const today = todayISO();
   return (
     <div className="day-strip" role="tablist" aria-label="Day">
       {days.map((d) => (
-        <button key={d} role="tab" type="button" aria-selected={d === selected} className={cx("day-strip-item", d === today && "is-today")} onClick={() => onSelect(d)}>
+        <button
+          key={d}
+          role="tab"
+          type="button"
+          aria-selected={d === selected}
+          className={cx("day-strip-item", d === today && "is-today")}
+          onClick={() => onSelect(d)}
+        >
           <span>{formatDate(d, "weekdayShort")}</span>
           <strong>{formatDate(d, "day")}</strong>
           <i className={blocks.some((b) => b.date === d) ? "has" : undefined} aria-hidden />
@@ -156,7 +235,9 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
   const firstDay = days[0];
 
   // Open on the working day (or the first block if it starts earlier), not at midnight.
-  const earliest = blocks.length ? Math.min(...blocks.filter((b) => days.includes(b.date)).map((b) => Number(b.start.slice(0, 2))), 7) : 7;
+  const earliest = blocks.length
+    ? Math.min(...blocks.filter((b) => days.includes(b.date)).map((b) => Number(b.start.slice(0, 2))), 7)
+    : 7;
   useEffect(() => {
     scroller.current?.scrollTo({ top: Math.max(0, earliest * HOUR - 12) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -169,7 +250,11 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
   };
 
   return (
-    <section className="cal" aria-label="Week calendar" style={{ "--cols": days.length, "--hour": `${HOUR}px` } as React.CSSProperties}>
+    <section
+      className="cal"
+      aria-label="Week calendar"
+      style={{ "--cols": days.length, "--hour": `${HOUR}px` } as React.CSSProperties}
+    >
       <div className="cal-head">
         <span className="cal-gutter" />
         {days.map((d) => {
@@ -194,76 +279,139 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
               </span>
             ))}
           </div>
-          {days.map((d) => { const fixed = commitmentsOn(d, commitments.data ?? []); return (
-            <div key={d} className={cx("cal-col", d === today && "is-today")} onClick={createAt(d)} >
-              {fixed.map((c) => (
-                <div key={`${c.source.sourceId}-${c.source.date}-${c.start}`} className={cx("cal-routine", c.policy !== "NoTasks" && "is-open", c.source.kind === "event" && "is-event")} aria-hidden
-                  data-area={c.source.kind === "event" ? "none" : (c.source.color ?? "none")}
-                  style={{ top: (Math.max(0, c.start) / 60) * HOUR, height: ((Math.min(1440, c.end) - Math.max(0, c.start)) / 60) * HOUR }}>
-                  <span>
-                    <strong>{c.title}</strong> {fromMinutes(Math.max(0, c.start))}–{fromMinutes(c.end % 1440)}
-                    {c.source.kind === "event" ? "" : c.policy === "NoTasks" ? " · protected" : " · open"}
-                  </span>
-                </div>
-              ))}
-              {d === today && (
-                <div className="now-line" style={{ top: (now / 60) * HOUR }} aria-hidden>
-                  <span />
-                </div>
-              )}
-              {placeBlocks(blocks.filter((b) => b.date === d)).map((p) => {
-                const area = p.block.focusAreaId ? areaById.get(p.block.focusAreaId) : undefined;
-                const height = Math.max(((p.endMin - p.startMin) / 60) * HOUR - 2, 20);
-                const dragging = drag?.moved && drag.block.id === p.block.id ? drag : null;
-                const liveStart = dragging ? fromMinutes(toMinutes(p.block.start) + dragging.minuteShift) : p.block.start.slice(0, 5);
-                const liveEnd = dragging ? fromMinutes(toMinutes(p.block.start) + dragging.minuteShift + p.block.plannedMinutes) : p.block.end.slice(0, 5);
-                const clash = p.block.status === "Planned" || p.block.status === "InProgress" ? clashLabel(clashesFor(p.block, fixed)) : "";
-                const breaks = [p.block.breakBeforeMinutes ? `${p.block.breakBeforeMinutes} min recovery before` : "", p.block.breakAfterMinutes ? `${p.block.breakAfterMinutes} min recovery after` : ""].filter(Boolean).join(", ");
-                return [
-                  p.block.breakBeforeMinutes > 0 && !dragging && (
-                    <span key={`${p.block.id}-break-before`} className="cal-break is-before" data-area={breakColor} aria-hidden title={`${p.block.breakBeforeMinutes} min recovery`}
-                      style={{ top: Math.max(0, ((p.startMin - p.block.breakBeforeMinutes) / 60) * HOUR + 1), height: Math.max((p.block.breakBeforeMinutes / 60) * HOUR - 2, 6), left: `calc(${(p.lane / p.lanes) * 100}% + 2px)`, width: `calc(${100 / p.lanes}% - 4px)` }}>
-                      {(p.block.breakBeforeMinutes / 60) * HOUR >= 16 && <>Break · {p.block.breakBeforeMinutes}m</>}
-                    </span>
-                  ),
-                  p.block.breakAfterMinutes > 0 && !dragging && (
-                    <span key={`${p.block.id}-break`} className="cal-break" data-area={breakColor} aria-hidden title={`${p.block.breakAfterMinutes} min recovery`}
-                      style={{ top: (p.endMin / 60) * HOUR + 1, height: Math.max((p.block.breakAfterMinutes / 60) * HOUR - 2, 6), left: `calc(${(p.lane / p.lanes) * 100}% + 2px)`, width: `calc(${100 / p.lanes}% - 4px)` }}>
-                      {(p.block.breakAfterMinutes / 60) * HOUR >= 16 && <>Break · {p.block.breakAfterMinutes}m</>}
-                    </span>
-                  ),
-                  <motion.button
-                    key={p.block.id}
-                    type="button"
-                    initial={{ opacity: 0, scale: 0.96 }}
-                    animate={{ opacity: 1, scale: 1, x: dragging ? dragging.dayShift * dragging.colWidth : 0, y: dragging ? (dragging.minuteShift / 60) * HOUR : 0 }}
-                    transition={dragging ? { type: "spring", stiffness: 900, damping: 50 } : { duration: 0.2 }}
-                    className={cx("cal-block", height < 40 && "is-short", dragging && "is-dragging", clash && "is-clash")}
-                    onPointerDown={startDrag(p.block)}
-                    onPointerMove={onDrag}
-                    onPointerUp={endDrag}
-                    onPointerCancel={() => setDrag(null)}
-                    data-area={area?.color ?? "none"}
-                    data-status={p.block.status}
-                    style={{ top: (p.startMin / 60) * HOUR + 1, height, left: `calc(${(p.lane / p.lanes) * 100}% + 2px)`, width: `calc(${100 / p.lanes}% - 4px)` }}
-                    onClick={() => !justDragged.current && onOpen(p.block)}
-                    aria-label={`${p.block.title}, ${formatTime(p.block.start)} to ${formatTime(p.block.end)}, ${area?.name ?? "no focus area"}, ${statusLabel[p.block.status]}${breaks ? `, ${breaks}` : ""}${clash ? `. ${clash}` : ""}. Open to edit or move.`}
+          {days.map((d) => {
+            const fixed = commitmentsOn(d, commitments.data ?? []);
+            return (
+              <div key={d} className={cx("cal-col", d === today && "is-today")} onClick={createAt(d)}>
+                {fixed.map((c) => (
+                  <div
+                    key={`${c.source.sourceId}-${c.source.date}-${c.start}`}
+                    className={cx(
+                      "cal-routine",
+                      c.policy !== "NoTasks" && "is-open",
+                      c.source.kind === "event" && "is-event",
+                    )}
+                    aria-hidden
+                    data-area={c.source.kind === "event" ? "none" : (c.source.color ?? "none")}
+                    style={{
+                      top: (Math.max(0, c.start) / 60) * HOUR,
+                      height: ((Math.min(1440, c.end) - Math.max(0, c.start)) / 60) * HOUR,
+                    }}
                   >
-                    <span className="cal-block-title">
-                      {p.block.status !== "Planned" && <StatusIcon status={p.block.status} size={12} />}
-                      {p.block.title}
+                    <span>
+                      <strong>{c.title}</strong> {fromMinutes(Math.max(0, c.start))}–{fromMinutes(c.end % 1440)}
+                      {c.source.kind === "event" ? "" : c.policy === "NoTasks" ? " · protected" : " · open"}
                     </span>
-                    <span className="cal-block-time">
-                      {liveStart}–{liveEnd}
-                      {p.block.isOutside && <MapPin size={11} aria-label="outside work" />}
-                      {p.overnight && <MoonStar size={11} aria-label="continues past midnight" />}
-                      {clash && <TriangleAlert size={11} aria-hidden />}
-                    </span>
-                  </motion.button>,
-                ];
-              })}
-            </div>
-          ); })}
+                  </div>
+                ))}
+                {d === today && (
+                  <div className="now-line" style={{ top: (now / 60) * HOUR }} aria-hidden>
+                    <span />
+                  </div>
+                )}
+                {placeBlocks(blocks.filter((b) => b.date === d)).map((p) => {
+                  const area = p.block.focusAreaId ? areaById.get(p.block.focusAreaId) : undefined;
+                  const height = Math.max(((p.endMin - p.startMin) / 60) * HOUR - 2, 20);
+                  const dragging = drag?.moved && drag.block.id === p.block.id ? drag : null;
+                  const liveStart = dragging
+                    ? fromMinutes(toMinutes(p.block.start) + dragging.minuteShift)
+                    : p.block.start.slice(0, 5);
+                  const liveEnd = dragging
+                    ? fromMinutes(toMinutes(p.block.start) + dragging.minuteShift + p.block.plannedMinutes)
+                    : p.block.end.slice(0, 5);
+                  const clash =
+                    p.block.status === "Planned" || p.block.status === "InProgress"
+                      ? clashLabel(clashesFor(p.block, fixed))
+                      : "";
+                  const breaks = [
+                    p.block.breakBeforeMinutes ? `${p.block.breakBeforeMinutes} min recovery before` : "",
+                    p.block.breakAfterMinutes ? `${p.block.breakAfterMinutes} min recovery after` : "",
+                  ]
+                    .filter(Boolean)
+                    .join(", ");
+                  return [
+                    p.block.breakBeforeMinutes > 0 && !dragging && (
+                      <span
+                        key={`${p.block.id}-break-before`}
+                        className="cal-break is-before"
+                        data-area={breakColor}
+                        aria-hidden
+                        title={`${p.block.breakBeforeMinutes} min recovery`}
+                        style={{
+                          top: Math.max(0, ((p.startMin - p.block.breakBeforeMinutes) / 60) * HOUR + 1),
+                          height: Math.max((p.block.breakBeforeMinutes / 60) * HOUR - 2, 6),
+                          left: `calc(${(p.lane / p.lanes) * 100}% + 2px)`,
+                          width: `calc(${100 / p.lanes}% - 4px)`,
+                        }}
+                      >
+                        {(p.block.breakBeforeMinutes / 60) * HOUR >= 16 && <>Break · {p.block.breakBeforeMinutes}m</>}
+                      </span>
+                    ),
+                    p.block.breakAfterMinutes > 0 && !dragging && (
+                      <span
+                        key={`${p.block.id}-break`}
+                        className="cal-break"
+                        data-area={breakColor}
+                        aria-hidden
+                        title={`${p.block.breakAfterMinutes} min recovery`}
+                        style={{
+                          top: (p.endMin / 60) * HOUR + 1,
+                          height: Math.max((p.block.breakAfterMinutes / 60) * HOUR - 2, 6),
+                          left: `calc(${(p.lane / p.lanes) * 100}% + 2px)`,
+                          width: `calc(${100 / p.lanes}% - 4px)`,
+                        }}
+                      >
+                        {(p.block.breakAfterMinutes / 60) * HOUR >= 16 && <>Break · {p.block.breakAfterMinutes}m</>}
+                      </span>
+                    ),
+                    <motion.button
+                      key={p.block.id}
+                      type="button"
+                      initial={{ opacity: 0, scale: 0.96 }}
+                      animate={{
+                        opacity: 1,
+                        scale: 1,
+                        x: dragging ? dragging.dayShift * dragging.colWidth : 0,
+                        y: dragging ? (dragging.minuteShift / 60) * HOUR : 0,
+                      }}
+                      transition={dragging ? { type: "spring", stiffness: 900, damping: 50 } : { duration: 0.2 }}
+                      className={cx(
+                        "cal-block",
+                        height < 40 && "is-short",
+                        dragging && "is-dragging",
+                        clash && "is-clash",
+                      )}
+                      onPointerDown={startDrag(p.block)}
+                      onPointerMove={onDrag}
+                      onPointerUp={endDrag}
+                      onPointerCancel={() => setDrag(null)}
+                      data-area={area?.color ?? "none"}
+                      data-status={p.block.status}
+                      style={{
+                        top: (p.startMin / 60) * HOUR + 1,
+                        height,
+                        left: `calc(${(p.lane / p.lanes) * 100}% + 2px)`,
+                        width: `calc(${100 / p.lanes}% - 4px)`,
+                      }}
+                      onClick={() => !justDragged.current && onOpen(p.block)}
+                      aria-label={`${p.block.title}, ${formatTime(p.block.start)} to ${formatTime(p.block.end)}, ${area?.name ?? "no focus area"}, ${statusLabel[p.block.status]}${breaks ? `, ${breaks}` : ""}${clash ? `. ${clash}` : ""}. Open to edit or move.`}
+                    >
+                      <span className="cal-block-title">
+                        {p.block.status !== "Planned" && <StatusIcon status={p.block.status} size={12} />}
+                        {p.block.title}
+                      </span>
+                      <span className="cal-block-time">
+                        {liveStart}–{liveEnd}
+                        {p.block.isOutside && <MapPin size={11} aria-label="outside work" />}
+                        {p.overnight && <MoonStar size={11} aria-label="continues past midnight" />}
+                        {clash && <TriangleAlert size={11} aria-hidden />}
+                      </span>
+                    </motion.button>,
+                  ];
+                })}
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -275,21 +423,54 @@ function CalendarLegend() {
   const breakColor = usePreferences().data?.breakColor ?? "green";
   return (
     <ul className="cal-legend" aria-label="Calendar key">
-      <li><span className="legend-swatch is-block" aria-hidden /> Block</li>
-      <li><span className="legend-swatch is-break" data-area={breakColor} aria-hidden /> Recovery break</li>
-      <li><span className="legend-swatch is-protected" data-area="none" aria-hidden /> Routine, protected (hatched)</li>
-      <li><span className="legend-swatch is-open" data-area="none" aria-hidden /> Routine, open for tasks (dashed)</li>
-      <li><span className="legend-swatch is-event" aria-hidden /> Meeting from your calendar</li>
-      <li className="cal-legend-note"><Link to="/routines">Change colours in Routines</Link></li>
+      <li>
+        <span className="legend-swatch is-block" aria-hidden /> Block
+      </li>
+      <li>
+        <span className="legend-swatch is-break" data-area={breakColor} aria-hidden /> Recovery break
+      </li>
+      <li>
+        <span className="legend-swatch is-protected" data-area="none" aria-hidden /> Routine, protected (hatched)
+      </li>
+      <li>
+        <span className="legend-swatch is-open" data-area="none" aria-hidden /> Routine, open for tasks (dashed)
+      </li>
+      <li>
+        <span className="legend-swatch is-event" aria-hidden /> Meeting from your calendar
+      </li>
+      <li className="cal-legend-note">
+        <Link to="/routines">Change colours in Routines</Link>
+      </li>
     </ul>
   );
 }
 
-function BlockTable({ blocks, loading, areaById, onOpen, onCreate }: { blocks: Block[]; loading: boolean; areaById: Map<string, Area>; onOpen: (b: Block) => void; onCreate: () => void }) {
+function BlockTable({
+  blocks,
+  loading,
+  areaById,
+  onOpen,
+  onCreate,
+}: {
+  blocks: Block[];
+  loading: boolean;
+  areaById: Map<string, Area>;
+  onOpen: (b: Block) => void;
+  onCreate: () => void;
+}) {
   if (!loading && blocks.length === 0) {
     return (
       <div className="card">
-        <EmptyState icon={<CalendarPlus size={22} />} title="Nothing planned this week" body="Make an appointment with your own priorities. Start with one deep-focus block." action={<Button variant="primary" onClick={onCreate}>Plan a block</Button>} />
+        <EmptyState
+          icon={<CalendarPlus size={22} />}
+          title="Nothing planned this week"
+          body="Make an appointment with your own priorities. Start with one deep-focus block."
+          action={
+            <Button variant="primary" onClick={onCreate}>
+              Plan a block
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -314,23 +495,43 @@ function BlockTable({ blocks, loading, areaById, onOpen, onCreate }: { blocks: B
           {blocks.map((b) => (
             <tr key={b.id} data-status={b.status}>
               <td className="nowrap">{formatDate(b.date, "medium")}</td>
-              <td className="mono nowrap">{b.start.slice(0, 5)}–{b.end.slice(0, 5)}</td>
+              <td className="mono nowrap">
+                {b.start.slice(0, 5)}–{b.end.slice(0, 5)}
+              </td>
               <td className="table-main">
                 <button type="button" className="row-link" onClick={() => onOpen(b)}>
                   {b.title}
                 </button>
                 {b.breakBeforeMinutes + b.breakAfterMinutes > 0 && (
-                  <span className="table-note break-tag"><Coffee size={12} aria-hidden /> {[b.breakBeforeMinutes ? `${formatDuration(b.breakBeforeMinutes)} recovery before` : "", b.breakAfterMinutes ? `${formatDuration(b.breakAfterMinutes)} recovery after` : ""].filter(Boolean).join(" · ")}</span>
+                  <span className="table-note break-tag">
+                    <Coffee size={12} aria-hidden />{" "}
+                    {[
+                      b.breakBeforeMinutes ? `${formatDuration(b.breakBeforeMinutes)} recovery before` : "",
+                      b.breakAfterMinutes ? `${formatDuration(b.breakAfterMinutes)} recovery after` : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
                 )}
                 {b.notes && <span className="table-note">{b.notes}</span>}
               </td>
-              <td><AreaChip area={b.focusAreaId ? areaById.get(b.focusAreaId) : undefined} /></td>
-              <td><PriorityMark priority={b.priority} /></td>
+              <td>
+                <AreaChip area={b.focusAreaId ? areaById.get(b.focusAreaId) : undefined} />
+              </td>
+              <td>
+                <PriorityMark priority={b.priority} />
+              </td>
               <td className="nowrap">{modeLabel[b.workMode]}</td>
-              <td><StatusPill status={b.status} /></td>
+              <td>
+                <StatusPill status={b.status} />
+              </td>
               <td className="num mono">{formatDuration(b.plannedMinutes)}</td>
-              <td className="num mono">{b.actualMinutes === null ? <span className="muted">—</span> : formatDuration(b.actualMinutes)}</td>
-              <td className="num mono"><Variance minutes={b.varianceMinutes} /></td>
+              <td className="num mono">
+                {b.actualMinutes === null ? <span className="muted">—</span> : formatDuration(b.actualMinutes)}
+              </td>
+              <td className="num mono">
+                <Variance minutes={b.varianceMinutes} />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -338,4 +539,3 @@ function BlockTable({ blocks, loading, areaById, onOpen, onCreate }: { blocks: B
     </div>
   );
 }
-

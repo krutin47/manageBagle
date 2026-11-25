@@ -1,8 +1,35 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
-  api, UnauthorizedError, type CaptureItem, type AiStatus, type TaskSuggestion,
-  type Area, type AreaColor, type Block, type CalendarConnection, type CalendarFeed, type Commitment, type Preferences, type Routine, type RoutineInput, type BlockInput, type Day, type DayName, type Outcome, type PlanItem, type ProviderKey,
-  type Review, type Status, type StopOutcome, type Task, type TaskInput, type Theme, type TimerSnapshot, type User, type WeekSummary, type WorkMode,
+  api,
+  UnauthorizedError,
+  type CaptureItem,
+  type AiStatus,
+  type TaskSuggestion,
+  type Area,
+  type AreaColor,
+  type Block,
+  type CalendarConnection,
+  type CalendarFeed,
+  type Commitment,
+  type Preferences,
+  type Routine,
+  type RoutineInput,
+  type BlockInput,
+  type Day,
+  type DayName,
+  type Outcome,
+  type PlanItem,
+  type ProviderKey,
+  type Review,
+  type Status,
+  type StopOutcome,
+  type Task,
+  type TaskInput,
+  type Theme,
+  type TimerSnapshot,
+  type User,
+  type WeekSummary,
+  type WorkMode,
 } from "./api";
 import { syncServerClock } from "./timerClock";
 import { addDays, fromMinutes, toMinutes, weekStart } from "./time";
@@ -76,13 +103,21 @@ export function useUser(): User {
 }
 
 export function useProviders() {
-  return useQuery({ queryKey: keys.providers, queryFn: ({ signal }) => api<Record<ProviderKey, boolean>>("/auth/providers", { signal }), staleTime: Infinity });
+  return useQuery({
+    queryKey: keys.providers,
+    queryFn: ({ signal }) => api<Record<ProviderKey, boolean>>("/auth/providers", { signal }),
+    staleTime: Infinity,
+  });
 }
 
 // ---- Focus areas -----------------------------------------------------------------------------
 
 export function useAreas() {
-  return useQuery({ queryKey: keys.areas, queryFn: ({ signal }) => api<Area[]>("/areas", { signal }), staleTime: STALE.reference });
+  return useQuery({
+    queryKey: keys.areas,
+    queryFn: ({ signal }) => api<Area[]>("/areas", { signal }),
+    staleTime: STALE.reference,
+  });
 }
 
 export function useAreaMutations() {
@@ -92,9 +127,21 @@ export function useAreaMutations() {
     qc.invalidateQueries({ queryKey: keys.weekSummary.all });
   };
   return {
-    create: useMutation({ mutationFn: (body: { name: string; color: AreaColor }) => api<Area>("/areas", { method: "POST", body }), onSuccess: done }),
+    create: useMutation({
+      mutationFn: (body: { name: string; color: AreaColor }) => api<Area>("/areas", { method: "POST", body }),
+      onSuccess: done,
+    }),
     update: useMutation({
-      mutationFn: ({ id, ...body }: { id: string; name: string; color: AreaColor; breakMinutes: number; breakPlacement: Area["breakPlacement"] }) => api<Area>(`/areas/${id}`, { method: "PUT", body }),
+      mutationFn: ({
+        id,
+        ...body
+      }: {
+        id: string;
+        name: string;
+        color: AreaColor;
+        breakMinutes: number;
+        breakPlacement: Area["breakPlacement"];
+      }) => api<Area>(`/areas/${id}`, { method: "PUT", body }),
       onSuccess: done,
     }),
     remove: useMutation({
@@ -142,7 +189,9 @@ function cachedBlock(qc: QueryClient, id: string): Block | undefined {
 
 /** Puts the server's answer (with its new version) into the cache straight away. */
 function storeBlock(qc: QueryClient, saved: Block) {
-  qc.setQueriesData<Block[]>({ queryKey: keys.blocks.all }, (list) => list?.map((b) => (b.id === saved.id ? saved : b)));
+  qc.setQueriesData<Block[]>({ queryKey: keys.blocks.all }, (list) =>
+    list?.map((b) => (b.id === saved.id ? saved : b)),
+  );
 }
 
 const blockBody = (b: BlockInput) => ({ ...b, start: withSeconds(b.start), end: withSeconds(b.end) });
@@ -158,11 +207,17 @@ export function useBlockMutations() {
     qc.invalidateQueries({ queryKey: keys.backlog });
   };
   return {
-    create: useMutation({ mutationFn: (b: BlockInput) => api<Block>("/blocks", { method: "POST", body: blockBody(b) }), onSuccess: settle }),
+    create: useMutation({
+      mutationFn: (b: BlockInput) => api<Block>("/blocks", { method: "POST", body: blockBody(b) }),
+      onSuccess: settle,
+    }),
     update: useMutation({
       scope: BLOCK_WRITES,
       mutationFn: ({ id, ...b }: BlockInput & { id: string }) =>
-        api<Block>(`/blocks/${id}`, { method: "PUT", body: { ...blockBody(b), version: cachedBlock(qc, id)?.version } }),
+        api<Block>(`/blocks/${id}`, {
+          method: "PUT",
+          body: { ...blockBody(b), version: cachedBlock(qc, id)?.version },
+        }),
       onSuccess: (saved) => storeBlock(qc, saved),
       onSettled: () => {
         settle();
@@ -175,7 +230,22 @@ export function useBlockMutations() {
       mutationFn: ({ block, date, start }: { block: Block; date: string; start: string }) => {
         const { title, focusAreaId, priority, workMode, status, actualMinutes, notes, isOutside } = block;
         const end = fromMinutes(toMinutes(start) + block.plannedMinutes);
-        const body = { ...blockBody({ date, start, end, title, focusAreaId, priority, workMode, status, actualMinutes, notes, isOutside }), version: cachedBlock(qc, block.id)?.version };
+        const body = {
+          ...blockBody({
+            date,
+            start,
+            end,
+            title,
+            focusAreaId,
+            priority,
+            workMode,
+            status,
+            actualMinutes,
+            notes,
+            isOutside,
+          }),
+          version: cachedBlock(qc, block.id)?.version,
+        };
         return api<Block>(`/blocks/${block.id}`, { method: "PUT", body });
       },
       onMutate: async ({ block, date, start }) => {
@@ -184,7 +254,9 @@ export function useBlockMutations() {
         const previous = qc.getQueryData<Block[]>(key);
         const end = fromMinutes(toMinutes(start) + block.plannedMinutes);
         qc.setQueryData<Block[]>(key, (list) =>
-          list?.map((b) => (b.id === block.id ? { ...b, date, start, end } : b)).sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start)),
+          list
+            ?.map((b) => (b.id === block.id ? { ...b, date, start, end } : b))
+            .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start)),
         );
         return { key, previous };
       },
@@ -195,8 +267,19 @@ export function useBlockMutations() {
     /** Optimistic: ticking a block off should feel instant. */
     progress: useMutation({
       scope: BLOCK_WRITES,
-      mutationFn: ({ block, ...body }: { block: Block; status?: Status; actualMinutes?: number; clearActual?: boolean }) =>
-        api<Block>(`/blocks/${block.id}/progress`, { method: "PATCH", body: { ...body, version: cachedBlock(qc, block.id)?.version } }),
+      mutationFn: ({
+        block,
+        ...body
+      }: {
+        block: Block;
+        status?: Status;
+        actualMinutes?: number;
+        clearActual?: boolean;
+      }) =>
+        api<Block>(`/blocks/${block.id}/progress`, {
+          method: "PATCH",
+          body: { ...body, version: cachedBlock(qc, block.id)?.version },
+        }),
       onMutate: async ({ block, status, actualMinutes, clearActual }) => {
         const key = keys.blocks.week(weekStart(block.date));
         await qc.cancelQueries({ queryKey: key });
@@ -205,7 +288,12 @@ export function useBlockMutations() {
           list?.map((b) => {
             if (b.id !== block.id) return b;
             const actual = clearActual ? null : (actualMinutes ?? b.actualMinutes);
-            return { ...b, status: status ?? b.status, actualMinutes: actual, varianceMinutes: actual === null ? null : actual - b.plannedMinutes };
+            return {
+              ...b,
+              status: status ?? b.status,
+              actualMinutes: actual,
+              varianceMinutes: actual === null ? null : actual - b.plannedMinutes,
+            };
           }),
         );
         return { key, previous };
@@ -233,7 +321,11 @@ export function useWeekSummary(start: string) {
 // ---- Daily focus -----------------------------------------------------------------------------
 
 export function useDay(date: string) {
-  return useQuery({ queryKey: keys.days.of(date), queryFn: ({ signal }) => api<Day>(`/days/${date}`, { signal }), staleTime: STALE.planning });
+  return useQuery({
+    queryKey: keys.days.of(date),
+    queryFn: ({ signal }) => api<Day>(`/days/${date}`, { signal }),
+    staleTime: STALE.planning,
+  });
 }
 
 export function useDayMutations(date: string) {
@@ -242,11 +334,19 @@ export function useDayMutations(date: string) {
   const done = () => qc.invalidateQueries({ queryKey: key });
   return {
     saveOutcome: useMutation({
-      mutationFn: ({ rank, ...body }: Outcome) => api<Outcome>(`/days/${date}/outcomes/${rank}`, { method: "PUT", body }),
+      mutationFn: ({ rank, ...body }: Outcome) =>
+        api<Outcome>(`/days/${date}/outcomes/${rank}`, { method: "PUT", body }),
       onMutate: async (next) => {
         await qc.cancelQueries({ queryKey: key });
         const previous = qc.getQueryData<Day>(key);
-        qc.setQueryData<Day>(key, (d) => d && { ...d, outcomes: [...d.outcomes.filter((o) => o.rank !== next.rank), next].sort((a, b) => a.rank - b.rank) });
+        qc.setQueryData<Day>(
+          key,
+          (d) =>
+            d && {
+              ...d,
+              outcomes: [...d.outcomes.filter((o) => o.rank !== next.rank), next].sort((a, b) => a.rank - b.rank),
+            },
+        );
         return { previous };
       },
       onError: (_e, _v, ctx) => qc.setQueryData(key, ctx?.previous),
@@ -256,7 +356,10 @@ export function useDayMutations(date: string) {
         qc.invalidateQueries({ queryKey: keys.backlog });
       },
     }),
-    removeOutcome: useMutation({ mutationFn: (rank: number) => api(`/days/${date}/outcomes/${rank}`, { method: "DELETE" }), onSuccess: done }),
+    removeOutcome: useMutation({
+      mutationFn: (rank: number) => api(`/days/${date}/outcomes/${rank}`, { method: "DELETE" }),
+      onSuccess: done,
+    }),
     saveReview: useMutation({
       mutationFn: (body: Review) => api<Review>(`/days/${date}/review`, { method: "PUT", body }),
       onSuccess: (review) => qc.setQueryData<Day>(key, (d) => d && { ...d, review }),
@@ -275,7 +378,9 @@ export function usePlanDay(date: string) {
       api<{ tasksCreated: number; blocksBooked: number; leftInBacklog: number }>(`/days/${date}/plan`, {
         method: "POST",
         headers: { "Idempotency-Key": idempotencyKey },
-        body: { items: items.map((i) => ({ ...i, start: i.start && withSeconds(i.start), end: i.end && withSeconds(i.end) })) },
+        body: {
+          items: items.map((i) => ({ ...i, start: i.start && withSeconds(i.start), end: i.end && withSeconds(i.end) })),
+        },
       }),
     onSuccess: () => {
       invalidatePlanning(qc);
@@ -286,14 +391,19 @@ export function usePlanDay(date: string) {
 }
 
 export function useThemes() {
-  return useQuery({ queryKey: keys.themes, queryFn: ({ signal }) => api<Theme[]>("/themes", { signal }), staleTime: STALE.reference });
+  return useQuery({
+    queryKey: keys.themes,
+    queryFn: ({ signal }) => api<Theme[]>("/themes", { signal }),
+    staleTime: STALE.reference,
+  });
 }
 
 export function useSaveTheme() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ day, ...body }: Theme) => api<Theme>(`/themes/${day satisfies DayName}`, { method: "PUT", body }),
-    onSuccess: (saved) => qc.setQueryData<Theme[]>(keys.themes, (list) => list?.map((t) => (t.day === saved.day ? saved : t))),
+    onSuccess: (saved) =>
+      qc.setQueryData<Theme[]>(keys.themes, (list) => list?.map((t) => (t.day === saved.day ? saved : t))),
   });
 }
 
@@ -313,13 +423,18 @@ export function useBacklog(history: "recent" | "all" = "recent") {
 
 /** Whether "Turn into tasks" is available, and how many uses are left today (ADR-020). */
 export function useAiStatus() {
-  return useQuery({ queryKey: keys.ai, queryFn: ({ signal }) => api<AiStatus>("/ai/status", { signal }), staleTime: STALE.reference });
+  return useQuery({
+    queryKey: keys.ai,
+    queryFn: ({ signal }) => api<AiStatus>("/ai/status", { signal }),
+    staleTime: STALE.reference,
+  });
 }
 
 export function useSuggestTasks() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (text: string) => api<{ tasks: TaskSuggestion[]; remainingToday: number }>("/ai/suggest-tasks", { method: "POST", body: { text } }),
+    mutationFn: (text: string) =>
+      api<{ tasks: TaskSuggestion[]; remainingToday: number }>("/ai/suggest-tasks", { method: "POST", body: { text } }),
     onSettled: () => qc.invalidateQueries({ queryKey: keys.ai }),
   });
 }
@@ -344,25 +459,46 @@ export function useTaskMutations() {
     qc.invalidateQueries({ queryKey: keys.timer });
   };
   return {
-    create: useMutation({ mutationFn: (body: TaskInput) => api<Task>("/backlog", { method: "POST", body }), onSuccess: done }),
+    create: useMutation({
+      mutationFn: (body: TaskInput) => api<Task>("/backlog", { method: "POST", body }),
+      onSuccess: done,
+    }),
     update: useMutation({
       scope: TASK_WRITES,
       mutationFn: ({ id, ...body }: TaskInput & { id: string }) =>
-        api<Task>(`/backlog/${id}`, { method: "PUT", body: { ...body, version: qc.getQueryData<Task[]>(keys.backlog)?.find((t) => t.id === id)?.version } }),
+        api<Task>(`/backlog/${id}`, {
+          method: "PUT",
+          body: { ...body, version: qc.getQueryData<Task[]>(keys.backlog)?.find((t) => t.id === id)?.version },
+        }),
       onMutate: async (next) => {
         await qc.cancelQueries({ queryKey: keys.backlog });
         const previous = qc.getQueryData<Task[]>(keys.backlog);
         qc.setQueryData<Task[]>(keys.backlog, (list) => list?.map((t) => (t.id === next.id ? { ...t, ...next } : t)));
         return { previous };
       },
-      onSuccess: (saved) => qc.setQueryData<Task[]>(keys.backlog, (list) => list?.map((t) => (t.id === saved.id ? saved : t))),
+      onSuccess: (saved) =>
+        qc.setQueryData<Task[]>(keys.backlog, (list) => list?.map((t) => (t.id === saved.id ? saved : t))),
       onError: (_e, _v, ctx) => qc.setQueryData(keys.backlog, ctx?.previous),
       onSettled: statusChanged,
     }),
     remove: useMutation({ mutationFn: (id: string) => api(`/backlog/${id}`, { method: "DELETE" }), onSuccess: done }),
     schedule: useMutation({
-      mutationFn: ({ id, start, end, ...rest }: { id: string; date: string; start: string; end: string; workMode: WorkMode }) =>
-        api<{ task: Task; block: Block }>(`/backlog/${id}/schedule`, { method: "POST", body: { ...rest, start: withSeconds(start), end: withSeconds(end) } }),
+      mutationFn: ({
+        id,
+        start,
+        end,
+        ...rest
+      }: {
+        id: string;
+        date: string;
+        start: string;
+        end: string;
+        workMode: WorkMode;
+      }) =>
+        api<{ task: Task; block: Block }>(`/backlog/${id}/schedule`, {
+          method: "POST",
+          body: { ...rest, start: withSeconds(start), end: withSeconds(end) },
+        }),
       onSuccess: () => {
         done();
         invalidatePlanning(qc);
@@ -410,20 +546,28 @@ export function useTimerMutations() {
   return {
     start: useMutation({
       scope: BLOCK_WRITES,
-      mutationFn: ({ blockId, pauseRunning = false }: { blockId: string; pauseRunning?: boolean }) => post(`/blocks/${blockId}/timer/start`, { pauseRunning }),
+      mutationFn: ({ blockId, pauseRunning = false }: { blockId: string; pauseRunning?: boolean }) =>
+        post(`/blocks/${blockId}/timer/start`, { pauseRunning }),
       onSuccess: apply,
       onSettled: settle,
     }),
-    pause: useMutation({ scope: BLOCK_WRITES, mutationFn: (blockId: string) => post(`/blocks/${blockId}/timer/pause`), onSuccess: apply, onSettled: settle }),
+    pause: useMutation({
+      scope: BLOCK_WRITES,
+      mutationFn: (blockId: string) => post(`/blocks/${blockId}/timer/pause`),
+      onSuccess: apply,
+      onSettled: settle,
+    }),
     extend: useMutation({
       scope: BLOCK_WRITES,
-      mutationFn: ({ blockId, minutes }: { blockId: string; minutes: number }) => post(`/blocks/${blockId}/timer/extend`, { minutes }),
+      mutationFn: ({ blockId, minutes }: { blockId: string; minutes: number }) =>
+        post(`/blocks/${blockId}/timer/extend`, { minutes }),
       onSuccess: apply,
       onSettled: settle,
     }),
     stop: useMutation({
       scope: BLOCK_WRITES,
-      mutationFn: ({ blockId, outcome, note }: { blockId: string; outcome: StopOutcome; note?: string }) => post(`/blocks/${blockId}/timer/stop`, { outcome, note }),
+      mutationFn: ({ blockId, outcome, note }: { blockId: string; outcome: StopOutcome; note?: string }) =>
+        post(`/blocks/${blockId}/timer/stop`, { outcome, note }),
       onSuccess: apply,
       onSettled: closing,
     }),
@@ -433,7 +577,11 @@ export function useTimerMutations() {
 // ---- Routines, commitments, preferences (P2-C) ----------------------------------------------
 
 export function useRoutines() {
-  return useQuery({ queryKey: keys.routines, queryFn: ({ signal }) => api<Routine[]>("/routines", { signal }), staleTime: STALE.reference });
+  return useQuery({
+    queryKey: keys.routines,
+    queryFn: ({ signal }) => api<Routine[]>("/routines", { signal }),
+    staleTime: STALE.reference,
+  });
 }
 
 /** Routine occurrences for the week containing the date, expanded by the server in the account's zone. */
@@ -442,7 +590,8 @@ export function useCommitments(anyDateInWeek: string) {
   return useQuery({
     // A day early, so an overnight routine that began the evening before is included.
     queryKey: keys.commitments.week(start),
-    queryFn: ({ signal }) => api<Commitment[]>(`/commitments?from=${addDays(start, -1)}&to=${addDays(start, 6)}`, { signal }),
+    queryFn: ({ signal }) =>
+      api<Commitment[]>(`/commitments?from=${addDays(start, -1)}&to=${addDays(start, 6)}`, { signal }),
     staleTime: STALE.reference,
   });
 }
@@ -454,14 +603,24 @@ export function useRoutineMutations() {
     qc.invalidateQueries({ queryKey: keys.commitments.all });
   };
   return {
-    create: useMutation({ mutationFn: (body: RoutineInput) => api<Routine>("/routines", { method: "POST", body }), onSuccess: done }),
-    update: useMutation({ mutationFn: ({ id, ...body }: Routine) => api<Routine>(`/routines/${id}`, { method: "PUT", body }), onSuccess: done }),
+    create: useMutation({
+      mutationFn: (body: RoutineInput) => api<Routine>("/routines", { method: "POST", body }),
+      onSuccess: done,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, ...body }: Routine) => api<Routine>(`/routines/${id}`, { method: "PUT", body }),
+      onSuccess: done,
+    }),
     remove: useMutation({ mutationFn: (id: string) => api(`/routines/${id}`, { method: "DELETE" }), onSuccess: done }),
   };
 }
 
 export function usePreferences() {
-  return useQuery({ queryKey: keys.preferences, queryFn: ({ signal }) => api<Preferences>("/preferences", { signal }), staleTime: STALE.account });
+  return useQuery({
+    queryKey: keys.preferences,
+    queryFn: ({ signal }) => api<Preferences>("/preferences", { signal }),
+    staleTime: STALE.account,
+  });
 }
 
 export function useSavePreferences() {
@@ -475,11 +634,20 @@ export function useSavePreferences() {
 // ---- Calendars (P2-D) ------------------------------------------------------------------------
 
 export function useCalendarFeed(enabled: boolean) {
-  return useQuery({ queryKey: keys.calendarFeed, queryFn: ({ signal }) => api<CalendarFeed>("/calendar/feed", { signal }), enabled, staleTime: Infinity });
+  return useQuery({
+    queryKey: keys.calendarFeed,
+    queryFn: ({ signal }) => api<CalendarFeed>("/calendar/feed", { signal }),
+    enabled,
+    staleTime: Infinity,
+  });
 }
 
 export function useCalendarConnections() {
-  return useQuery({ queryKey: keys.calendarConnections, queryFn: ({ signal }) => api<CalendarConnection[]>("/calendar/connections", { signal }), staleTime: STALE.planning });
+  return useQuery({
+    queryKey: keys.calendarConnections,
+    queryFn: ({ signal }) => api<CalendarConnection[]>("/calendar/connections", { signal }),
+    staleTime: STALE.planning,
+  });
 }
 
 export function useCalendarMutations() {
@@ -494,10 +662,18 @@ export function useCalendarMutations() {
       mutationFn: () => api<CalendarFeed>("/calendar/feed/regenerate", { method: "POST" }),
       onSuccess: (feed) => qc.setQueryData(keys.calendarFeed, feed),
     }),
-    connect: useMutation({ mutationFn: (body: { name: string; url: string }) => api<CalendarConnection>("/calendar/connections", { method: "POST", body }), onSuccess: () => changed() }),
-    disconnect: useMutation({ mutationFn: (id: string) => api(`/calendar/connections/${id}`, { method: "DELETE" }), onSuccess: () => changed() }),
+    connect: useMutation({
+      mutationFn: (body: { name: string; url: string }) =>
+        api<CalendarConnection>("/calendar/connections", { method: "POST", body }),
+      onSuccess: () => changed(),
+    }),
+    disconnect: useMutation({
+      mutationFn: (id: string) => api(`/calendar/connections/${id}`, { method: "DELETE" }),
+      onSuccess: () => changed(),
+    }),
     refresh: useMutation({
-      mutationFn: (force: boolean) => api<CalendarConnection[]>(`/calendar/connections/refresh${force ? "?force=true" : ""}`, { method: "POST" }),
+      mutationFn: (force: boolean) =>
+        api<CalendarConnection[]>(`/calendar/connections/refresh${force ? "?force=true" : ""}`, { method: "POST" }),
       onSuccess: changed,
     }),
   };

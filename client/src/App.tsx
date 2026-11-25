@@ -84,29 +84,127 @@ function GuestOnly() {
 export function App() {
   return (
     <ErrorBoundary area="manageBagle">
-    <Routes>
-      <Route element={<GuestOnly />}>
-        <Route path="/login" element={<Suspense fallback={null}><LoginPage /></Suspense>} />
-        <Route path="/login/verify" element={<Suspense fallback={null}><VerifyPage /></Suspense>} />
-        <Route path="/register" element={<Suspense fallback={null}><RegisterPage /></Suspense>} />
-        <Route path="/forgot-password" element={<Suspense fallback={null}><ForgotPasswordPage /></Suspense>} />
-        <Route path="/reset-password" element={<Suspense fallback={null}><ResetPasswordPage /></Suspense>} />
-      </Route>
-      {/* Reachable signed in or out: the link may be opened in a browser that already has a session. */}
-      <Route path="/confirm-email" element={<Suspense fallback={null}><ConfirmEmailPage /></Suspense>} />
-      <Route path="/mfa-recovery" element={<Suspense fallback={null}><MfaRecoveryLinkPage /></Suspense>} />
-      <Route element={<RequireAuth />}>
-        <Route index element={<TodayPage />} />
-        <Route path="/week" element={<Suspense fallback={null}><WeekPage /></Suspense>} />
-        <Route path="/planner" element={<Suspense fallback={null}><PlannerPage /></Suspense>} />
-        <Route path="/backlog" element={<Suspense fallback={null}><BacklogPage /></Suspense>} />
-        <Route path="/routines" element={<Suspense fallback={null}><RoutinesPage /></Suspense>} />
-        <Route path="/review" element={<Suspense fallback={null}><ReviewPage /></Suspense>} />
-        <Route path="/guide" element={<Suspense fallback={null}><GuidePage /></Suspense>} />
-        <Route path="/settings" element={<Suspense fallback={null}><SettingsPage /></Suspense>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Route>
-    </Routes>
+      <Routes>
+        <Route element={<GuestOnly />}>
+          <Route
+            path="/login"
+            element={
+              <Suspense fallback={null}>
+                <LoginPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/login/verify"
+            element={
+              <Suspense fallback={null}>
+                <VerifyPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              <Suspense fallback={null}>
+                <RegisterPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/forgot-password"
+            element={
+              <Suspense fallback={null}>
+                <ForgotPasswordPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/reset-password"
+            element={
+              <Suspense fallback={null}>
+                <ResetPasswordPage />
+              </Suspense>
+            }
+          />
+        </Route>
+        {/* Reachable signed in or out: the link may be opened in a browser that already has a session. */}
+        <Route
+          path="/confirm-email"
+          element={
+            <Suspense fallback={null}>
+              <ConfirmEmailPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/mfa-recovery"
+          element={
+            <Suspense fallback={null}>
+              <MfaRecoveryLinkPage />
+            </Suspense>
+          }
+        />
+        <Route element={<RequireAuth />}>
+          <Route index element={<TodayPage />} />
+          <Route
+            path="/week"
+            element={
+              <Suspense fallback={null}>
+                <WeekPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/planner"
+            element={
+              <Suspense fallback={null}>
+                <PlannerPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/backlog"
+            element={
+              <Suspense fallback={null}>
+                <BacklogPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/routines"
+            element={
+              <Suspense fallback={null}>
+                <RoutinesPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/review"
+            element={
+              <Suspense fallback={null}>
+                <ReviewPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/guide"
+            element={
+              <Suspense fallback={null}>
+                <GuidePage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <Suspense fallback={null}>
+                <SettingsPage />
+              </Suspense>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
     </ErrorBoundary>
   );
 }

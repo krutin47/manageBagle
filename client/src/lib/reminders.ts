@@ -24,12 +24,25 @@ export function remindersBetween(after: number, upTo: number, plan: ReminderPlan
   const due: Reminder[] = [];
   if (plan.waterEvery) {
     for (let at = plan.dayStart + plan.waterEvery; at < plan.dayEnd; at += plan.waterEvery) {
-      if (at > after && at <= upTo) due.push({ key: `water-${at}`, kind: "water", at, title: "Time for some water", body: "A glass of water now keeps the afternoon slump away." });
+      if (at > after && at <= upTo)
+        due.push({
+          key: `water-${at}`,
+          kind: "water",
+          at,
+          title: "Time for some water",
+          body: "A glass of water now keeps the afternoon slump away.",
+        });
     }
   }
   for (const meal of plan.meals) {
     if (meal.start > after && meal.start <= upTo) {
-      due.push({ key: `meal-${meal.start}-${meal.title}`, kind: "meal", at: meal.start, title: `${meal.title} time`, body: "Step away from the screen. The plan will wait." });
+      due.push({
+        key: `meal-${meal.start}-${meal.title}`,
+        kind: "meal",
+        at: meal.start,
+        title: `${meal.title} time`,
+        body: "Step away from the screen. The plan will wait.",
+      });
     }
   }
   return due.sort((a, b) => a.at - b.at);
