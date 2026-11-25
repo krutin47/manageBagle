@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
+using ManageBagle.Api.Application.Planning;
 using ManageBagle.Api.Data;
 using ManageBagle.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -12,8 +13,6 @@ public record OutcomeRequest(
     [StringLength(200)] string? NextAction,
     ItemStatus Status,
     [Range(5, 1440)] int? MinutesNeeded);
-
-public record OutcomeResponse(int Rank, string Result, Guid? FocusAreaId, string NextAction, ItemStatus Status, int? MinutesNeeded, Guid? BacklogTaskId);
 
 public record ReviewRequest([StringLength(1000)] string? BiggestWin, [StringLength(1000)] string? Interruptions, [StringLength(1000)] string? ChangeTomorrow);
 
@@ -135,5 +134,5 @@ public static class DayEndpoints
         DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday,
     ];
 
-    internal static OutcomeResponse ToResponse(DailyOutcome o) => new(o.Rank, o.Result, o.FocusAreaId, o.NextAction, o.Status, o.MinutesNeeded, o.BacklogTaskId);
+    internal static OutcomeResponse ToResponse(DailyOutcome o) => OutcomeResponse.From(o);
 }

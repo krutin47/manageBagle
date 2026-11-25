@@ -118,12 +118,7 @@ public static class BlockEndpoints
         return null;
     }
 
-    internal static IResult NonexistentTime(CivilTime.Span.Nonexistent gap) => Results.ValidationProblem(
-        new Dictionary<string, string[]>
-        {
-            [gap.Field] = [$"{gap.Time:HH\\:mm} does not exist on {gap.Date:d MMMM}: the clocks go forward that day. The next time that exists is {gap.NextValidTime:HH\\:mm}."],
-        },
-        extensions: new Dictionary<string, object?> { ["code"] = ErrorCodes.NonexistentLocalTime, ["nextValidTime"] = gap.NextValidTime.ToString("HH\\:mm") });
+    internal static IResult NonexistentTime(CivilTime.Span.Nonexistent gap) => Application.Failure.NonexistentTime(gap).ToHttp();
 
     private static void Apply(TimeBlock block, BlockRequest req)
     {

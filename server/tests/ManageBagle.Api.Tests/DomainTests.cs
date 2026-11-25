@@ -154,6 +154,21 @@ public class ArchitectureTests
         Assert.Empty(offenders);
     }
 
+    [Fact]
+    public void Use_cases_do_not_depend_on_http_or_on_endpoint_code()
+    {
+        var forbidden = new[] { "Microsoft.AspNetCore.Http", "Microsoft.AspNetCore.Mvc", "Microsoft.AspNetCore.Builder", "ManageBagle.Api.Features", "ManageBagle.Api.Infrastructure" };
+        var types = typeof(CivilTime).Assembly.GetTypes().Where(t => t.Namespace?.StartsWith("ManageBagle.Api.Application") == true);
+        var offenders =
+            from type in types
+            from member in type.GetMembers(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly)
+            from used in TypesUsedBy(member)
+            where used.Namespace is { } ns && forbidden.Any(ns.StartsWith)
+            select $"{type.Name}.{member.Name} uses {used.FullName}";
+        Assert.Empty(offenders);
+        Assert.NotEmpty(types);
+    }
+
     private static IEnumerable<Type> TypesUsedBy(System.Reflection.MemberInfo member) => member switch
     {
         System.Reflection.MethodInfo m => m.GetParameters().Select(p => p.ParameterType).Append(m.ReturnType),
