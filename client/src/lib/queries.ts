@@ -4,7 +4,7 @@ import {
   type Area, type AreaColor, type Block, type CalendarConnection, type CalendarFeed, type Commitment, type Preferences, type Routine, type RoutineInput, type BlockInput, type Day, type DayName, type Outcome, type PlanItem, type ProviderKey,
   type Review, type Status, type StopOutcome, type Task, type TaskInput, type Theme, type TimerSnapshot, type User, type WeekSummary, type WorkMode,
 } from "./api";
-import { syncServerClock } from "../features/timer/clock";
+import { syncServerClock } from "./timerClock";
 import { addDays, fromMinutes, toMinutes, weekStart } from "./time";
 
 /**

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { dueSeconds, elapsedSeconds, formatClock, syncServerClock } from "./clock";
+import { dueSeconds, elapsedSeconds, formatClock, syncServerClock } from "./timerClock";
 
 describe("timer clock", () => {
   afterEach(() => syncServerClock(new Date().toISOString()));

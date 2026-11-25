@@ -1,4 +1,4 @@
-import type { Block } from "../../lib/api";
+import type { Block } from "./api";
 
 /**
  * Timer arithmetic for the screen. The server says when a run began, by its own clock; the difference

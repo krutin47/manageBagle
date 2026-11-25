@@ -7,7 +7,7 @@ import { ConflictError, errorMessage, type Block, type StopOutcome } from "../..
 import { askForNotificationsOnce, notifyInBackground } from "../../lib/notify";
 import { useRunningTimer, useTimerMutations } from "../../lib/queries";
 import { formatDuration } from "../../lib/time";
-import { dueSeconds, elapsedSeconds, formatClock } from "./clock";
+import { dueSeconds, elapsedSeconds, formatClock } from "../../lib/timerClock";
 
 interface TimerApi {
   running: Block | null;

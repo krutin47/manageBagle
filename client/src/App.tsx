@@ -5,9 +5,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ErrorNote, Logo } from "./components/ui";
 import { ConfirmEmailPage, MfaRecoveryLinkPage, ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyPage } from "./features/auth/AuthPages";
 import { BacklogPage } from "./features/backlog/BacklogPage";
-import { GuidePage } from "./features/guide/GuidePage";
 import { PlannerPage } from "./features/planner/PlannerPage";
-import { ReviewPage } from "./features/review/ReviewPage";
 import { AppShell } from "./features/shell/AppShell";
 import { TodayPage } from "./features/today/TodayPage";
 import { WeekPage } from "./features/week/WeekPage";
@@ -16,6 +14,9 @@ import { setTimeZone } from "./lib/time";
 
 // Settings carries the QR-code generator; load it only when someone opens that page.
 const SettingsPage = lazy(() => import("./features/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })));
+// Visited rarely, so not part of the first download (handbook §5.4).
+const GuidePage = lazy(() => import("./features/guide/GuidePage").then((m) => ({ default: m.GuidePage })));
+const ReviewPage = lazy(() => import("./features/review/ReviewPage").then((m) => ({ default: m.ReviewPage })));
 
 function Splash() {
   return (
@@ -89,8 +90,8 @@ export function App() {
         <Route path="/week" element={<WeekPage />} />
         <Route path="/planner" element={<PlannerPage />} />
         <Route path="/backlog" element={<BacklogPage />} />
-        <Route path="/review" element={<ReviewPage />} />
-        <Route path="/guide" element={<GuidePage />} />
+        <Route path="/review" element={<Suspense fallback={null}><ReviewPage /></Suspense>} />
+        <Route path="/guide" element={<Suspense fallback={null}><GuidePage /></Suspense>} />
         <Route path="/settings" element={<Suspense fallback={null}><SettingsPage /></Suspense>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

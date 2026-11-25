@@ -66,11 +66,11 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | Generated TypeScript contracts | **Not done** | client types are hand-written |
 | Contract diff in CI | Done | committed snapshot + test |
 | Move endpoint EF access into application/infrastructure | **Not done** | |
-| Feature import rules | **Not done** | no ESLint boundary rule yet |
-| Formatting and analyzers | Partial | `.editorconfig`, warnings as errors. No Prettier, no `jsx-a11y`, `noUncheckedIndexedAccess` not enabled |
+| Feature import rules | Partial | ESLint forbids `lib/` and `components/` from importing features (one violation found and fixed). Rules between features are not enforced yet |
+| Formatting and analyzers | Partial | `.editorconfig`, warnings as errors. No Prettier; `noUncheckedIndexedAccess` not enabled. **`eslint-plugin-jsx-a11y` is blocked:** it does not yet support ESLint 10, and forcing it would break `npm ci` |
 | Dependency vulnerability scans | Done in CI definition | `npm audit`, `dotnet list package --vulnerable`; CI has not run yet |
 | Signed release artifact, SBOM | **Not done** | |
-| Route lazy loading | Partial | Settings only |
+| Route lazy loading | Partial | Settings, Guide, Review. Measured: main bundle 736 KB (231 KB gzip); Guide and Review saved only 8 KB. The weight is in animation, menu and drag libraries — splitting those is Phase 3 work |
 | Targeted stale times, key factory, request cancellation | Done | ADR-003 |
 | Architecture dependency test | Done | `ArchitectureTests` |
 
