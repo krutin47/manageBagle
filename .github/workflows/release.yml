@@ -1,0 +1,118 @@
+name: Release
+
+# ADR-009: one image per reviewed commit, promoted unchanged.
+#   push to uat  → build, sign (provenance + SBOM attestations), publish to GHCR, deploy to UAT.
+#   push to main → no rebuild: find the image UAT ran for this exact source tree, verify its
+#                  signature, deploy that digest to production.
+on:
+  push:
+    branches: [uat, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build, sign and publish the image
+    if: github.ref_name == 'uat'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    outputs:
+      image: ${{ steps.names.outputs.image }}
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: names
+        run: |
+          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/managebagle" >> "$GITHUB_OUTPUT"
+          echo "tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          sbom: true
+          provenance: mode=max
+          tags: |
+            ${{ steps.names.outputs.image }}:sha-${{ github.sha }}
+            ${{ steps.names.outputs.image }}:tree-${{ steps.names.outputs.tree }}
+            ${{ steps.names.outputs.image }}:uat
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - name: Sign the build provenance (Sigstore, keyless)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ steps.names.outputs.image }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+  resolve:
+    name: Find the image UAT ran for this commit
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      attestations: read
+    outputs:
+      image: ${{ steps.find.outputs.image }}
+      digest: ${{ steps.find.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: find
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/managebagle"
+          tree="$(git rev-parse 'HEAD^{tree}')"
+          if ! digest="$(docker buildx imagetools inspect "$image:tree-$tree" --format '{{json .Manifest}}' | jq -r .digest)"; then
+            echo "::error::No UAT image for this source tree. Production is promoted from uat: merge uat into main without other changes."
+            exit 1
+          fi
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - name: Verify the image was built and signed by this repository's release workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh attestation verify "oci://${{ steps.find.outputs.image }}@${{ steps.find.outputs.digest }}" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml"
+
+  deploy-uat:
+    needs: build
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: uat
+      image: ${{ needs.build.outputs.image }}@${{ needs.build.outputs.digest }}
+    secrets: inherit
+    permissions:
+      contents: read
+      id-token: write
+
+  deploy-production:
+    needs: resolve
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: production
+      image: ${{ needs.resolve.outputs.image }}@${{ needs.resolve.outputs.digest }}
+    secrets: inherit
+    permissions:
+      contents: read
+      id-token: write

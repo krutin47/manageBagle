@@ -159,3 +159,10 @@ jobs:
         with:
           name: sbom
           path: sbom-out/sbom*.json
+
+  infra:
+    name: Azure template compiles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: az bicep build --file infra/main.bicep --stdout > /dev/null
