@@ -82,7 +82,11 @@ public static class RoutineEndpoints
             }
             var uid = user.UserId();
             var occurrences = await db.RoutineOccurrencesAsync(uid, from, to, ct);
-            return Results.Ok(occurrences.Select(o => new CommitmentResponse("routine", o.RoutineId, o.Title, o.Date, o.Start, o.End, o.Minutes, o.Policy, o.AreaIds, o.IsMeal)));
+            var meetings = await Application.Calendars.CalendarSync.BusyOnAsync(db, uid, from, to, ct);
+            return Results.Ok(occurrences
+                .Select(o => new CommitmentResponse("routine", o.RoutineId, o.Title, o.Date, o.Start, o.End, o.Minutes, o.Policy, o.AreaIds, o.IsMeal))
+                .Concat(meetings.Select(m => new CommitmentResponse("event", m.ConnectionId, m.Title, m.Date, m.Start, m.End, m.Minutes, TaskPolicy.NoTasks, [], false)))
+                .OrderBy(c => c.Date).ThenBy(c => c.Start));
         }).Produces<IEnumerable<CommitmentResponse>>();
 
         g.MapGet("/preferences", async (ClaimsPrincipal user, AppDbContext db, CancellationToken ct) =>

@@ -46,6 +46,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Database:MigrateOnStartup", "true");
         builder.UseSetting("RateLimits:AuthPerMinute", "10000");
         builder.UseSetting("Auth:SessionRevalidateSeconds", "0"); // so "other sessions end" is observable at once
+        builder.UseSetting("RateLimits:CalendarFetchPerMinute", "1000");
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton<IAppEmailSender>(Email);

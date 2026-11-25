@@ -22,6 +22,9 @@ public class AppUser : IdentityUser<Guid>
     public TimeOnly? DayEnd { get; set; }
     /// <summary>Minutes between "drink water" reminders; null when switched off (P2-C5).</summary>
     public int? WaterReminderMinutes { get; set; }
+    /// <summary>Calendar feed (P2-D1): the secret part of the subscription address, encrypted, and its hash for lookup.</summary>
+    public string? CalendarFeedTokenProtected { get; set; }
+    public string? CalendarFeedTokenHash { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
@@ -81,6 +84,31 @@ public class AuditEvent
     /// <summary>Short non-secret detail such as a provider name. Never credentials, codes or tokens.</summary>
     public string Detail { get; set; } = "";
     public DateTimeOffset At { get; set; }
+}
+
+/// <summary>An existing calendar read for busy time (P2-D2). The address is a secret and is stored encrypted.</summary>
+public class CalendarConnection
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public string Name { get; set; } = "";
+    public string UrlProtected { get; set; } = "";
+    /// <summary>Host only, for display: "calendar.google.com".</summary>
+    public string Host { get; set; } = "";
+    public DateTimeOffset? LastFetchedAt { get; set; }
+    public string LastError { get; set; } = "";
+    public int EventCount { get; set; }
+    public List<ExternalEvent> Events { get; set; } = [];
+}
+
+public class ExternalEvent
+{
+    public long Id { get; set; }
+    public Guid ConnectionId { get; set; }
+    public Guid UserId { get; set; }
+    public string Title { get; set; } = "";
+    public DateTimeOffset StartUtc { get; set; }
+    public DateTimeOffset EndUtc { get; set; }
 }
 
 public class IdempotencyRecord

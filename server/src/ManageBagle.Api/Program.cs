@@ -159,6 +159,13 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<AccountLinks>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Planning.PlanDay>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Timing.FocusTimer>();
+builder.Services.AddScoped<ManageBagle.Api.Application.Calendars.CalendarSync>();
+builder.Services.AddHttpClient(SafeFetch.ClientName, c =>
+    {
+        c.Timeout = TimeSpan.FromSeconds(15);
+        c.DefaultRequestHeaders.UserAgent.ParseAdd("manageBagle-calendar/1.0");
+    })
+    .ConfigurePrimaryHttpMessageHandler(SafeFetch.CreateHandler);
 
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddApiErrorHandling();
@@ -181,6 +188,13 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("auth", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = authLimit, Window = TimeSpan.FromMinutes(1) }));
+    o.AddPolicy("calendar-feed", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) }));
+    // Fetching other servers is the expensive and abusable part: a few per minute per account.
+    o.AddPolicy("calendar-fetch", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = config.GetValue("RateLimits:CalendarFetchPerMinute", 6), Window = TimeSpan.FromMinutes(1) }));
     o.AddPolicy("client-errors", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) }));
@@ -221,8 +235,9 @@ app.UseStaticFiles(new StaticFileOptions
     },
 });
 
-app.UseRateLimiter();
 app.UseAuthentication();
+// After authentication, so limits can be per account where that is what they are about.
+app.UseRateLimiter();
 app.UseRequestLogging();
 app.UseCsrfProtection();
 app.UseAuthorization();
@@ -241,6 +256,7 @@ app.MapDayEndpoints();
 app.MapPlanEndpoints();
 app.MapTimerEndpoints();
 app.MapRoutineEndpoints();
+app.MapCalendarEndpoints();
 app.MapSummaryEndpoints();
 app.MapClientErrorEndpoints();
 if (TestClock.Enabled(config)) app.MapTestClock();

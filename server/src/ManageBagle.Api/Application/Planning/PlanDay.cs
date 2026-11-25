@@ -84,7 +84,11 @@ public sealed class PlanDay(AppDbContext db, TimeProvider clock)
 
         // Routines that do not take a task are protected (P2-C3). Overnight routines from the day before count too.
         var routines = await db.Routines.AsNoTracking().Include(r => r.Areas).Where(r => r.UserId == uid).ToListAsync(ct);
-        var occurrences = RoutineSchedule.Expand(routines.Select(r => r.ToRule()), date.AddDays(-1), date, TimeZones.Find(zone));
+        IReadOnlyList<RoutineOccurrence> occurrences = RoutineSchedule.Expand(routines.Select(r => r.ToRule()), date.AddDays(-1), date, TimeZones.Find(zone));
+        // Meetings read from a connected calendar are fixed too (P2-D2).
+        var meetings = (await Calendars.CalendarSync.BusyOnAsync(db, uid, date.AddDays(-1), date, ct))
+            .Select(m => new RoutineOccurrence(m.ConnectionId, m.Title, m.Date, m.Start, m.End, m.Minutes, TaskPolicy.NoTasks, [], false));
+        occurrences = [.. occurrences, .. meetings];
         foreach (var item in items.Where(i => i.Start is not null))
         {
             if (RoutineClash(item, date, occurrences) is { } clash)

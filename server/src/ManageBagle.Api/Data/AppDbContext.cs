@@ -18,6 +18,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<Routine> Routines => Set<Routine>();
+    public DbSet<CalendarConnection> CalendarConnections => Set<CalendarConnection>();
+    public DbSet<ExternalEvent> ExternalEvents => Set<ExternalEvent>();
 
     /// <summary>Every edit to a versioned row moves its version on, so a stale writer is detected (HTTP 409).</summary>
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
@@ -37,6 +39,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
 
         b.Entity<AppUser>().Property(u => u.DisplayName).HasMaxLength(80);
         b.Entity<AppUser>().Property(u => u.TimeZoneId).HasMaxLength(64);
+        b.Entity<AppUser>().Property(u => u.CalendarFeedTokenProtected).HasMaxLength(500);
+        b.Entity<AppUser>().Property(u => u.CalendarFeedTokenHash).HasMaxLength(64);
+        b.Entity<AppUser>().HasIndex(u => u.CalendarFeedTokenHash).IsUnique().HasFilter("\"CalendarFeedTokenHash\" IS NOT NULL");
 
         b.Entity<FocusArea>(e =>
         {
@@ -98,6 +103,23 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.ChangeTomorrow).HasMaxLength(1000);
             e.HasIndex(x => new { x.UserId, x.Date }).IsUnique();
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<CalendarConnection>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(80);
+            e.Property(x => x.UrlProtected).HasMaxLength(4000);
+            e.Property(x => x.Host).HasMaxLength(255);
+            e.Property(x => x.LastError).HasMaxLength(200);
+            e.HasIndex(x => x.UserId);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Events).WithOne().HasForeignKey(x => x.ConnectionId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<ExternalEvent>(e =>
+        {
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.HasIndex(x => new { x.UserId, x.StartUtc });
         });
 
         b.Entity<Routine>(e =>

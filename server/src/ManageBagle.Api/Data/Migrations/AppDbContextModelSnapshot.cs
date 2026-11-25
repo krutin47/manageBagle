@@ -31,6 +31,14 @@ namespace ManageBagle.Api.Data.Migrations
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("integer");
 
+                    b.Property<string>("CalendarFeedTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("CalendarFeedTokenProtected")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("text");
@@ -103,6 +111,10 @@ namespace ManageBagle.Api.Data.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CalendarFeedTokenHash")
+                        .IsUnique()
+                        .HasFilter("\"CalendarFeedTokenHash\" IS NOT NULL");
 
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
@@ -222,6 +234,48 @@ namespace ManageBagle.Api.Data.Migrations
                     b.HasIndex("UserId", "Status");
 
                     b.ToTable("BacklogTasks");
+                });
+
+            modelBuilder.Entity("ManageBagle.Api.Data.CalendarConnection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EventCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Host")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("LastError")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset?>("LastFetchedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("UrlProtected")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("CalendarConnections");
                 });
 
             modelBuilder.Entity("ManageBagle.Api.Data.DailyOutcome", b =>
@@ -345,6 +399,40 @@ namespace ManageBagle.Api.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("DayThemes");
+                });
+
+            modelBuilder.Entity("ManageBagle.Api.Data.ExternalEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("EndUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("StartUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConnectionId");
+
+                    b.HasIndex("UserId", "StartUtc");
+
+                    b.ToTable("ExternalEvents");
                 });
 
             modelBuilder.Entity("ManageBagle.Api.Data.FocusArea", b =>
@@ -762,6 +850,15 @@ namespace ManageBagle.Api.Data.Migrations
                     b.Navigation("FocusArea");
                 });
 
+            modelBuilder.Entity("ManageBagle.Api.Data.CalendarConnection", b =>
+                {
+                    b.HasOne("ManageBagle.Api.Data.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("ManageBagle.Api.Data.DailyOutcome", b =>
                 {
                     b.HasOne("ManageBagle.Api.Data.BacklogTask", "BacklogTask")
@@ -799,6 +896,15 @@ namespace ManageBagle.Api.Data.Migrations
                     b.HasOne("ManageBagle.Api.Data.AppUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ManageBagle.Api.Data.ExternalEvent", b =>
+                {
+                    b.HasOne("ManageBagle.Api.Data.CalendarConnection", null)
+                        .WithMany("Events")
+                        .HasForeignKey("ConnectionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -917,6 +1023,11 @@ namespace ManageBagle.Api.Data.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("ManageBagle.Api.Data.CalendarConnection", b =>
+                {
+                    b.Navigation("Events");
                 });
 
             modelBuilder.Entity("ManageBagle.Api.Data.Routine", b =>
