@@ -50,6 +50,10 @@ dotnet run --project server/src/ManageBagle.Api
 cd client && npm install && npm run dev
 ```
 
+**Windows:** the API starts through `dotnet.exe` (no `ManageBagle.Api.exe` is built), so Smart App
+Control and company App Control policies do not block it. If you still have an old `.exe` from an
+earlier build, delete `server/src/ManageBagle.Api/bin` and `obj` once.
+
 Open http://localhost:5173. The dev server proxies `/api` to the API on port 5242, and the
 database schema is created on first start.
 
