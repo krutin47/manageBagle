@@ -20,6 +20,8 @@ public record TaskRequest(
     int? Version = null,
     [Range(0, 60)] int? BreakMinutes = null);
 
+public record CaptureRequest([Required, MinLength(1), MaxLength(60)] Application.Planning.CaptureItem[] Items);
+
 public record ScheduleRequest(DateOnly Date, TimeOnly Start, TimeOnly End, WorkMode WorkMode);
 
 public record TaskResponse(
@@ -42,6 +44,11 @@ public static class BacklogEndpoints
                 .OrderBy(t => t.CreatedAt).ToListAsync();
             return tasks.Select(TaskResponse.From);
         });
+
+        // The brain dump: many tasks captured at once, all or nothing (P2-E1).
+        g.MapPost("/capture", async (CaptureRequest req, ClaimsPrincipal user, Application.Planning.CaptureTasks capture, CancellationToken ct) =>
+            (await capture.HandleAsync(user.UserId(), req.Items, ct)).ToHttp(tasks => Results.Ok(tasks.Select(TaskResponse.From))))
+            .Produces<IEnumerable<TaskResponse>>().ProducesValidationProblem();
 
         g.MapPost("", async (TaskRequest req, ClaimsPrincipal user, AppDbContext db) =>
         {

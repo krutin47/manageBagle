@@ -141,22 +141,27 @@ public static class BlockEndpoints
     }
 
     /// <summary>
-    /// A block booked from a task is one session of that task. When the session is finished:
-    ///   - the task is finished only if it has no other open session (it may be spread over several blocks);
-    ///   - a top-three outcome for that day is ticked only when all of that day's sessions are finished.
+    /// A block booked from a task is one session of that task. The task's board column follows
+    /// (P2-G1, <see cref="TaskCompletion.AfterSessionChanged"/>), and a top-three outcome for that day is
+    /// ticked only when all of that day's sessions are finished.
     /// </summary>
-    private static async Task SyncLinkedTask(AppDbContext db, TimeBlock block, CancellationToken ct)
+    internal static async Task SyncLinkedTask(AppDbContext db, TimeBlock block, CancellationToken ct)
     {
-        if (block.BacklogTaskId is null || block.Status != ItemStatus.Done) return;
+        if (block.BacklogTaskId is null) return;
         var others = await db.TimeBlocks.AsNoTracking()
             .Where(b => b.UserId == block.UserId && b.BacklogTaskId == block.BacklogTaskId && b.Id != block.Id)
             .Select(b => new { b.Date, b.Status })
             .ToListAsync(ct);
 
         var task = await db.BacklogTasks.FirstOrDefaultAsync(t => t.Id == block.BacklogTaskId && t.UserId == block.UserId, ct);
-        if (task is not null) task.Status = TaskCompletion.AfterSessionFinished(task.Status, others.Select(o => o.Status));
+        if (task is not null)
+        {
+            var next = TaskCompletion.AfterSessionChanged(task.Status, block.Status, others.Select(o => o.Status), (block.ActualMinutes ?? 0) > 0 || block.TrackedSeconds >= 30);
+            task.Status = next.Status;
+            if (next.Unschedule) task.ScheduledDate = null;
+        }
 
-        if (others.Where(o => o.Date == block.Date).Any(o => TaskCompletion.IsOpen(o.Status))) return;
+        if (block.Status != ItemStatus.Done || others.Where(o => o.Date == block.Date).Any(o => TaskCompletion.IsOpen(o.Status))) return;
         var outcomes = await db.DailyOutcomes
             .Where(o => o.UserId == block.UserId && o.Date == block.Date && o.BacklogTaskId == block.BacklogTaskId).ToListAsync(ct);
         foreach (var outcome in outcomes) outcome.Status = ItemStatus.Done;

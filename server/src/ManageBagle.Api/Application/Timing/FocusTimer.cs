@@ -43,6 +43,10 @@ public sealed class FocusTimer(AppDbContext db, TimeProvider clock)
         }
 
         block.StartTimer(now);
+        if (block.BacklogTaskId is { } taskId && await db.BacklogTasks.FirstOrDefaultAsync(t => t.Id == taskId && t.UserId == userId, ct) is { } task)
+        {
+            task.Status = TaskCompletion.AfterSessionChanged(task.Status, ItemStatus.InProgress, [], worked: false).Status;
+        }
         // A race with another device starting a timer at the same instant is caught by the unique index (409).
         await db.SaveChangesAsync(ct);
         return new Snapshot(block, now, running?.Id);

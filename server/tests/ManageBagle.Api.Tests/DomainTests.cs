@@ -178,3 +178,21 @@ public class ArchitectureTests
         _ => [],
     };
 }
+
+public class TaskTransitionTests
+{
+    [Theory]
+    [InlineData(ItemStatus.Planned, ItemStatus.InProgress, false, ItemStatus.InProgress, false)]
+    [InlineData(ItemStatus.Planned, ItemStatus.Skipped, false, ItemStatus.Planned, true)]
+    [InlineData(ItemStatus.InProgress, ItemStatus.Skipped, true, ItemStatus.InProgress, true)]
+    [InlineData(ItemStatus.Skipped, ItemStatus.Skipped, false, ItemStatus.Skipped, false)] // dropped stays dropped
+    [InlineData(ItemStatus.Done, ItemStatus.Planned, false, ItemStatus.Planned, false)]
+    [InlineData(ItemStatus.Done, ItemStatus.Planned, true, ItemStatus.InProgress, false)]
+    [InlineData(ItemStatus.Planned, ItemStatus.Done, false, ItemStatus.Done, false)]
+    public void The_card_follows_its_only_session(ItemStatus task, ItemStatus session, bool worked, ItemStatus expected, bool unschedule) =>
+        Assert.Equal(new TaskTransition(expected, unschedule), TaskCompletion.AfterSessionChanged(task, session, [], worked));
+
+    [Fact]
+    public void Putting_off_one_session_keeps_a_task_that_has_another_open_session_on_the_calendar() =>
+        Assert.Equal(new TaskTransition(ItemStatus.InProgress, false), TaskCompletion.AfterSessionChanged(ItemStatus.InProgress, ItemStatus.Skipped, [ItemStatus.Planned], false));
+}
