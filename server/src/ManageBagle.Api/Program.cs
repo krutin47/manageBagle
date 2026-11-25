@@ -158,6 +158,7 @@ builder.Services.AddSingleton<IAppEmailSender, AppEmailSender>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<AccountLinks>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Planning.PlanDay>();
+builder.Services.AddScoped<ManageBagle.Api.Application.Timing.FocusTimer>();
 
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddApiErrorHandling();
@@ -237,6 +238,7 @@ app.MapBlockEndpoints();
 app.MapBacklogEndpoints();
 app.MapDayEndpoints();
 app.MapPlanEndpoints();
+app.MapTimerEndpoints();
 app.MapSummaryEndpoints();
 app.MapClientErrorEndpoints();
 

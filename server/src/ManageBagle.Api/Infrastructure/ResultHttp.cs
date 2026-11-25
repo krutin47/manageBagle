@@ -13,7 +13,8 @@ public static class ResultHttp
         if (failure.Kind != FailureKind.Validation)
         {
             var status = failure.Kind == FailureKind.NotFound ? StatusCodes.Status404NotFound : StatusCodes.Status409Conflict;
-            return HttpExtensions.Problem(status, failure.Code, failure.Message);
+            var problem = new Dictionary<string, object?>(failure.Extra ?? new Dictionary<string, object?>()) { ["code"] = failure.Code };
+            return Results.Problem(detail: failure.Message, statusCode: status, extensions: problem);
         }
         var extensions = new Dictionary<string, object?>(failure.Extra ?? new Dictionary<string, object?>()) { ["code"] = failure.Code };
         return Results.ValidationProblem(new Dictionary<string, string[]> { [failure.Field ?? "form"] = [failure.Message] }, extensions: extensions);

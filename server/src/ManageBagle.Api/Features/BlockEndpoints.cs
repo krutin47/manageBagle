@@ -28,11 +28,13 @@ public record BlockProgressRequest(ItemStatus? Status, [Range(0, 1440)] int? Act
 public record BlockResponse(
     Guid Id, DateOnly Date, TimeOnly Start, TimeOnly End, string Title, Guid? FocusAreaId,
     Priority Priority, WorkMode WorkMode, ItemStatus Status, int? ActualMinutes, int PlannedMinutes,
-    int? VarianceMinutes, string Notes, bool IsOutside, Guid? BacklogTaskId, string? TimeZone, int Version)
+    int? VarianceMinutes, string Notes, bool IsOutside, Guid? BacklogTaskId, string? TimeZone, int Version,
+    DateTimeOffset? TimerStartedAt, int TrackedSeconds, int ExtendedMinutes, string StopNote)
 {
     public static BlockResponse From(TimeBlock b) => new(
         b.Id, b.Date, b.Start, b.End, b.Title, b.FocusAreaId, b.Priority, b.WorkMode, b.Status,
-        b.ActualMinutes, b.PlannedMinutes, b.ActualMinutes - b.PlannedMinutes, b.Notes, b.IsOutside, b.BacklogTaskId, b.TimeZoneId, b.Version);
+        b.ActualMinutes, b.PlannedMinutes, b.ActualMinutes - b.PlannedMinutes, b.Notes, b.IsOutside, b.BacklogTaskId, b.TimeZoneId, b.Version,
+        b.TimerStartedAt, b.TrackedSeconds, b.ExtendedMinutes, b.StopNote);
 }
 
 public static class BlockEndpoints
@@ -84,12 +86,14 @@ public static class BlockEndpoints
             return Results.Ok(BlockResponse.From(block));
         }).Produces<BlockResponse>().ProducesValidationProblem().ProducesProblem(StatusCodes.Status409Conflict);
 
-        g.MapPatch("/{id:guid}/progress", async (Guid id, BlockProgressRequest req, ClaimsPrincipal user, AppDbContext db, CancellationToken ct) =>
+        g.MapPatch("/{id:guid}/progress", async (Guid id, BlockProgressRequest req, ClaimsPrincipal user, AppDbContext db, TimeProvider clock, CancellationToken ct) =>
         {
             var uid = user.UserId();
             var block = await db.TimeBlocks.FirstOrDefaultAsync(b => b.Id == id && b.UserId == uid, ct);
             if (block is null) return Results.NotFound();
             if (Versioning.Check(db, block, req.Version) is { } stale) return stale;
+            // Closing a block by hand while its timer runs banks the time first.
+            if (req.Status is ItemStatus.Done or ItemStatus.Skipped or ItemStatus.Planned) block.PauseTimer(clock.GetUtcNow());
             if (req.Status is { } status) block.Status = status;
             if (req.ClearActual) block.ActualMinutes = null;
             else if (req.ActualMinutes is { } actual) block.ActualMinutes = actual;

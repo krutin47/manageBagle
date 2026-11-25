@@ -91,6 +91,38 @@ public class TimeBlock : IVersioned
     public int PlannedMinutes { get; set; }
     public int Version { get; set; } = 1;
 
+    // ---- Focus timer (ADR-013) ----
+    /// <summary>When the current run began (UTC); null when the timer is not running.</summary>
+    public DateTimeOffset? TimerStartedAt { get; set; }
+    /// <summary>Seconds accumulated by earlier runs.</summary>
+    public int TrackedSeconds { get; set; }
+    /// <summary>Extra minutes granted at "time's up". The plan itself is not changed.</summary>
+    public int ExtendedMinutes { get; set; }
+    /// <summary>When work on the block first started, and when it was finished (UTC instants).</summary>
+    public DateTimeOffset? FirstStartedAt { get; set; }
+    public DateTimeOffset? FinishedAt { get; set; }
+    /// <summary>Optional note left when the block was put off or dropped.</summary>
+    public string StopNote { get; set; } = "";
+
+    public bool TimerRunning => TimerStartedAt is not null;
+
+    public void StartTimer(DateTimeOffset now)
+    {
+        if (TimerRunning) return;
+        TimerStartedAt = now;
+        FirstStartedAt ??= now;
+        if (Status == ItemStatus.Planned) Status = ItemStatus.InProgress;
+    }
+
+    /// <summary>Banks the current run and records the time worked as the actual minutes.</summary>
+    public void PauseTimer(DateTimeOffset now)
+    {
+        if (!TimerRunning) return;
+        TrackedSeconds = Domain.FocusTime.Elapsed(TrackedSeconds, TimerStartedAt, now);
+        TimerStartedAt = null;
+        ActualMinutes = Domain.FocusTime.ActualMinutes(TrackedSeconds) ?? ActualMinutes;
+    }
+
     /// <summary>Sets when the block happens. Returns the problem instead if a clock time does not exist that day.</summary>
     public Domain.CivilTime.Span.Nonexistent? Schedule(DateOnly date, TimeOnly start, TimeOnly end, string? timeZoneId)
     {

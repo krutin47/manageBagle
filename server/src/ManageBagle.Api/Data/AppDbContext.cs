@@ -55,6 +55,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.TimeZoneId).HasMaxLength(64);
             e.Property(x => x.Version).IsConcurrencyToken().HasDefaultValue(1);
             e.HasIndex(x => new { x.UserId, x.Date });
+            e.Property(x => x.StopNote).HasMaxLength(500);
+            e.Ignore(x => x.TimerRunning);
+            // One running timer per account is a database fact, not only a screen rule (ADR-013).
+            e.HasIndex(x => x.UserId).IsUnique().HasFilter("\"TimerStartedAt\" IS NOT NULL").HasDatabaseName("IX_TimeBlocks_OneRunningTimer");
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.FocusArea).WithMany().HasForeignKey(x => x.FocusAreaId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(x => x.BacklogTask).WithMany().HasForeignKey(x => x.BacklogTaskId).OnDelete(DeleteBehavior.SetNull);

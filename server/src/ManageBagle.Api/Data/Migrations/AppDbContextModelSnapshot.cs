@@ -421,6 +421,15 @@ namespace ManageBagle.Api.Data.Migrations
                     b.Property<TimeOnly>("End")
                         .HasColumnType("time without time zone");
 
+                    b.Property<int>("ExtendedMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("FirstStartedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid?>("FocusAreaId")
                         .HasColumnType("uuid");
 
@@ -448,14 +457,25 @@ namespace ManageBagle.Api.Data.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
+                    b.Property<string>("StopNote")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("TimeZoneId")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("TimerStartedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<int>("TrackedSeconds")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
@@ -476,6 +496,11 @@ namespace ManageBagle.Api.Data.Migrations
                     b.HasIndex("BacklogTaskId");
 
                     b.HasIndex("FocusAreaId");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_TimeBlocks_OneRunningTimer")
+                        .HasFilter("\"TimerStartedAt\" IS NOT NULL");
 
                     b.HasIndex("UserId", "Date");
 
