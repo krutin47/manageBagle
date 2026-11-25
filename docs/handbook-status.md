@@ -67,7 +67,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | Contract diff in CI | Done | committed snapshot + test |
 | Move endpoint EF access into application/infrastructure | Partial | every endpoint with a business rule now goes through a use case. Simple CRUD (areas, themes, reviews, outcomes) still queries `DbContext` in the endpoint; moving it would add layers without changing behaviour, so it is left until one of them gains a rule |
 | Feature import rules | Done | ESLint: `lib/` and `components/` import no feature; the building blocks `capture/` and `timer/` import no page; pages do not import each other (the Planner's block editor is the one shared exception). A capture ↔ today cycle was removed. Verified by deliberately violating each rule |
-| Formatting and analyzers | Partial | `.editorconfig`, warnings as errors, `noUncheckedIndexedAccess` on (22 places fixed, one a real guard for dragging past the visible week). No Prettier: adopting it would reformat every file in one unreviewable diff. **`eslint-plugin-jsx-a11y` is blocked:** it does not yet support ESLint 10 |
+| Formatting and analyzers | Done except accessibility lint | `.editorconfig`, warnings as errors, `noUncheckedIndexedAccess`, Prettier with a CI check (ADR-021). **`eslint-plugin-jsx-a11y` is blocked:** it does not yet support ESLint 10 (checked 2026-11-25) |
 | Dependency vulnerability scans | Done in CI definition | `npm audit`, `dotnet list package --vulnerable`; CI has not run yet |
 | Signed release artifact, SBOM | Partial | SBOM (SPDX, from BuildKit) generated and uploaded by CI — verified on `dev` (519 KB artifact). Signing needs images published to a registry: **needs you** |
 | Route lazy loading | Done | every page except Today, including sign-in. First download 755 → 661 KB (236 → 211 KB gzip); measurements in performance.md |
@@ -103,12 +103,11 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | Two-replica environment: shared keys, session continuity, trusted proxies | Done locally · draining not checked | `scripts/load/two-instances.mjs`, six checks pass. Graceful draining needs a real load balancer |
 | Queue or worker for measured costly work | Not needed yet | nothing measured is slow enough; reminders run in the browser |
 | AI classification and estimation | Not started | P3-AI1–AI3, ADR-012; needs a model provider and budget decision from you |
-| Agreed SLOs, tested rollback, alerts and runbooks | **Needs you** | objectives proposed in performance.md; rollback runbook exists but has not been run on a deployment; no monitoring backend |
+| Agreed SLOs, tested rollback, alerts and runbooks | Partial | objectives agreed for about 100 people (performance.md); Sentry alerts on errors once its DSN is set. Rollback and an uptime check need the deployed environment |
 
 ## Handbook requirements not yet met anywhere
 
 - No `/api/v1` prefix (deferred to the first breaking change, per §7.1).
-- Retention periods are proposed but not agreed (§17.3, see [data-inventory.md](data-inventory.md)).
 
 Closed on 2026-11-25:
 

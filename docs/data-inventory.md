@@ -1,6 +1,6 @@
 # Data inventory and retention (handbook §17.3)
 
-Status: inventory complete; **retention periods proposed, awaiting the product owner's decision** ·
+Status: inventory complete; retention periods **agreed by the product owner on 2026-11-25** ·
 Updated 2026-11-25
 
 ## What is stored, why, and for how long
@@ -12,7 +12,7 @@ Updated 2026-11-25
 | Linked Google / Microsoft account ids | `AspNetUserLogins` | sign-in with those providers | until unlinked or the account is deleted | yes |
 | Tasks, blocks, top threes, reviews, day themes, focus areas, routines, preferences | app tables | the product itself | until the person deletes them or the account | yes |
 | Finished and dropped tasks | `BacklogTasks` | history | kept; the default view shows the last 30 days | yes |
-| Account activity (sign-ins, security changes, exports) | `AuditEvents` | lets the owner spot misuse; supports recovery | **proposed: 13 months** (`Retention__AuditMonths`, currently 0 = keep) | yes |
+| Account activity (sign-ins, security changes, exports) | `AuditEvents` | lets the owner spot misuse; supports recovery | 13 months (`Retention__AuditMonths=13`, set in the Azure template) | yes |
 | Private calendar addresses (encrypted) | `CalendarConnections` | read busy time | until disconnected or the account is deleted | yes (secret) |
 | Copies of other calendars' events (title, start, end) | `ExternalEvents` | plan around meetings | replaced on every refresh (≤ 15 min old when in use); deleted with the connection | yes |
 | Calendar subscription link (encrypted and hashed) | `AspNetUsers` | export to other calendar apps | until regenerated or the account is deleted | secret |
@@ -22,8 +22,8 @@ Updated 2026-11-25
 | AI usage records (model, token counts, cost; no text) | `AiUsage` | monthly budget and daily limit | 13 months, with account activity (`Retention__AuditMonths`) | account id only |
 | Idempotency records for "plan my day" | `IdempotencyRecords` | a repeated click saves once | 24 hours, then purged | no content beyond the plan |
 | Cookie-encryption keys | `DataProtectionKeys` | keep people signed in across restarts | managed by ASP.NET Core (90-day key lifetime) | no |
-| Application logs | wherever the host collects stdout | diagnosing faults | **set by the hosting platform; proposed 30 days** | route templates, user ids, trace ids and browser error messages — no request bodies, emails or task text |
-| Database backups | backup storage | recovery | **proposed: 35 days** (`scripts/backup.sh`) | yes, everything above |
+| Application logs | wherever the host collects stdout | diagnosing faults | 30 days (Log Analytics retention, set in the Azure template) | route templates, user ids, trace ids and browser error messages — no request bodies, emails or task text |
+| Database backups | backup storage | recovery | 35 days (Azure PostgreSQL automated backups, set in the Azure template) | yes, everything above |
 | Browser storage | the person's browser | unsaved brain dump (session only), theme, "already asked" flags | until the tab or browser clears it | the draft text |
 
 No analytics, advertising or third-party tracking.
@@ -43,9 +43,6 @@ audio.
 | Correct it | everything is editable in the app |
 | Delete it | Settings → Delete account: removes the account and every row above at once (database cascades). Backups age out within the backup retention period. |
 
-## Decisions needed
+## Still open
 
-1. Account activity: keep for 13 months? (Set `Retention__AuditMonths=13`.)
-2. Backups: 35 days?
-3. Logs at the hosting platform: 30 days?
-4. A privacy notice for the sign-up page, once a company name and contact address exist.
+- A privacy notice for the sign-up page, once a company name and contact address exist.

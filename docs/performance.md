@@ -89,16 +89,21 @@ With the defaults: up to 3 instances on a database with `max_connections = 100`.
 Not yet checked: graceful draining of in-flight requests during a rolling deploy behind a real
 load balancer.
 
-## Proposed objectives (to agree)
+## Agreed objectives (2026-11-25)
 
-| Objective | Proposal | Status on this machine |
-|---|---|---|
-| Today and Planner open, p95 | under 300 ms at expected load | 57 ms at 50 simulated users; 517 ms at 200 |
-| Writes (tick, capture), p95 | under 300 ms at expected load | 83 ms at 50 simulated users |
-| Error rate | under 0.1 % | 0 % at 50 and 200 |
+Expected load in the first year: **about 100 people at the busiest moment** (product owner). The
+load test's 50 simulated users each act far faster than a person, so 100 real people is well inside
+what was measured.
 
-"Expected load" needs a number from you: how many people do you expect to be using it at the busiest
-moment in the first year?
+| Objective | Target | Measured on this machine (50 simulated users) | How it is watched |
+|---|---|---|---|
+| Today and Planner open, p95 | under 300 ms | 57 ms / 50 ms | load test before releases (`scripts/load/run.mjs`) |
+| Writes (tick a block, capture), p95 | under 300 ms | 83 ms / 52 ms | load test |
+| Error rate | under 0.1 % of requests | 0 % | Sentry alerts on new and recurring errors (ADR-018) |
+| Availability (production) | 99.5 % a month (about 3.6 hours down) | not measured: not deployed | the deploy smoke test; an uptime check needs a monitoring choice (below) |
+
+Not yet in place: an uptime check that pages someone. Options once production exists: Sentry's
+uptime monitors (free plan: one monitor) or an Azure Monitor availability test.
 
 ## SQL commands per journey (handbook Phase 0)
 
