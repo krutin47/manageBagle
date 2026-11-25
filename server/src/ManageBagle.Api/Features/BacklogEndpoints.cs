@@ -36,14 +36,25 @@ public record TaskResponse(
 
 public static class BacklogEndpoints
 {
+    /// <summary>How long finished and dropped tasks stay in the default backlog response.</summary>
+    public const int ClosedDays = 30;
+
     public static void MapBacklogEndpoints(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/backlog").RequireAuthorization().WithTags("Backlog");
 
-        g.MapGet("", async (ClaimsPrincipal user, AppDbContext db) =>
+        // Open tasks, plus finished and dropped ones closed in the last ClosedDays days; history=all
+        // returns everything. Keeps the response bounded as the years go by (handbook §7.1).
+        g.MapGet("", async (string? history, ClaimsPrincipal user, AppDbContext db, TimeProvider clock, CancellationToken ct) =>
         {
-            var tasks = await db.BacklogTasks.AsNoTracking().Where(t => t.UserId == user.UserId())
-                .OrderBy(t => t.CreatedAt).ToListAsync();
+            var uid = user.UserId();
+            var query = db.BacklogTasks.AsNoTracking().Where(t => t.UserId == uid);
+            if (history != "all")
+            {
+                var since = clock.GetUtcNow().AddDays(-ClosedDays);
+                query = query.Where(t => t.ClosedAt == null || t.ClosedAt >= since);
+            }
+            var tasks = await query.OrderBy(t => t.CreatedAt).ToListAsync(ct);
             return tasks.Select(TaskResponse.From);
         });
 

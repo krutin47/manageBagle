@@ -5,7 +5,7 @@ import { placeBlocks } from "./layout";
 
 const block = (id: string, start: string, end: string): Block => ({
   id, date: "2026-11-16", start, end, title: id, focusAreaId: null, priority: "Medium", workMode: "DeepFocus", status: "Planned",
-  actualMinutes: null, plannedMinutes: plannedMinutes(start, end), varianceMinutes: null, notes: "", isOutside: false, backlogTaskId: null, timeZone: null, version: 1, timerStartedAt: null, trackedSeconds: 0, extendedMinutes: 0, stopNote: "", breakBeforeMinutes: 0, breakAfterMinutes: 0,
+  actualMinutes: null, plannedMinutes: plannedMinutes(start, end), varianceMinutes: null, notes: "", isOutside: false, backlogTaskId: null, timeZone: null, version: 1, timerStartedAt: null, trackedSeconds: 0, extendedMinutes: 0, stopNote: "", breakBeforeMinutes: 0, breakAfterMinutes: 0, firstStartedAt: null, finishedAt: null,
 });
 
 describe("placeBlocks", () => {

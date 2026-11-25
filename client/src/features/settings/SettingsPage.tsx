@@ -27,6 +27,7 @@ export function SettingsPage() {
         <SecurityCard user={user} />
         <ActivityCard />
         <AppearanceCard />
+        <DataCard />
         <DangerCard user={user} />
       </div>
     </>
@@ -525,6 +526,21 @@ function ActivityCard() {
             ))}
           </ul>
         )}
+    </section>
+  );
+}
+
+/** Handbook §17.3: everything the account holds, as one file. A plain link: the browser downloads it with the session cookie. */
+function DataCard() {
+  return (
+    <section className="card" aria-labelledby="your-data">
+      <header className="card-head">
+        <div>
+          <h2 id="your-data">Your data</h2>
+          <p>Download everything your account holds — tasks, blocks, top threes, reviews, routines, settings and account activity — as one JSON file. Passwords, security keys and private calendar addresses are never included.</p>
+        </div>
+        <a className="btn btn-secondary btn-md" href="/api/account/export" download><Download size={16} aria-hidden /> Download my data</a>
+      </header>
     </section>
   );
 }

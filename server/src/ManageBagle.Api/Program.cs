@@ -182,6 +182,7 @@ builder.Services.AddCsrfProtection(secureCookies: !builder.Environment.IsDevelop
 if (TestClock.Enabled(config)) builder.Services.AddTestClock(builder.Environment);
 else builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddOpenApi();
+builder.Services.AddHostedService<ManageBagle.Api.Infrastructure.RetentionService>();
 
 builder.Services.AddRateLimiter(o =>
 {
@@ -276,6 +277,7 @@ app.MapRoutineEndpoints();
 app.MapCalendarEndpoints();
 app.MapSummaryEndpoints();
 app.MapClientErrorEndpoints();
+app.MapAccountExportEndpoints();
 if (TestClock.Enabled(config)) app.MapTestClock();
 
 app.MapFallback("/api/{**path}", () => HttpExtensions.Problem(StatusCodes.Status404NotFound, ErrorCodes.NotFound, "There is nothing at this address."));

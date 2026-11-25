@@ -298,8 +298,16 @@ export function useSaveTheme() {
 
 // ---- Backlog ---------------------------------------------------------------------------------
 
-export function useBacklog() {
-  return useQuery({ queryKey: keys.backlog, queryFn: ({ signal }) => api<Task[]>("/backlog", { signal }), staleTime: STALE.planning });
+/**
+ * Open tasks plus those finished or dropped in the last 30 days; `"all"` adds older history.
+ * Both live under keys.backlog, so every invalidation of the backlog refreshes both.
+ */
+export function useBacklog(history: "recent" | "all" = "recent") {
+  return useQuery({
+    queryKey: history === "all" ? [...keys.backlog, "all"] : keys.backlog,
+    queryFn: ({ signal }) => api<Task[]>(history === "all" ? "/backlog?history=all" : "/backlog", { signal }),
+    staleTime: STALE.planning,
+  });
 }
 
 /** The brain dump (P2-E1): many tasks into the backlog in one all-or-nothing save; nothing is booked. */

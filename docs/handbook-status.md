@@ -14,10 +14,10 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | Item | State | Evidence |
 |---|---|---|
 | Client lint, type-check, tests, build | Done | run locally, all pass |
-| Server build (warnings as errors) and tests against real PostgreSQL | Done | 161 tests pass |
+| Server build (warnings as errors) and tests against real PostgreSQL | Done | 171 tests pass |
 | Migrations against a disposable database | Done | every test run creates a database from migrations; release sequence run by hand |
-| Build the Docker image and run it | **Not done** | no Docker daemon where this was built; CI job `image` does it on the first pull request |
-| Trace five user journeys with timings and SQL counts | **Not done** | no measurements taken yet |
+| Build the Docker image and run it | Done in CI | the `image` job builds it, checks it runs as non-root, is not ready before migrations, migrates, serves the app with security headers; green on `dev` |
+| Trace five user journeys with timings and SQL counts | Done | SQL counts per journey held to budgets by `QueryBudgetTests`; timings from the load test ([performance.md](performance.md)) |
 | Review auth endpoints, auto-link, CSRF, cookies, proxy, key ring, ownership | Done | findings became the Phase 1 work below; see `docs/baseline.md` |
 
 ## Phase 1 — production safety foundations
@@ -40,7 +40,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | 5 | Atomic plan and simultaneous edits tested | Done | 8 concurrent writers: exactly one wins |
 | 6 | Migrations as an explicit release step | Done | `--migrate`; readiness fails until applied |
 | 6 | Backups and a restore drill | Partial | `scripts/backup.sh`, `scripts/restore-drill.sh`; drill passed **against a local database only**. No production backups exist because no production exists. |
-| 7 | Playwright end-to-end flows | Done | 18 tests, run locally against the production build |
+| 7 | Playwright end-to-end flows | Done | 20 tests, run locally against the production build and in CI |
 | 7 | Verify the full Docker / UAT deployment | **Not done** | no image has been built, no environment exists |
 
 **Also done in Phase 1:** a queryable audit trail shown to the owner (Settings → Account activity); other sessions now end within 60 s of a password change or reset (`Auth__SessionRevalidateSeconds`), instead of Identity's 30-minute default.
@@ -69,8 +69,8 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | Feature import rules | Done | ESLint: `lib/` and `components/` import no feature; the building blocks `capture/` and `timer/` import no page; pages do not import each other (the Planner's block editor is the one shared exception). A capture ↔ today cycle was removed. Verified by deliberately violating each rule |
 | Formatting and analyzers | Partial | `.editorconfig`, warnings as errors, `noUncheckedIndexedAccess` on (22 places fixed, one a real guard for dragging past the visible week). No Prettier: adopting it would reformat every file in one unreviewable diff. **`eslint-plugin-jsx-a11y` is blocked:** it does not yet support ESLint 10 |
 | Dependency vulnerability scans | Done in CI definition | `npm audit`, `dotnet list package --vulnerable`; CI has not run yet |
-| Signed release artifact, SBOM | Partial | SBOM (SPDX, from BuildKit) is generated and uploaded by the CI image job — **defined but not yet run**: no Docker here, and CI runs on pull requests. Signing needs a container registry: **needs you** |
-| Route lazy loading | Partial | Settings, Guide, Review. Measured: main bundle 736 KB (231 KB gzip); Guide and Review saved only 8 KB. The weight is in animation, menu and drag libraries — splitting those is Phase 3 work |
+| Signed release artifact, SBOM | Partial | SBOM (SPDX, from BuildKit) generated and uploaded by CI — verified on `dev` (519 KB artifact). Signing needs images published to a registry: **needs you** |
+| Route lazy loading | Done | every page except Today, including sign-in. First download 755 → 661 KB (236 → 211 KB gzip); measurements in performance.md |
 | Targeted stale times, key factory, request cancellation | Done | ADR-003 |
 | Architecture dependency test | Done | `ArchitectureTests` |
 
@@ -97,7 +97,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | Item | State | Notes |
 |---|---|---|
 | Workload simulation with p95/p99, DB connections, memory, request rate | Done locally | `scripts/load/run.mjs`; results in [performance.md](performance.md). One machine, not a deployment |
-| Fix highest-cost query patterns and unbounded results | Partial | connection exhaustion fixed (bounded pool), busiest route 5 → 3 queries. The backlog still returns every task; not a problem at measured sizes |
+| Fix highest-cost query patterns and unbounded results | Done | connection exhaustion fixed (bounded pool), busiest route 5 → 3 queries, query budgets per journey. The backlog returns open tasks plus 30 days of closed ones (`history=all` for the rest); blocks and commitments are limited to 62 days |
 | Ingress and global rate limits | Partial | per-account limit on every API call (`RateLimits__RequestsPerMinute`), tested. Ingress limits depend on the host: **needs you** |
 | Two-replica environment: shared keys, session continuity, trusted proxies | Done locally · draining not checked | `scripts/load/two-instances.mjs`, six checks pass. Graceful draining needs a real load balancer |
 | Queue or worker for measured costly work | Not needed yet | nothing measured is slow enough; reminders run in the browser |
@@ -106,9 +106,18 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 
 ## Handbook requirements not yet met anywhere
 
-- Overlapping fixed commitments are neither rejected nor reconciled; blocks may overlap freely (§1 invariants).
-- Collections are not paginated (backlog returns all tasks; blocks are bounded to 62 days) (§7.1).
 - No `/api/v1` prefix (deferred to the first breaking change, per §7.1).
-- No recurring blocks, so the civil-time recurrence rule is untested (§10).
-- Actual start/finish instants are not recorded, only minutes (§10).
-- No data inventory, retention policy or export path (§17.3).
+- Retention periods are proposed but not agreed (§17.3, see [data-inventory.md](data-inventory.md)).
+
+Closed on 2026-11-25:
+
+- Fixed commitments (§1): planning refuses to book over a protected routine or meeting; a block
+  placed there by hand is allowed but flagged with an icon and words in the editor, on Today and in
+  the Planner.
+- Bounded collections (§7.1): see Phase 3 above.
+- Recurrence in civil time (§10): routines are the recurring items; their clock time is tested
+  across a daylight-saving change (`RoutineTests`).
+- Actual start and finish instants (§10): recorded on every block however its status changes,
+  returned by the API, included in the export.
+- Data inventory, retention and export (§17.3): [data-inventory.md](data-inventory.md); "Download my
+  data" in Settings; audit retention is configurable (`Retention__AuditMonths`).

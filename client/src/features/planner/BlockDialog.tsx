@@ -1,10 +1,11 @@
-import { Trash2 } from "lucide-react";
+import { Trash2, TriangleAlert } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { AreaSelect, Button, Dialog, ErrorNote, Field, Input, OutsideToggle, Segmented, Textarea } from "../../components/ui";
 import { useToast } from "../../components/toast";
 import { ApiError, errorMessage, type Area, type Block, type BlockInput } from "../../lib/api";
 import { modeLabel, PRIORITIES, STATUSES, statusLabel, WORK_MODES } from "../../lib/labels";
-import { useBlockMutations } from "../../lib/queries";
+import { clashesFor, clashLabel, commitmentsOn } from "../../lib/commitments";
+import { useBlockMutations, useCommitments } from "../../lib/queries";
 import { formatDuration, fromMinutes, plannedMinutes, toMinutes, trimSeconds } from "../../lib/time";
 
 export type BlockDraft = Partial<Block> & { date: string; start: string; end: string };
@@ -41,6 +42,8 @@ function BlockForm({ draft, areas, onClose }: { draft: BlockDraft; areas: Area[]
   const planned = form.start && form.end ? plannedMinutes(form.start, form.end) : 0;
   const overnight = form.start && form.end ? toMinutes(form.end) < toMinutes(form.start) : false;
   const busy = create.isPending || update.isPending;
+  const commitments = useCommitments(form.date || draft.date);
+  const clashes = form.start && planned > 0 ? clashesFor({ start: form.start, plannedMinutes: planned, focusAreaId: form.focusAreaId }, commitmentsOn(form.date || draft.date, commitments.data ?? [])) : [];
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -79,6 +82,12 @@ function BlockForm({ draft, areas, onClose }: { draft: BlockDraft; areas: Area[]
           <Field label="Start" error={error?.field("start")}>{(p) => <Input {...p} type="time" step={300} required value={form.start} onChange={(e) => patch({ start: e.target.value })} />}</Field>
           <Field label="End" error={error?.field("end")}>{(p) => <Input {...p} type="time" step={300} required value={form.end} onChange={(e) => patch({ end: e.target.value })} />}</Field>
         </div>
+
+        {clashes.length > 0 && (
+          <p className="clash-note" role="status">
+            <TriangleAlert size={15} aria-hidden /> {clashLabel(clashes)}. You can still save it; it will be marked on your calendar.
+          </p>
+        )}
 
         <div className="duration-row">
           <span className="duration-read" aria-live="polite">

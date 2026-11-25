@@ -64,7 +64,7 @@ public class TaskFlowTests(ClockedFactory factory) : IClassFixture<ClockedFactor
     }
 
     private static async Task<JsonElement> Task(HttpClient client, Guid id) =>
-        (await client.GetFromJsonAsync<JsonElement>("/api/backlog")).EnumerateArray().Single(t => t.GetProperty("id").GetGuid() == id);
+        (await client.GetFromJsonAsync<JsonElement>("/api/backlog?history=all")).EnumerateArray().Single(t => t.GetProperty("id").GetGuid() == id);
 
     [Fact]
     public async Task Starting_the_timer_moves_the_card_to_in_progress()
@@ -203,5 +203,60 @@ public class TaskFlowTests(ClockedFactory factory) : IClassFixture<ClockedFactor
         var (client, task) = await TaskOverTwoDays("Begin");
         await Json(await client.PutAsJsonAsync($"/api/days/{Today:yyyy-MM-dd}/outcomes/1", new { result = "Begin", focusAreaId = (Guid?)null, nextAction = "", status = "InProgress", minutesNeeded = 60 }));
         Assert.Equal("InProgress", (await Task(client, task)).GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Finished_and_dropped_tasks_leave_the_default_backlog_after_thirty_days_but_stay_in_history()
+    {
+        var (client, email) = await factory.NewUserAsync();
+        var captured = await Json(await client.PostAsJsonAsync("/api/backlog/capture", new { items = new[] { "Old win", "Still open", "Closed by a block" }.Select(t => new { title = t, workMode = "ShallowWork", priority = "Low", impact = "Low" }) }));
+        var ids = captured.EnumerateArray().Select(t => t.GetProperty("id").GetGuid()).ToArray();
+        await MoveCard(client, ids[0], "Done");
+        // Closing through a block, not the board, is recorded the same way.
+        var day = Today.ToString("yyyy-MM-dd");
+        await Json(await client.PostAsJsonAsync($"/api/days/{day}/plan", new { items = new[] { new { taskId = (Guid?)ids[2], title = "Closed by a block", estimatedMinutes = 30, workMode = "ShallowWork", priority = "Low", topRank = (int?)null, start = "20:00:00", end = "20:30:00" } } }));
+        var block = (await client.GetFromJsonAsync<JsonElement>($"/api/blocks?from={day}&to={day}"))[0];
+        await Json(await client.PatchAsJsonAsync($"/api/blocks/{block.GetProperty("id").GetGuid()}/progress", new { status = "Done", version = block.GetProperty("version").GetInt32() }));
+
+        async Task<string[]> Titles(string query = "") => (await client.GetFromJsonAsync<JsonElement>($"/api/backlog{query}")).EnumerateArray().Select(t => t.GetProperty("title").GetString()!).ToArray();
+        Assert.Equal(3, (await Titles()).Length);
+
+        factory.Clock.Advance(TimeSpan.FromDays(31));
+        // A month later the old session has expired (absolute limit 30 days): sign in again.
+        client = factory.NewClient();
+        await Json(await client.PostAsJsonAsync("/api/auth/login", new { email, password = ApiFactory.Password, rememberMe = false }));
+        Assert.Equal(["Still open"], await Titles());
+        Assert.Equal(3, (await Titles("?history=all")).Length);
+
+        // Reopened: it is open again, so it is back.
+        await MoveCard(client, ids[0], "Planned");
+        Assert.Contains("Old win", await Titles());
+    }
+
+    [Fact]
+    public async Task When_work_actually_began_and_ended_is_recorded_however_the_status_changes()
+    {
+        var (client, block, _) = await PlannedTask("Timed by hand");
+        var id = block.GetProperty("id").GetGuid();
+        var started = await Json(await client.PatchAsJsonAsync($"/api/blocks/{id}/progress", new { status = "InProgress", version = block.GetProperty("version").GetInt32() }));
+        Assert.NotEqual(JsonValueKind.Null, started.GetProperty("firstStartedAt").ValueKind);
+        Assert.Equal(JsonValueKind.Null, started.GetProperty("finishedAt").ValueKind);
+
+        factory.Clock.Advance(TimeSpan.FromMinutes(40));
+        var done = await Json(await client.PatchAsJsonAsync($"/api/blocks/{id}/progress", new { status = "Done", version = started.GetProperty("version").GetInt32() }));
+        var span = done.GetProperty("finishedAt").GetDateTimeOffset() - done.GetProperty("firstStartedAt").GetDateTimeOffset();
+        Assert.Equal(40, (int)span.TotalMinutes);
+
+        var reopened = await Json(await client.PatchAsJsonAsync($"/api/blocks/{id}/progress", new { status = "Planned", version = done.GetProperty("version").GetInt32() }));
+        Assert.Equal(JsonValueKind.Null, reopened.GetProperty("finishedAt").ValueKind);
+        // The first start is kept (PostgreSQL stores microseconds, so compare to the millisecond).
+        Assert.True((started.GetProperty("firstStartedAt").GetDateTimeOffset() - reopened.GetProperty("firstStartedAt").GetDateTimeOffset()).Duration() < TimeSpan.FromMilliseconds(1));
+
+        // Ticked straight to done from the top three: the end is known, the start is not invented.
+        var (other, otherBlock, _) = await PlannedTask("Ticked from the top three");
+        await Json(await other.PutAsJsonAsync("/api/days/2026-11-26/outcomes/1", new { result = "Ticked from the top three", focusAreaId = (Guid?)null, nextAction = "", status = "Done", minutesNeeded = 60 }));
+        var ticked = (await other.GetFromJsonAsync<JsonElement>("/api/blocks?from=2026-11-26&to=2026-11-26"))[0];
+        Assert.NotEqual(JsonValueKind.Null, ticked.GetProperty("finishedAt").ValueKind);
+        Assert.Equal(JsonValueKind.Null, ticked.GetProperty("firstStartedAt").ValueKind);
     }
 }

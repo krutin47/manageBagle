@@ -223,6 +223,8 @@ public class BacklogTask : IVersioned
     public int? BreakMinutes { get; set; }
     public DateOnly? ScheduledDate { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    /// <summary>When the task was last finished or dropped; null while open. Maintained by <see cref="AppDbContext"/>.</summary>
+    public DateTimeOffset? ClosedAt { get; set; }
 }
 
 /// <summary>One of the day's "big three" outcomes.</summary>

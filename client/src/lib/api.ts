@@ -60,6 +60,9 @@ export interface Block {
   /** Recovery break reserved before / after the block; not planned work. */
   breakBeforeMinutes: number;
   breakAfterMinutes: number;
+  /** When work on it first began (timer or "in progress"), and when it was finished; null if unknown. */
+  firstStartedAt: string | null;
+  finishedAt: string | null;
 }
 
 export type StopOutcome = "Finished" | "Later" | "Drop";
@@ -71,7 +74,7 @@ export interface TimerSnapshot {
   pausedBlockId: string | null;
 }
 
-export type BlockInput = Omit<Block, "id" | "plannedMinutes" | "varianceMinutes" | "backlogTaskId" | "timeZone" | "version" | "timerStartedAt" | "trackedSeconds" | "extendedMinutes" | "stopNote" | "breakBeforeMinutes" | "breakAfterMinutes"> & { breakBeforeMinutes?: number; breakAfterMinutes?: number };
+export type BlockInput = Omit<Block, "id" | "plannedMinutes" | "varianceMinutes" | "backlogTaskId" | "timeZone" | "version" | "timerStartedAt" | "trackedSeconds" | "extendedMinutes" | "stopNote" | "breakBeforeMinutes" | "breakAfterMinutes" | "firstStartedAt" | "finishedAt"> & { breakBeforeMinutes?: number; breakAfterMinutes?: number };
 
 export interface Task {
   id: string;

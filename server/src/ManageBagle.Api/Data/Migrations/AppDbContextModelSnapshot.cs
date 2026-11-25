@@ -170,6 +170,9 @@ namespace ManageBagle.Api.Data.Migrations
                     b.Property<int?>("BreakMinutes")
                         .HasColumnType("integer");
 
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 

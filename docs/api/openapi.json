@@ -134,6 +134,25 @@
         }
       }
     },
+    "/api/account/export": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountExport"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/register": {
       "post": {
         "tags": [
@@ -1382,6 +1401,15 @@
         "tags": [
           "Backlog"
         ],
+        "parameters": [
+          {
+            "name": "history",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -2466,6 +2494,89 @@
   },
   "components": {
     "schemas": {
+      "AccountExport": {
+        "required": [
+          "exportedAt",
+          "profile",
+          "preferences",
+          "focusAreas",
+          "dayThemes",
+          "routines",
+          "tasks",
+          "blocks",
+          "topThree",
+          "reviews",
+          "connectedCalendars",
+          "activity"
+        ],
+        "type": "object",
+        "properties": {
+          "exportedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ExportProfile"
+          },
+          "preferences": {
+            "$ref": "#/components/schemas/ExportPreferences"
+          },
+          "focusAreas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AreaResponse"
+            }
+          },
+          "dayThemes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThemeResponse"
+            }
+          },
+          "routines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoutineResponse"
+            }
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskResponse"
+            }
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockResponse"
+            }
+          },
+          "topThree": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportOutcome"
+            }
+          },
+          "reviews": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportReview"
+            }
+          },
+          "connectedCalendars": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportCalendar"
+            }
+          },
+          "activity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEventResponse"
+            }
+          }
+        }
+      },
       "AreaRequest": {
         "required": [
           "name",
@@ -2756,7 +2867,9 @@
           "extendedMinutes",
           "stopNote",
           "breakBeforeMinutes",
-          "breakAfterMinutes"
+          "breakAfterMinutes",
+          "firstStartedAt",
+          "finishedAt"
         ],
         "type": "object",
         "properties": {
@@ -2889,6 +3002,20 @@
               "string"
             ],
             "format": "int32"
+          },
+          "firstStartedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -3330,6 +3457,156 @@
               "string"
             ],
             "format": "double"
+          }
+        }
+      },
+      "ExportCalendar": {
+        "required": [
+          "name",
+          "host",
+          "lastFetchedAt",
+          "eventCount"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "lastFetchedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "eventCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "ExportOutcome": {
+        "required": [
+          "date",
+          "outcome"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/OutcomeResponse"
+          }
+        }
+      },
+      "ExportPreferences": {
+        "required": [
+          "dayStart",
+          "dayEnd",
+          "waterReminderMinutes",
+          "breakColor"
+        ],
+        "type": "object",
+        "properties": {
+          "dayStart": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "time"
+          },
+          "dayEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "time"
+          },
+          "waterReminderMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "breakColor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ExportProfile": {
+        "required": [
+          "email",
+          "displayName",
+          "timeZone",
+          "createdAt",
+          "twoStepVerification",
+          "signInProviders"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "timeZone": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "twoStepVerification": {
+            "type": "boolean"
+          },
+          "signInProviders": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ExportReview": {
+        "required": [
+          "date",
+          "biggestWin",
+          "interruptions",
+          "changeTomorrow"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "biggestWin": {
+            "type": "string"
+          },
+          "interruptions": {
+            "type": "string"
+          },
+          "changeTomorrow": {
+            "type": "string"
           }
         }
       },
@@ -4652,6 +4929,9 @@
     },
     {
       "name": "Diagnostics"
+    },
+    {
+      "name": "Account"
     },
     {
       "name": "Auth"

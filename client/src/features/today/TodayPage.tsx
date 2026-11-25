@@ -1,4 +1,4 @@
-import { CalendarCheck, CalendarClock, CalendarDays, CalendarPlus, Check, Clock, Clock3, Coffee, MapPin, NotebookPen, Pencil, Play, Plus, Repeat, RotateCcw, Trash2, Utensils } from "lucide-react";
+import { TriangleAlert, CalendarCheck, CalendarClock, CalendarDays, CalendarPlus, Check, Clock, Clock3, Coffee, MapPin, NotebookPen, Pencil, Play, Plus, Repeat, RotateCcw, Trash2, Utensils } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { DropdownMenu } from "radix-ui";
 import { useMemo, useState, type FormEvent } from "react";
@@ -8,11 +8,11 @@ import { AreaChip, AreaSelect, Button, cx, DateNav, Dialog, EmptyState, ErrorNot
 import { errorMessage, type Area, type Block, type DayName, type Outcome, type Status, type Task } from "../../lib/api";
 import { useDocumentTitle, useNowMinutes } from "../../lib/hooks";
 import { modeLabel, STATUSES, statusLabel } from "../../lib/labels";
-import { commitmentsOn } from "../../lib/commitments";
+import { clashesFor, clashLabel, commitmentsOn } from "../../lib/commitments";
 import { useAreas, useBacklog, useCommitments, useBlockMutations, useDay, useDayMutations, useThemes, useUser, useWeekBlocks } from "../../lib/queries";
 import { addDays, nowMinutes, formatDate, formatDuration, formatHours, fromMinutes, isValidISODate, parseISODate, snap, todayISO, toMinutes } from "../../lib/time";
 import { BlockDialog, type BlockDraft } from "../planner/BlockDialog";
-import { Variance } from "../planner/PlannerPage";
+import { Variance } from "../../components/Variance";
 import { useBrainDump } from "../capture/BrainDump";
 import { RunningTag, TimerButton, useFocusTimer } from "../timer/TimerProvider";
 import { dueLabel, PlanDayDialog, valueScore } from "./PlanDayDialog";
@@ -48,9 +48,10 @@ export function TodayPage() {
   const outcomes = useMemo(() => day.data?.outcomes ?? [], [day.data]);
   const theme = themes.data?.find((t) => t.day === DAY_NAMES[parseISODate(date).getDay()]);
   const commitments = useCommitments(date);
-  const routineBands = useMemo(() => commitmentsOn(date, commitments.data ?? []).map((c) => ({
+  const fixed = useMemo(() => commitmentsOn(date, commitments.data ?? []), [date, commitments.data]);
+  const routineBands = useMemo(() => fixed.map((c) => ({
     title: c.title, start: c.start, end: c.end, isMeal: c.source.isMeal, policy: c.policy, key: `${c.source.sourceId}-${c.source.date}-${c.start}`, kind: c.source.kind, color: c.source.color,
-  })), [date, commitments.data]);
+  })), [fixed]);
 
   // A top-three outcome and its booked block are the same piece of work; show them as one.
   const rankByTask = useMemo(() => new Map(outcomes.filter((o) => o.backlogTaskId).map((o) => [o.backlogTaskId!, o.rank])), [outcomes]);
@@ -189,9 +190,9 @@ export function TodayPage() {
               ) : blocksQuery.isPending ? (
                 <div className="stack"><Skeleton height={56} radius={10} /><Skeleton height={56} radius={10} /><Skeleton height={56} radius={10} /></div>
               ) : blocks.length === 0 ? (
-                <EmptyState icon={<CalendarPlus size={22} />} title="Nothing has a time yet" body="An outcome without a slot is a wish. Give your top three real time on the clock." action={<Button variant="primary" onClick={() => setPlanning([])}>Plan my day</Button>} />
+                <EmptyState icon={<CalendarPlus size={22} />} title="Nothing has a time yet" body="An outcome without a slot is a wish. Use Plan my day, above, to give your top three real time on the clock." />
               ) : (
-                <Agenda blocks={blocks} routines={routineBands} areaById={areaById} rankByTask={rankByTask} showNow={isToday} onOpen={setDraft} />
+                <Agenda blocks={blocks} routines={routineBands} fixed={fixed} areaById={areaById} rankByTask={rankByTask} showNow={isToday} onOpen={setDraft} />
               )}
             </div>
           </section>
@@ -413,7 +414,7 @@ function OutcomeForm({ date, outcome, areas, onClose }: { date: string; outcome:
 
 type RoutineBand = { title: string; start: number; end: number; isMeal: boolean; policy: string; key: string; kind: "routine" | "event"; color: string | null };
 
-function Agenda({ blocks, routines, areaById, rankByTask, showNow, onOpen }: { blocks: Block[]; routines: RoutineBand[]; areaById: Map<string, Area>; rankByTask: Map<string, number>; showNow: boolean; onOpen: (b: Block) => void }) {
+function Agenda({ blocks, routines, fixed, areaById, rankByTask, showNow, onOpen }: { blocks: Block[]; routines: RoutineBand[]; fixed: ReturnType<typeof commitmentsOn>; areaById: Map<string, Area>; rankByTask: Map<string, number>; showNow: boolean; onOpen: (b: Block) => void }) {
   const now = useNowMinutes();
   // The marker sits above the first block still to do; finished or dropped blocks are not "next".
   const nowIndex = showNow ? blocks.findIndex((b) => (b.status === "Planned" || b.status === "InProgress") && toMinutes(b.start) + b.plannedMinutes > now) : -1;
@@ -431,7 +432,7 @@ function Agenda({ blocks, routines, areaById, rankByTask, showNow, onOpen }: { b
                 <span>{toMinutes(b.start) <= now ? "Now" : `Next · in ${formatDuration(toMinutes(b.start) - now)}`}</span>
               </div>
             )}
-            <AgendaRow block={b} rank={b.backlogTaskId ? rankByTask.get(b.backlogTaskId) : undefined} area={b.focusAreaId ? areaById.get(b.focusAreaId) : undefined} onOpen={() => onOpen(b)} />
+            <AgendaRow block={b} clash={b.status === "Planned" || b.status === "InProgress" ? clashLabel(clashesFor(b, fixed)) : ""} rank={b.backlogTaskId ? rankByTask.get(b.backlogTaskId) : undefined} area={b.focusAreaId ? areaById.get(b.focusAreaId) : undefined} onOpen={() => onOpen(b)} />
           </motion.li>
         )])}
         {trailing.map((r) => <RoutineRow key={r.key} band={r} />)}
@@ -458,7 +459,7 @@ const MENU_STATUSES: { value: Status; label: string }[] = [
   { value: "Done", label: "Done" },
 ];
 
-function AgendaRow({ block, rank, area, onOpen }: { block: Block; rank?: number; area?: Area; onOpen: () => void }) {
+function AgendaRow({ block, rank, area, clash, onOpen }: { block: Block; rank?: number; area?: Area; clash: string; onOpen: () => void }) {
   const toast = useToast();
   const { progress } = useBlockMutations();
   const timer = useFocusTimer();
@@ -494,6 +495,7 @@ function AgendaRow({ block, rank, area, onOpen }: { block: Block; rank?: number;
           {block.isOutside && <> · <span className="outside-tag"><MapPin size={12} aria-hidden /> outside</span></>}
           {block.breakBeforeMinutes + block.breakAfterMinutes > 0 && <> · <span className="break-tag"><Coffee size={12} aria-hidden /> {formatDuration(block.breakBeforeMinutes + block.breakAfterMinutes)} recovery {block.breakBeforeMinutes ? "before" : "after"}</span></>}
           {block.varianceMinutes !== null && <> · <Variance minutes={block.varianceMinutes} /></>}
+          {clash && <> · <span className="clash-tag"><TriangleAlert size={12} aria-hidden /> {clash}</span></>}
         </span>
       </div>
       {/* Keyed on the saved value so the field resets whenever the server's number changes. */}

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace ManageBagle.Api.Data;
 
@@ -21,6 +22,52 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<CalendarConnection> CalendarConnections => Set<CalendarConnection>();
     public DbSet<ExternalEvent> ExternalEvents => Set<ExternalEvent>();
 
+    /// <summary>
+    /// A task's status changes in many places (board, timer, blocks, outcomes), so when it closed is
+    /// recorded here, once, for all of them. Bounds what the backlog returns (handbook §7.1).
+    /// </summary>
+    private void StampClosedTasks()
+    {
+        DateTimeOffset? now = null;
+        foreach (var entry in ChangeTracker.Entries<BacklogTask>().Where(e => e.State is EntityState.Added or EntityState.Modified))
+        {
+            var closed = entry.Entity.Status is ItemStatus.Done or ItemStatus.Skipped;
+            if (!closed) entry.Entity.ClosedAt = null;
+            else if (entry.Entity.ClosedAt is null || (entry.State == EntityState.Modified && entry.Property(t => t.Status).IsModified
+                     && entry.Property(t => t.Status).OriginalValue is not (ItemStatus.Done or ItemStatus.Skipped)))
+            {
+                now ??= Clock().GetUtcNow();
+                entry.Entity.ClosedAt = now;
+            }
+        }
+    }
+
+    /// <summary>
+    /// When work on a block actually began and ended (handbook §10), whichever way its status changed:
+    /// the timer, the status menu, the board, or a ticked top-three outcome. Reopening clears the end.
+    /// </summary>
+    private void StampBlockInstants()
+    {
+        DateTimeOffset? now = null;
+        foreach (var entry in ChangeTracker.Entries<TimeBlock>().Where(e => e.State is EntityState.Added or EntityState.Modified))
+        {
+            if (entry.State == EntityState.Modified && !entry.Property(b => b.Status).IsModified) continue;
+            var block = entry.Entity;
+            // Ticked straight to done: when it began is unknown, so it stays null rather than invented.
+            if (block.Status == ItemStatus.InProgress && block.FirstStartedAt is null)
+                block.FirstStartedAt = now ??= Clock().GetUtcNow();
+            if (block.Status == ItemStatus.Done) block.FinishedAt ??= now ??= Clock().GetUtcNow();
+            else block.FinishedAt = null;
+        }
+    }
+
+    /// <summary>The app's clock (a fake one in tests); the system clock for design-time tools.</summary>
+    private TimeProvider Clock()
+    {
+        try { return this.GetService<TimeProvider>(); }
+        catch (InvalidOperationException) { return TimeProvider.System; }
+    }
+
     /// <summary>Every edit to a versioned row moves its version on, so a stale writer is detected (HTTP 409).</summary>
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
@@ -30,6 +77,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             entry.Entity.Version = entry.Property(e => e.Version).OriginalValue + 1;
         }
+        StampClosedTasks();
+        StampBlockInstants();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 

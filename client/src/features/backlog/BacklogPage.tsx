@@ -21,7 +21,8 @@ const BLANK: TaskInput = { title: "", focusAreaId: null, estimatedMinutes: null,
 export function BacklogPage() {
   useDocumentTitle("Backlog");
   const toast = useToast();
-  const tasks = useBacklog();
+  const [history, setHistory] = useState<"recent" | "all">("recent");
+  const tasks = useBacklog(history);
   const areas = useAreas();
   const { create, update, remove } = useTaskMutations();
   const [params, setParams] = useSearchParams();
@@ -136,6 +137,12 @@ export function BacklogPage() {
           </AnimatePresence>
         </ul>
       )}
+
+      <p className="backlog-history">
+        {history === "recent"
+          ? <>Finished and dropped tasks stay here for 30 days. <button type="button" className="link-btn" onClick={() => setHistory("all")}>Show all history</button></>
+          : <>Showing all history. <button type="button" className="link-btn" onClick={() => setHistory("recent")}>Show the last 30 days only</button></>}
+      </p>
 
       <Dialog open={!!editing} onClose={() => setEditing(null)} title={editing === "new" ? "New task" : "Edit task"}>
         {editing && <TaskForm key={editing === "new" ? "new" : editing.id} task={editing === "new" ? null : editing} areas={areas.data ?? []} onClose={() => setEditing(null)} />}

@@ -1,5 +1,20 @@
 // Generated from docs/api/openapi.json by scripts/api-types.mjs — do not edit. Run `npm run gen:api`.
 
+export interface AccountExport {
+  exportedAt: string;
+  profile: ExportProfile;
+  preferences: ExportPreferences;
+  focusAreas: AreaResponse[];
+  dayThemes: ThemeResponse[];
+  routines: RoutineResponse[];
+  tasks: TaskResponse[];
+  blocks: BlockResponse[];
+  topThree: ExportOutcome[];
+  reviews: ExportReview[];
+  connectedCalendars: ExportCalendar[];
+  activity: AuditEventResponse[];
+}
+
 export interface AreaRequest {
   name: string;
   color: string;
@@ -77,6 +92,8 @@ export interface BlockResponse {
   stopNote: string;
   breakBeforeMinutes: number;
   breakAfterMinutes: number;
+  firstStartedAt: string | null;
+  finishedAt: string | null;
 }
 
 export type BreakPlacement = "After" | "Before";
@@ -177,6 +194,41 @@ export interface DaySummary {
   blocks: number;
   blocksDone: number;
   doneRate: number | null;
+}
+
+export interface ExportCalendar {
+  name: string;
+  host: string;
+  lastFetchedAt: string | null;
+  eventCount: number;
+}
+
+export interface ExportOutcome {
+  date: string;
+  outcome: OutcomeResponse;
+}
+
+export interface ExportPreferences {
+  dayStart: string | null;
+  dayEnd: string | null;
+  waterReminderMinutes: number | null;
+  breakColor: string | null;
+}
+
+export interface ExportProfile {
+  email: string;
+  displayName: string;
+  timeZone: string | null;
+  createdAt: string;
+  twoStepVerification: boolean;
+  signInProviders: string[];
+}
+
+export interface ExportReview {
+  date: string;
+  biggestWin: string;
+  interruptions: string;
+  changeTomorrow: string;
 }
 
 export interface ForgotPasswordRequest {

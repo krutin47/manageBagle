@@ -658,3 +658,10 @@
 .routine-row-title, .routine-row-title small { color: var(--a-ink); }
 .routine-list li .routine-icon { background: var(--a-tint); color: var(--a-ink); }
 .break-color { margin-top: 18px; }
+
+.backlog-history { font-size: 13.5px; color: var(--ink-2); }
+
+/* Blocks over fixed time (handbook §1): flagged with an icon and words, not colour alone. */
+.clash-tag { display: inline-flex; align-items: center; gap: 3px; color: var(--warn); font-weight: 600; white-space: nowrap; }
+.clash-note { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 8px; background: var(--warn-tint); color: var(--warn); font-size: 13.5px; font-weight: 550; }
+.cal-block.is-clash { outline: 2px dashed var(--warn); outline-offset: -2px; }

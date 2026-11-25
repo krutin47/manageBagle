@@ -1,15 +1,16 @@
-import { CalendarPlus, Coffee, MapPin, MoonStar, Plus } from "lucide-react";
+import { CalendarPlus, Coffee, MapPin, MoonStar, Plus, TriangleAlert } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 import { AreaChip, Button, cx, DateNav, EmptyState, ErrorNote, PageHeader, PriorityMark, Segmented, StatusIcon, StatusPill } from "../../components/ui";
 import { errorMessage, type Area, type Block } from "../../lib/api";
 import { useToast } from "../../components/toast";
+import { Variance } from "../../components/Variance";
 import { useDocumentTitle, useMediaQuery, useNowMinutes } from "../../lib/hooks";
 import { modeLabel, statusLabel } from "../../lib/labels";
-import { commitmentsOn } from "../../lib/commitments";
+import { clashesFor, clashLabel, commitmentsOn } from "../../lib/commitments";
 import { useAreas, useBlockMutations, useCommitments, usePreferences, useWeekBlocks } from "../../lib/queries";
-import { formatDate, formatDuration, formatTime, formatVariance, formatWeekRange, fromMinutes, isValidISODate, nowMinutes, snap, todayISO, toMinutes, weekDays, weekStart } from "../../lib/time";
+import { formatDate, formatDuration, formatTime, formatWeekRange, fromMinutes, isValidISODate, nowMinutes, snap, todayISO, toMinutes, weekDays, weekStart } from "../../lib/time";
 import { BlockDialog, type BlockDraft } from "./BlockDialog";
 import { placeBlocks } from "./layout";
 
@@ -193,9 +194,9 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
               </span>
             ))}
           </div>
-          {days.map((d) => (
+          {days.map((d) => { const fixed = commitmentsOn(d, commitments.data ?? []); return (
             <div key={d} className={cx("cal-col", d === today && "is-today")} onClick={createAt(d)} >
-              {commitmentsOn(d, commitments.data ?? []).map((c) => (
+              {fixed.map((c) => (
                 <div key={`${c.source.sourceId}-${c.source.date}-${c.start}`} className={cx("cal-routine", c.policy !== "NoTasks" && "is-open", c.source.kind === "event" && "is-event")} aria-hidden
                   data-area={c.source.kind === "event" ? "none" : (c.source.color ?? "none")}
                   style={{ top: (Math.max(0, c.start) / 60) * HOUR, height: ((Math.min(1440, c.end) - Math.max(0, c.start)) / 60) * HOUR }}>
@@ -216,6 +217,7 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
                 const dragging = drag?.moved && drag.block.id === p.block.id ? drag : null;
                 const liveStart = dragging ? fromMinutes(toMinutes(p.block.start) + dragging.minuteShift) : p.block.start.slice(0, 5);
                 const liveEnd = dragging ? fromMinutes(toMinutes(p.block.start) + dragging.minuteShift + p.block.plannedMinutes) : p.block.end.slice(0, 5);
+                const clash = p.block.status === "Planned" || p.block.status === "InProgress" ? clashLabel(clashesFor(p.block, fixed)) : "";
                 const breaks = [p.block.breakBeforeMinutes ? `${p.block.breakBeforeMinutes} min recovery before` : "", p.block.breakAfterMinutes ? `${p.block.breakAfterMinutes} min recovery after` : ""].filter(Boolean).join(", ");
                 return [
                   p.block.breakBeforeMinutes > 0 && !dragging && (
@@ -236,7 +238,7 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
                     initial={{ opacity: 0, scale: 0.96 }}
                     animate={{ opacity: 1, scale: 1, x: dragging ? dragging.dayShift * dragging.colWidth : 0, y: dragging ? (dragging.minuteShift / 60) * HOUR : 0 }}
                     transition={dragging ? { type: "spring", stiffness: 900, damping: 50 } : { duration: 0.2 }}
-                    className={cx("cal-block", height < 40 && "is-short", dragging && "is-dragging")}
+                    className={cx("cal-block", height < 40 && "is-short", dragging && "is-dragging", clash && "is-clash")}
                     onPointerDown={startDrag(p.block)}
                     onPointerMove={onDrag}
                     onPointerUp={endDrag}
@@ -245,7 +247,7 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
                     data-status={p.block.status}
                     style={{ top: (p.startMin / 60) * HOUR + 1, height, left: `calc(${(p.lane / p.lanes) * 100}% + 2px)`, width: `calc(${100 / p.lanes}% - 4px)` }}
                     onClick={() => !justDragged.current && onOpen(p.block)}
-                    aria-label={`${p.block.title}, ${formatTime(p.block.start)} to ${formatTime(p.block.end)}, ${area?.name ?? "no focus area"}, ${statusLabel[p.block.status]}${breaks ? `, ${breaks}` : ""}. Open to edit or move.`}
+                    aria-label={`${p.block.title}, ${formatTime(p.block.start)} to ${formatTime(p.block.end)}, ${area?.name ?? "no focus area"}, ${statusLabel[p.block.status]}${breaks ? `, ${breaks}` : ""}${clash ? `. ${clash}` : ""}. Open to edit or move.`}
                   >
                     <span className="cal-block-title">
                       {p.block.status !== "Planned" && <StatusIcon status={p.block.status} size={12} />}
@@ -255,12 +257,13 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
                       {liveStart}–{liveEnd}
                       {p.block.isOutside && <MapPin size={11} aria-label="outside work" />}
                       {p.overnight && <MoonStar size={11} aria-label="continues past midnight" />}
+                      {clash && <TriangleAlert size={11} aria-hidden />}
                     </span>
                   </motion.button>,
                 ];
               })}
             </div>
-          ))}
+          ); })}
         </div>
       </div>
     </section>
@@ -336,7 +339,3 @@ function BlockTable({ blocks, loading, areaById, onOpen, onCreate }: { blocks: B
   );
 }
 
-export function Variance({ minutes }: { minutes: number | null }) {
-  if (minutes === null) return <span className="muted">—</span>;
-  return <span className={cx("variance", minutes > 0 ? "is-over" : "is-under")}>{formatVariance(minutes)}</span>;
-}

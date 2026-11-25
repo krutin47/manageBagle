@@ -99,3 +99,33 @@ load balancer.
 
 "Expected load" needs a number from you: how many people do you expect to be using it at the busiest
 moment in the first year?
+
+## SQL commands per journey (handbook Phase 0)
+
+Measured by `QueryBudgetTests`, which counts every command the API sends while a journey makes the
+same requests as the screen. Each count is a budget: exceeding it fails the build, so an N+1 query
+or a duplicated lookup is caught. Production settings (session re-checked once a minute).
+
+| Journey | Requests | SQL commands | Budget |
+|---|---|---|---|
+| Plan a day (6 tasks) | 1 | 8 | 9 |
+| Open Today | 7 | 11 | 12 |
+| Open Planner | 3 | 5 | 6 |
+| Tick a block | 1 | 5 | 6 |
+| Brain dump (3 tasks) | 1 | 2 | 3 |
+| Open Week | 1 | 1 | 2 |
+
+No journey's cost grows with the number of tasks or blocks.
+
+## First download (handbook §5.4)
+
+Only Today is in the first download; every other page, including sign-in, loads when opened.
+
+| | Before | After |
+|---|---|---|
+| JavaScript before the first screen | 755 KB (236 KB gzip) | 661 KB (211 KB gzip) |
+| Backlog (drag and drop) | in the first download | 58 KB, on opening the Backlog |
+
+What remains is React, the router, data fetching, animation and the menu and dialog primitives that
+Today itself uses. Going much lower means replacing one of those libraries, which is not worth it
+until slow first loads are seen in real use.
