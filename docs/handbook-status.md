@@ -50,7 +50,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | Criterion | Met? |
 |---|---|
 | Security test suite passes | Yes |
-| Sessions persist across deployments | By design (key ring in the database); **not yet demonstrated** by restarting a deployed instance |
+| Sessions persist across deployments | Demonstrated locally: a session survived restarting an instance, and worked across two instances ([performance.md](performance.md)). Not yet on a deployed environment |
 | A tested backup restore succeeds | Locally only |
 | An ordinary user can complete the day-plan flow after a new release | Locally, in the E2E suite; not on a deployed release |
 
@@ -92,6 +92,18 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | P2-H1 | Calendar shows breaks before and after, routines, meetings, with a legend | Done | browser test checks routine label, break, key and list view |
 | P3-AI1–AI3 | Brain dump from a paragraph, voice or photo | Phase 3 | ADR-012 |
 
+## Phase 3 — reliability and capacity
+
+| Item | State | Notes |
+|---|---|---|
+| Workload simulation with p95/p99, DB connections, memory, request rate | Done locally | `scripts/load/run.mjs`; results in [performance.md](performance.md). One machine, not a deployment |
+| Fix highest-cost query patterns and unbounded results | Partial | connection exhaustion fixed (bounded pool), busiest route 5 → 3 queries. The backlog still returns every task; not a problem at measured sizes |
+| Ingress and global rate limits | Partial | per-account limit on every API call (`RateLimits__RequestsPerMinute`), tested. Ingress limits depend on the host: **needs you** |
+| Two-replica environment: shared keys, session continuity, trusted proxies | Done locally · draining not checked | `scripts/load/two-instances.mjs`, six checks pass. Graceful draining needs a real load balancer |
+| Queue or worker for measured costly work | Not needed yet | nothing measured is slow enough; reminders run in the browser |
+| AI classification and estimation | Not started | P3-AI1–AI3, ADR-012; needs a model provider and budget decision from you |
+| Agreed SLOs, tested rollback, alerts and runbooks | **Needs you** | objectives proposed in performance.md; rollback runbook exists but has not been run on a deployment; no monitoring backend |
+
 ## Handbook requirements not yet met anywhere
 
 - Overlapping fixed commitments are neither rejected nor reconciled; blocks may overlap freely (§1 invariants).
@@ -100,4 +112,3 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 - No recurring blocks, so the civil-time recurrence rule is untested (§10).
 - Actual start/finish instants are not recorded, only minutes (§10).
 - No data inventory, retention policy or export path (§17.3).
-- No load test, no SLO measurement (§1, Phase 3).

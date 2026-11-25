@@ -515,7 +515,7 @@ public static class AuthEndpoints
             }
             var uri = $"otpauth://totp/{Uri.EscapeDataString(Issuer)}:{Uri.EscapeDataString(user.Email!)}" +
                       $"?secret={key}&issuer={Uri.EscapeDataString(Issuer)}&digits=6";
-            return Results.Ok(new MfaSetupResponse(key, uri));
+            return Results.Ok(new MfaSetupResponse(key ?? throw new InvalidOperationException("No authenticator key was generated."), uri));
         }).Produces<MfaSetupResponse>();
 
         authed.MapPost("/mfa/enable", async (CodeRequest req, ClaimsPrincipal principal, UserManager<AppUser> users, SignInManager<AppUser> signIn) =>

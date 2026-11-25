@@ -81,10 +81,14 @@ public static class RoutineEndpoints
             {
                 return HttpExtensions.Invalid("to", $"Ask for a range of at most {BlockEndpoints.MaxRangeDays} days.");
             }
+            // Three queries: the zone, the routines (with their areas), the meetings. Measured as the
+            // slowest route under load (docs/performance.md), so nothing is fetched twice.
             var uid = user.UserId();
-            var occurrences = await db.RoutineOccurrencesAsync(uid, from, to, ct);
-            var colors = await db.Routines.AsNoTracking().Where(r => r.UserId == uid).ToDictionaryAsync(r => r.Id, r => r.Color, ct);
-            var meetings = await Application.Calendars.CalendarSync.BusyOnAsync(db, uid, from, to, ct);
+            var zone = TimeZones.Find(await db.TimeZoneOf(uid, ct));
+            var routines = await db.Routines.AsNoTracking().Include(r => r.Areas).Where(r => r.UserId == uid).ToListAsync(ct);
+            var colors = routines.ToDictionary(r => r.Id, r => r.Color);
+            var occurrences = RoutineSchedule.Expand(routines.Select(r => r.ToRule()), from, to, zone);
+            var meetings = await Application.Calendars.CalendarSync.BusyOnAsync(db, uid, from, to, zone, ct);
             return Results.Ok(occurrences
                 .Select(o => new CommitmentResponse("routine", o.RoutineId, o.Title, o.Date, o.Start, o.End, o.Minutes, o.Policy, o.AreaIds, o.IsMeal, colors.GetValueOrDefault(o.RoutineId)))
                 .Concat(meetings.Select(m => new CommitmentResponse("event", m.ConnectionId, m.Title, m.Date, m.Start, m.End, m.Minutes, TaskPolicy.NoTasks, [], false, null)))
@@ -135,13 +139,5 @@ public static class RoutineEndpoints
         routine.Areas.Clear();
         if (req.TaskPolicy == TaskPolicy.SelectedAreas) routine.Areas.AddRange(areaIds.Select(a => new RoutineArea { RoutineId = routine.Id, FocusAreaId = a }));
         return null;
-    }
-
-    /// <summary>Routine occurrences overlapping the range, including overnight ones that began the day before.</summary>
-    public static async Task<IReadOnlyList<RoutineOccurrence>> RoutineOccurrencesAsync(this AppDbContext db, Guid userId, DateOnly from, DateOnly to, CancellationToken ct)
-    {
-        var routines = await db.Routines.AsNoTracking().Include(r => r.Areas).Where(r => r.UserId == userId).ToListAsync(ct);
-        var zoneId = await db.Users.Where(u => u.Id == userId).Select(u => u.TimeZoneId).FirstOrDefaultAsync(ct);
-        return RoutineSchedule.Expand(routines.Select(r => r.ToRule()), from, to, TimeZones.Find(zoneId));
     }
 }

@@ -313,9 +313,10 @@ export function useCaptureTasks() {
 
 export function useTaskMutations() {
   const qc = useQueryClient();
-  // A card moved to Done or Dropped closes the task's blocks and top-three outcomes too.
-  const done = () => {
-    qc.invalidateQueries({ queryKey: keys.backlog });
+  const done = () => qc.invalidateQueries({ queryKey: keys.backlog });
+  // A card moved to Done or Dropped closes the task's blocks and top-three outcomes too (P2-G1).
+  const statusChanged = () => {
+    done();
     qc.invalidateQueries({ queryKey: keys.blocks.all });
     qc.invalidateQueries({ queryKey: keys.days.all });
     qc.invalidateQueries({ queryKey: keys.timer });
@@ -334,7 +335,7 @@ export function useTaskMutations() {
       },
       onSuccess: (saved) => qc.setQueryData<Task[]>(keys.backlog, (list) => list?.map((t) => (t.id === saved.id ? saved : t))),
       onError: (_e, _v, ctx) => qc.setQueryData(keys.backlog, ctx?.previous),
-      onSettled: done,
+      onSettled: statusChanged,
     }),
     remove: useMutation({ mutationFn: (id: string) => api(`/backlog/${id}`, { method: "DELETE" }), onSuccess: done }),
     schedule: useMutation({
