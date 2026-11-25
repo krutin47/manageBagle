@@ -299,7 +299,6 @@ be done in code is done; what is left needs a decision or an account only the ow
 | **Expected peak users** | To agree response-time objectives ([performance.md](performance.md)). |
 | **Retention periods** | Proposed in [data-inventory.md](data-inventory.md): activity 13 months, backups 35 days, logs 30 days. |
 | **AI brain dump** (paragraph, voice, photo) | Needs a model provider, a budget and a privacy stance (ADR-012). |
-| **Notifications while the app is closed** | Needs Web Push: a service worker, keys and a background sender. Worth building? |
 | **Prettier** | Adopting it reformats every file in one change. |
 
 ### Blocked by tooling

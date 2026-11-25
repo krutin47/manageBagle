@@ -40,7 +40,10 @@ const columnByColumn: KeyboardCoordinateGetter = (event, { context, currentCoord
   event.preventDefault();
   const order = COLUMNS.map((c) => c.status as string);
   const from = order.indexOf(String(context.over?.id ?? context.active?.data.current?.status ?? order[0]));
-  const target = context.droppableRects.get(order[Math.max(0, Math.min(order.length - 1, from + step))]!);
+  const id = order[Math.max(0, Math.min(order.length - 1, from + step))]!;
+  // Columns are measured just after a card is picked up; an arrow pressed before that (a quick
+  // keyboard user, a busy device) measures the column itself instead of being ignored.
+  const target = context.droppableRects.get(id) ?? context.droppableContainers.get(id)?.node.current?.getBoundingClientRect();
   return target ? { x: target.left + 12, y: currentCoordinates.y } : undefined;
 };
 

@@ -353,6 +353,29 @@ export interface ProfileRequest {
   timeZone?: string | null;
 }
 
+export interface PushKeyResponse {
+  publicKey: string;
+}
+
+export interface PushSubscribeRequest {
+  endpoint: string;
+  keys: PushSubscriptionKeys;
+}
+
+export interface PushSubscriptionKeys {
+  p256dh: string;
+  auth: string;
+}
+
+export interface PushTestResponse {
+  sent: number;
+  devices: number;
+}
+
+export interface PushUnsubscribeRequest {
+  endpoint: string;
+}
+
 export interface RecoveryCodesResponse {
   recoveryCodes: string[];
 }

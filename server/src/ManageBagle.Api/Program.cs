@@ -165,6 +165,12 @@ builder.Services.AddScoped<AccountLinks>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Planning.PlanDay>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Planning.CaptureTasks>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Tasks.ChangeTaskStatus>();
+// Notifications while the app is closed (ADR-019).
+builder.Services.AddScoped<ManageBagle.Api.Infrastructure.Push.PushService>();
+builder.Services.AddScoped<ManageBagle.Api.Infrastructure.Push.PushReminders>();
+builder.Services.AddHttpClient(ManageBagle.Api.Infrastructure.Push.PushService.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(10))
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+if (config.GetValue("Push:SchedulerEnabled", true)) builder.Services.AddHostedService<ManageBagle.Api.Infrastructure.Push.PushReminderService>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Timing.FocusTimer>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Calendars.CalendarSync>();
 builder.Services.AddHttpClient(SafeFetch.ClientName, c =>
@@ -281,6 +287,7 @@ app.MapCalendarEndpoints();
 app.MapSummaryEndpoints();
 app.MapClientErrorEndpoints();
 app.MapAccountExportEndpoints();
+app.MapPushEndpoints();
 if (TestClock.Enabled(config)) app.MapTestClock();
 
 app.MapFallback("/api/{**path}", () => HttpExtensions.Problem(StatusCodes.Status404NotFound, ErrorCodes.NotFound, "There is nothing at this address."));

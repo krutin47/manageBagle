@@ -22,3 +22,4 @@ Decisions that are binding unless a later record supersedes them. Each states wh
 | [016](016-client-types-checked-against-the-contract.md) | Client types are checked against the API contract at compile time | Accepted — implemented |
 | [017](017-azure-container-apps.md) | Azure Container Apps, deployed by GitHub Actions with OpenID Connect | Accepted — not yet deployed |
 | [018](018-sentry-for-errors.md) | Errors are reported to Sentry | Accepted — implemented |
+| [019](019-web-push-without-a-library.md) | Notifications while the app is closed use standard Web Push, built in | Accepted — implemented |

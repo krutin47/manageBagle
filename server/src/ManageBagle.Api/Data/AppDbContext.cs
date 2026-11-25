@@ -21,6 +21,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Routine> Routines => Set<Routine>();
     public DbSet<CalendarConnection> CalendarConnections => Set<CalendarConnection>();
     public DbSet<ExternalEvent> ExternalEvents => Set<ExternalEvent>();
+    public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
+    public DbSet<PushKey> PushKeys => Set<PushKey>();
+    public DbSet<PushDelivery> PushDeliveries => Set<PushDelivery>();
 
     /// <summary>
     /// A task's status changes in many places (board, timer, blocks, outcomes), so when it closed is
@@ -214,6 +217,29 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.Review).HasMaxLength(500);
             e.Property(x => x.Day).HasConversion<string>().HasMaxLength(12);
             e.HasIndex(x => new { x.UserId, x.Day }).IsUnique();
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<PushSubscription>(e =>
+        {
+            e.Property(x => x.Endpoint).HasMaxLength(1000);
+            e.Property(x => x.P256dh).HasMaxLength(200);
+            e.Property(x => x.Auth).HasMaxLength(100);
+            e.HasIndex(x => x.Endpoint).IsUnique(); // one row per browser
+            e.HasIndex(x => x.UserId);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<PushKey>(e =>
+        {
+            e.Property(x => x.Id).ValueGeneratedNever(); // a single row, id 1: a second instance racing to create it fails cleanly
+            e.Property(x => x.PublicKey).HasMaxLength(100);
+            e.Property(x => x.PrivateKeyProtected).HasMaxLength(1000);
+        });
+        b.Entity<PushDelivery>(e =>
+        {
+            e.Property(x => x.Key).HasMaxLength(120);
+            e.HasIndex(x => new { x.UserId, x.Key, x.DueAt }).IsUnique(); // the "send once" guarantee
+            e.HasIndex(x => x.SentAt); // clean-up of old rows
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }

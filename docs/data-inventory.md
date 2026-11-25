@@ -16,6 +16,9 @@ Updated 2026-11-25
 | Private calendar addresses (encrypted) | `CalendarConnections` | read busy time | until disconnected or the account is deleted | yes (secret) |
 | Copies of other calendars' events (title, start, end) | `ExternalEvents` | plan around meetings | replaced on every refresh (≤ 15 min old when in use); deleted with the connection | yes |
 | Calendar subscription link (encrypted and hashed) | `AspNetUsers` | export to other calendar apps | until regenerated or the account is deleted | secret |
+| Notification subscriptions (push service address and the browser's public keys) | `PushSubscriptions` | reminders while the app is closed | until turned off, signed out on that browser, rejected by the push service, or the account is deleted | device identifier |
+| Sent-reminder records | `PushDeliveries` | send each reminder once | 2 days | no content |
+| Notification keys (VAPID; private half encrypted) | `PushKeys` | sign notifications | until replaced | no |
 | Idempotency records for "plan my day" | `IdempotencyRecords` | a repeated click saves once | 24 hours, then purged | no content beyond the plan |
 | Cookie-encryption keys | `DataProtectionKeys` | keep people signed in across restarts | managed by ASP.NET Core (90-day key lifetime) | no |
 | Application logs | wherever the host collects stdout | diagnosing faults | **set by the hosting platform; proposed 30 days** | route templates, user ids, trace ids and browser error messages — no request bodies, emails or task text |

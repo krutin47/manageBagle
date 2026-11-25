@@ -264,3 +264,36 @@ public class DayTheme
     public string Outcome { get; set; } = "";
     public string Review { get; set; } = "";
 }
+
+/// <summary>One browser (or installed app) that agreed to receive notifications for an account (ADR-019).</summary>
+public class PushSubscription
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    /// <summary>The push service URL for this browser; unique, and only on allow-listed push services.</summary>
+    public string Endpoint { get; set; } = "";
+    /// <summary>The browser's P-256 public key and auth secret, base64url, for encrypting messages to it.</summary>
+    public string P256dh { get; set; } = "";
+    public string Auth { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? LastSentAt { get; set; }
+}
+
+/// <summary>The app's own VAPID key pair, created on first use; the private half is encrypted with the data-protection keys.</summary>
+public class PushKey
+{
+    public int Id { get; set; }
+    public string PublicKey { get; set; } = "";
+    public string PrivateKeyProtected { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
+/// <summary>A reminder already sent, so several instances or a restart never send it twice.</summary>
+public class PushDelivery
+{
+    public long Id { get; set; }
+    public Guid UserId { get; set; }
+    public string Key { get; set; } = "";
+    public DateTimeOffset DueAt { get; set; }
+    public DateTimeOffset SentAt { get; set; }
+}

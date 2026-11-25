@@ -665,3 +665,6 @@
 .clash-tag { display: inline-flex; align-items: center; gap: 3px; color: var(--warn); font-weight: 600; white-space: nowrap; }
 .clash-note { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 8px; background: var(--warn-tint); color: var(--warn); font-size: 13.5px; font-weight: 550; }
 .cal-block.is-clash { outline: 2px dashed var(--warn); outline-offset: -2px; }
+
+.push-control { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.push-control .muted { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; flex-basis: 100%; }

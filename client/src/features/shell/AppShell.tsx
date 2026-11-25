@@ -13,6 +13,7 @@ import { useToast } from "../../components/toast";
 import { Button, cx, IconButton, Logo } from "../../components/ui";
 import { api, type User } from "../../lib/api";
 import { useTheme } from "../../lib/hooks";
+import { disablePush } from "../../lib/push";
 import { keys, useUser } from "../../lib/queries";
 import { browserTimeZone } from "../../lib/time";
 
@@ -86,6 +87,8 @@ export function AppShell() {
   const [theme, setTheme] = useTheme();
 
   const signOut = async () => {
+    // A shared browser must not keep receiving this account's reminders.
+    await disablePush().catch(() => undefined);
     await api("/auth/logout", { method: "POST" }).catch(() => undefined);
     qc.clear();
     qc.setQueryData(keys.me, null);

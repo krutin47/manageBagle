@@ -82,7 +82,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | P2-B1–B5 | Focus timer: play/pause/stop, one at a time, time recorded, time's-up prompt, stop reasons | Done | ADR-013; 12 API tests (incl. a five-way start race), 3 browser tests; drop notes shown on Review |
 | P2-C1–C3 | Routines with task policies; fitting respects them and a day window | Done | ADR-014; server refuses plans that break a routine; 5 domain + 5 API tests, fitter tests, 1 browser test |
 | P2-C4 | Recovery breaks per focus area and per task | Done | reserved on the block, shown on Today and the calendar |
-| P2-C5 | Water and meal reminders (app open) | Done | toast, or a browser notification when the tab is in the background. Push when the app is closed: Phase 3 |
+| P2-C5 | Water, meal and time's-up reminders | Done | in-app toast; with notifications turned on, also while the app is closed (Web Push, ADR-019): encryption verified against RFC 8291, sending once across instances tested. Delivery through a real browser push service is not testable here |
 | P2-D1 | Calendar export (subscription feed and .ics) | Done | ADR-015; private regenerable link, titles and times only; browser test |
 | P2-D2 | Read busy time from an existing calendar | Done | ADR-015; SSRF-safe fetch (13 URL + 15 address tests), recurring meetings expanded, plan refuses to book over meetings; tested against a stub server — **not yet against a real Google or Outlook calendar** |
 | P2-D3 | Write into Google Calendar, two-way sync | Phase 3 | needs Google OAuth credentials |

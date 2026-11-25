@@ -1,10 +1,11 @@
 import { Bell, Coffee, Dumbbell, Lock, Moon, Pencil, Plus, Repeat, Trash2, Utensils, Briefcase } from "lucide-react";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { ColorPicker } from "../../components/ColorPicker";
 import { useToast } from "../../components/toast";
 import { Button, ConfirmDialog, cx, Dialog, ErrorNote, Field, IconButton, Input, Segmented, Select, Skeleton } from "../../components/ui";
 import { ApiError, errorMessage, type Area, type AreaColor, type Preferences, type Routine, type RoutineInput, type TaskPolicy, type WeekdayFlag } from "../../lib/api";
 import { useAreas, usePreferences, useRoutineMutations, useRoutines, useSavePreferences } from "../../lib/queries";
+import { disablePush, enablePush, pushState, sendTestPush, type PushState } from "../../lib/push";
 import { trimSeconds } from "../../lib/time";
 
 const DAYS: { flag: WeekdayFlag; short: string }[] = [
@@ -230,16 +231,43 @@ function YourDayForm({ prefs }: { prefs: Preferences }) {
   );
 }
 
-/** Reminders show as toasts in the app; with permission they also show while the tab is in the background (P2-C5). */
+const PUSH_TEXT: Record<PushState, string> = {
+  unsupported: "This browser cannot show notifications while manageBagle is closed; reminders still appear in the app.",
+  "needs-install": "On iPhone and iPad, add manageBagle to your Home Screen (Share → Add to Home Screen), open it from there, and turn notifications on.",
+  blocked: "Notifications are blocked for this site in your browser settings; reminders still appear in the app.",
+  off: "Get water, meal and time's-up reminders on this device even when manageBagle is closed.",
+  on: "On for this device: reminders arrive even when manageBagle is closed.",
+};
+
+/** Reminders as notifications on this device, even with the app closed (P2-C5, ADR-019). */
 function NotificationPermission() {
-  const supported = typeof window !== "undefined" && "Notification" in window;
-  const [state, setState] = useState(() => (supported ? Notification.permission : "denied"));
-  if (!supported) return null;
-  if (state === "granted") return <span className="muted"><Bell size={14} aria-hidden /> Notifications on while the app is open in a tab</span>;
-  if (state === "denied") return <span className="muted">Browser notifications are blocked; reminders still appear in the app.</span>;
+  const toast = useToast();
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { void pushState().then(setState); }, []);
+  if (state === null) return null;
+  const run = async (action: () => Promise<PushState | void>, done?: string) => {
+    setBusy(true);
+    try {
+      const next = await action();
+      setState(next ?? (await pushState()));
+      if (done) toast.success(done);
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
-    <Button variant="ghost" icon={<Bell size={16} aria-hidden />} onClick={() => void Notification.requestPermission().then(setState, () => undefined)}>
-      Also notify me in the background
-    </Button>
+    <div className="push-control" role="group" aria-label="Notifications on this device">
+      <p className="muted"><Bell size={14} aria-hidden /> {PUSH_TEXT[state]}</p>
+      {state === "off" && <Button icon={<Bell size={16} aria-hidden />} loading={busy} onClick={() => run(enablePush, "Notifications are on for this device")}>Turn on notifications</Button>}
+      {state === "on" && (
+        <>
+          <Button variant="ghost" loading={busy} onClick={() => run(async () => { const r = await sendTestPush(); toast.info(r.sent > 0 ? "Test sent. It shows once the app is in the background." : "Nothing could be sent to this device."); })}>Send a test</Button>
+          <Button variant="ghost" loading={busy} onClick={() => run(async () => { await disablePush(); return "off"; }, "Notifications are off for this device")}>Turn off</Button>
+        </>
+      )}
+    </div>
   );
 }
