@@ -5,6 +5,7 @@ import { DropdownMenu } from "radix-ui";
 import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate, useOutlet } from "react-router";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
+import { TimerProvider } from "../timer/TimerProvider";
 import { useToast } from "../../components/toast";
 import { Button, cx, IconButton, Logo } from "../../components/ui";
 import { api, type User } from "../../lib/api";
@@ -88,6 +89,7 @@ export function AppShell() {
   };
 
   return (
+    <TimerProvider>
     <div className="shell">
       <a href="#main" className="skip-link">
         Skip to content
@@ -162,5 +164,6 @@ export function AppShell() {
         </AnimatePresence>
       </main>
     </div>
+    </TimerProvider>
   );
 }

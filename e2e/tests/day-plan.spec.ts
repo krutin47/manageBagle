@@ -54,7 +54,7 @@ test("a new person can plan a day from a brain dump, work it, and find it again 
 
   // The plan is on the page…
   const schedule = page.getByRole("region", { name: "Schedule" });
-  await expect(schedule.getByRole("button", { name: /Ship the importer/ })).toBeVisible();
+  await expect(schedule.locator(".agenda-title", { hasText: "Ship the importer" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Day totals" })).toContainText("/ 4");
 
   // …ticking the top outcome finishes its block too (one piece of work, one tick)…
@@ -64,7 +64,7 @@ test("a new person can plan a day from a brain dump, work it, and find it again 
   // …and all of it is still there after a reload: it was saved, not just shown.
   await page.reload();
   await expect(schedule.getByRole("button", { name: /Status: Done/ })).toHaveCount(1);
-  await expect(schedule.getByRole("button", { name: /Pick up suit from tailor/ })).toBeVisible();
+  await expect(schedule.locator(".agenda-title", { hasText: "Pick up suit from tailor" })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: "Outcome 1 done" })).toBeChecked();
 });
 
@@ -79,7 +79,7 @@ test("a double click on the final button saves the plan once", async ({ page }) 
   await page.getByRole("button", { name: /Next: fit into the day/ }).click();
   await page.getByRole("button", { name: "Add to the day" }).dblclick();
 
-  await expect(page.getByRole("region", { name: "Schedule" }).getByRole("button", { name: /Write the report/ })).toHaveCount(1);
+  await expect(page.getByRole("region", { name: "Schedule" }).locator(".agenda-title", { hasText: "Write the report" })).toHaveCount(1);
   await page.goto("/backlog?view=list");
   await expect(page.getByRole("button", { name: "Write the report", exact: true })).toHaveCount(1);
 });
@@ -94,10 +94,10 @@ test("the day plan works on a phone with the keyboard and without sideways scrol
   await page.getByRole("button", { name: /Next: top three/ }).click();
   await page.getByRole("button", { name: /Next: fit into the day/ }).click();
   await page.getByRole("button", { name: "Add to the day" }).click();
-  await expect(page.getByRole("region", { name: "Schedule" }).getByRole("button", { name: /Call the bank/ })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Schedule" }).locator(".agenda-title", { hasText: "Call the bank" })).toBeVisible();
 
   // Moving a block needs no drag: open it and change the time in the form.
-  await page.getByRole("region", { name: "Schedule" }).getByRole("button", { name: /Call the bank/ }).click();
+  await page.getByRole("region", { name: "Schedule" }).locator(".agenda-title", { hasText: "Call the bank" }).click();
   const form = page.getByRole("dialog");
   await form.getByLabel("Start", { exact: true }).fill("15:00");
   await form.getByLabel("End", { exact: true }).fill("15:30");

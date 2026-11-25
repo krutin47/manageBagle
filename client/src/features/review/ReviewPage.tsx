@@ -28,6 +28,7 @@ export function ReviewPage() {
   const done = blocks.filter((b) => b.status === "Done").length;
   const overran = blocks.filter((b) => (b.varianceMinutes ?? 0) > 0).sort((a, b) => b.varianceMinutes! - a.varianceMinutes!);
   const outcomes = day.data?.outcomes ?? [];
+  const putOff = blocks.filter((b) => b.status === "Skipped");
 
   return (
     <>
@@ -77,6 +78,19 @@ export function ReviewPage() {
                   <li key={b.id}>
                     <span>{b.title}</span>
                     <em className="variance is-over">+{formatDuration(b.varianceMinutes!)}</em>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="review-facts-wide">
+            <h3>Put off or dropped</h3>
+            {putOff.length === 0 ? <p className="muted">Nothing was put off or dropped.</p> : (
+              <ul className="fact-list">
+                {putOff.map((b) => (
+                  <li key={b.id}>
+                    <span>{b.title}{b.stopNote && <q className="fact-note">{b.stopNote}</q>}</span>
+                    <em>{b.actualMinutes ? `${formatDuration(b.actualMinutes)} worked` : "not started"}</em>
                   </li>
                 ))}
               </ul>

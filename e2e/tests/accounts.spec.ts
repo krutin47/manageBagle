@@ -70,6 +70,7 @@ test("someone who lost their authenticator and recovery codes can recover by ema
   // The phone and the codes are gone. Sign in with the password only.
   await page.getByRole("button", { name: /Morgan Locked/ }).click();
   await page.getByRole("menuitem", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/login/); // let the sign-out finish before navigating away
   await signIn(page, email);
   await expect(page).toHaveURL(/\/login\/verify/);
   await page.getByRole("button", { name: "Lost your phone? Use a recovery code" }).click();

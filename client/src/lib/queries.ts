@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 import {
   api, UnauthorizedError,
   type Area, type AreaColor, type Block, type BlockInput, type Day, type DayName, type Outcome, type PlanItem, type ProviderKey,
-  type Review, type Status, type Task, type TaskInput, type Theme, type User, type WeekSummary, type WorkMode,
+  type Review, type Status, type StopOutcome, type Task, type TaskInput, type Theme, type TimerSnapshot, type User, type WeekSummary, type WorkMode,
 } from "./api";
+import { syncServerClock } from "../features/timer/clock";
 import { addDays, fromMinutes, toMinutes, weekStart } from "./time";
 
 /**
@@ -28,6 +29,7 @@ export const keys = {
   },
   themes: ["themes"] as const,
   backlog: ["backlog"] as const,
+  timer: ["timer"] as const,
 };
 
 /** How long each kind of data may be shown before it is quietly refreshed. Mutations invalidate sooner. */
@@ -317,6 +319,65 @@ export function useTaskMutations() {
         done();
         invalidatePlanning(qc);
       },
+    }),
+  };
+}
+
+// ---- Focus timer -----------------------------------------------------------------------------
+
+/** The block whose timer is running for this account, on any device; null when none is. */
+export function useRunningTimer() {
+  return useQuery({
+    queryKey: keys.timer,
+    queryFn: async ({ signal }) => {
+      const snapshot = await api<TimerSnapshot | undefined>("/timer", { signal });
+      if (!snapshot) return null;
+      syncServerClock(snapshot.serverNow);
+      return snapshot.block;
+    },
+    // Cheap and important: a timer paused or stopped on another device should show here quickly.
+    staleTime: 5_000,
+    refetchOnWindowFocus: "always",
+    refetchInterval: (query) => (query.state.data ? 60_000 : false),
+  });
+}
+
+export function useTimerMutations() {
+  const qc = useQueryClient();
+  const apply = (snapshot: TimerSnapshot) => {
+    syncServerClock(snapshot.serverNow);
+    storeBlock(qc, snapshot.block);
+    qc.setQueryData(keys.timer, snapshot.block.timerStartedAt ? snapshot.block : null);
+  };
+  const settle = () => {
+    invalidatePlanning(qc);
+    qc.invalidateQueries({ queryKey: keys.timer });
+  };
+  const closing = () => {
+    settle();
+    qc.invalidateQueries({ queryKey: keys.days.all });
+    qc.invalidateQueries({ queryKey: keys.backlog });
+  };
+  const post = (path: string, body?: unknown) => api<TimerSnapshot>(path, { method: "POST", body });
+  return {
+    start: useMutation({
+      scope: BLOCK_WRITES,
+      mutationFn: ({ blockId, pauseRunning = false }: { blockId: string; pauseRunning?: boolean }) => post(`/blocks/${blockId}/timer/start`, { pauseRunning }),
+      onSuccess: apply,
+      onSettled: settle,
+    }),
+    pause: useMutation({ scope: BLOCK_WRITES, mutationFn: (blockId: string) => post(`/blocks/${blockId}/timer/pause`), onSuccess: apply, onSettled: settle }),
+    extend: useMutation({
+      scope: BLOCK_WRITES,
+      mutationFn: ({ blockId, minutes }: { blockId: string; minutes: number }) => post(`/blocks/${blockId}/timer/extend`, { minutes }),
+      onSuccess: apply,
+      onSettled: settle,
+    }),
+    stop: useMutation({
+      scope: BLOCK_WRITES,
+      mutationFn: ({ blockId, outcome, note }: { blockId: string; outcome: StopOutcome; note?: string }) => post(`/blocks/${blockId}/timer/stop`, { outcome, note }),
+      onSuccess: apply,
+      onSettled: closing,
     }),
   };
 }

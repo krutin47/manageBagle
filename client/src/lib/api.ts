@@ -40,9 +40,25 @@ export interface Block {
   timeZone: string | null;
   /** Changes on every save; sent back so a stale tab cannot overwrite newer work. */
   version: number;
+  /** Focus timer (ADR-013): when the current run began, or null; seconds banked by earlier runs. */
+  timerStartedAt: string | null;
+  trackedSeconds: number;
+  /** Extra minutes granted at "time's up"; the plan itself is unchanged. */
+  extendedMinutes: number;
+  /** Optional note left when the block was put off or dropped. */
+  stopNote: string;
 }
 
-export type BlockInput = Omit<Block, "id" | "plannedMinutes" | "varianceMinutes" | "backlogTaskId" | "timeZone" | "version">;
+export type StopOutcome = "Finished" | "Later" | "Drop";
+
+export interface TimerSnapshot {
+  block: Block;
+  /** The server's clock at the moment of the answer: elapsed time is measured against it. */
+  serverNow: string;
+  pausedBlockId: string | null;
+}
+
+export type BlockInput = Omit<Block, "id" | "plannedMinutes" | "varianceMinutes" | "backlogTaskId" | "timeZone" | "version" | "timerStartedAt" | "trackedSeconds" | "extendedMinutes" | "stopNote">;
 
 export interface Task {
   id: string;

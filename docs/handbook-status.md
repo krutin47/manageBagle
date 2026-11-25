@@ -40,7 +40,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | 5 | Atomic plan and simultaneous edits tested | Done | 8 concurrent writers: exactly one wins |
 | 6 | Migrations as an explicit release step | Done | `--migrate`; readiness fails until applied |
 | 6 | Backups and a restore drill | Partial | `scripts/backup.sh`, `scripts/restore-drill.sh`; drill passed **against a local database only**. No production backups exist because no production exists. |
-| 7 | Playwright end-to-end flows | Done | 11 tests, run locally |
+| 7 | Playwright end-to-end flows | Done | 14 tests, run locally against the production build |
 | 7 | Verify the full Docker / UAT deployment | **Not done** | no image has been built, no environment exists |
 
 **Also done in Phase 1:** a queryable audit trail shown to the owner (Settings → Account activity); other sessions now end within 60 s of a password change or reset (`Auth__SessionRevalidateSeconds`), instead of Identity's 30-minute default.
@@ -79,7 +79,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | ID | Item | State | Notes |
 |---|---|---|---|
 | P2-A1–A7 | Brain dump: priority from due date, deep focus = 2 h, area as tag, working sort modes, distinct suggestion chips, one row of options, outside-work icon | Done | rules in `features/today/brainDump.ts` (21 unit tests); browser test covers A1, A2, A4, A7 |
-| P2-B1–B5 | Focus timer: play/pause/stop, one at a time, time recorded, time's-up prompt, stop reasons | Not started | ADR-013 |
+| P2-B1–B5 | Focus timer: play/pause/stop, one at a time, time recorded, time's-up prompt, stop reasons | Done | ADR-013; 12 API tests (incl. a five-way start race), 3 browser tests; drop notes shown on Review |
 | P2-C1–C3 | Routines with task policies; fitting respects them and a day window | Not started | ADR-014 |
 | P2-C4 | Recovery breaks per focus area and per task | Not started | ADR-014 |
 | P2-C5 | Water and meal reminders (app open) | Not started | Push when the app is closed: Phase 3 |

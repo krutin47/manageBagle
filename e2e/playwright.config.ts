@@ -27,8 +27,11 @@ export default defineConfig({
     launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
   },
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
-    { name: "phone", use: { ...devices["Pixel 7"] }, grep: /@phone/ },
+    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } }, testIgnore: /focus-timer/ },
+    { name: "phone", use: { ...devices["Pixel 7"] }, grep: /@phone/, testIgnore: /focus-timer/ },
+    // These tests move the server's clock, which would upset time-based checks (authenticator codes,
+    // link expiry) in tests running alongside them. They run on their own, after everything else.
+    { name: "clock", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } }, testMatch: /focus-timer/, dependencies: ["desktop", "phone"] },
   ],
   webServer: [
     {
@@ -44,6 +47,8 @@ export default defineConfig({
         RateLimits__AuthPerMinute: "10000",
         // The real wait is 72 hours; the browser test exercises the flow, the API tests the wait.
         Auth__MfaResetDelayHours: "0",
+        // Lets tests move the server's clock together with the browser's (never available in Production).
+        Testing__ClockControl: "true",
       },
     },
     {

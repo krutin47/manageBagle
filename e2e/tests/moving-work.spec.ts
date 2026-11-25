@@ -36,7 +36,7 @@ test("a backlog card can be moved between columns with the keyboard alone", asyn
   const card = page.locator(".board-card-wrap", { hasText: "Renew passport" });
   await card.focus();
   await page.keyboard.press("Space");
-  await expect(page.getByRole("status").filter({ hasText: /Picked up Renew passport\.|Over To do\./ })).toBeAttached();
+  await expect(card).toHaveAttribute("aria-pressed", "true"); // picked up
   await page.keyboard.press("ArrowRight"); // one press, one column
   await expect(page.getByRole("status").filter({ hasText: "Over In progress." })).toBeAttached();
   await page.keyboard.press("Space");

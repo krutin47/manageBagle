@@ -165,7 +165,8 @@ builder.Services.AddApiErrorHandling();
 builder.Services.AddValidation();
 builder.Services.AddAppHealthChecks();
 builder.Services.AddCsrfProtection(secureCookies: !builder.Environment.IsDevelopment());
-builder.Services.AddSingleton(TimeProvider.System);
+if (TestClock.Enabled(config)) builder.Services.AddTestClock(builder.Environment);
+else builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddOpenApi();
 
 builder.Services.AddRateLimiter(o =>
@@ -241,6 +242,7 @@ app.MapPlanEndpoints();
 app.MapTimerEndpoints();
 app.MapSummaryEndpoints();
 app.MapClientErrorEndpoints();
+if (TestClock.Enabled(config)) app.MapTestClock();
 
 app.MapFallback("/api/{**path}", () => HttpExtensions.Problem(StatusCodes.Status404NotFound, ErrorCodes.NotFound, "There is nothing at this address."));
 app.MapFallbackToFile("index.html");

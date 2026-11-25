@@ -12,6 +12,7 @@ import { useAreas, useBacklog, useBlockMutations, useDay, useDayMutations, useTh
 import { addDays, nowMinutes, formatDate, formatDuration, formatHours, fromMinutes, isValidISODate, parseISODate, snap, todayISO, toMinutes } from "../../lib/time";
 import { BlockDialog, type BlockDraft } from "../planner/BlockDialog";
 import { Variance } from "../planner/PlannerPage";
+import { TimerButton } from "../timer/TimerProvider";
 import { BrainDumpDialog, dueLabel, valueScore } from "./BrainDumpDialog";
 
 const DAY_NAMES: DayName[] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -359,6 +360,7 @@ function AgendaRow({ block, rank, area, onOpen }: { block: Block; rank?: number;
         </span>
       </div>
       {/* Keyed on the saved value so the field resets whenever the server's number changes. */}
+      <TimerButton block={block} />
       <ActualInput key={block.actualMinutes ?? "empty"} label={`Actual minutes for ${block.title}`} saved={block.actualMinutes} onCommit={commitActual} />
       <DropdownMenu.Root>
         <DropdownMenu.Trigger className="status-btn" data-status={block.status} aria-label={`Status: ${statusLabel[block.status]}. Change status`}>

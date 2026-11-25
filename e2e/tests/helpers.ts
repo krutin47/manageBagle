@@ -68,3 +68,20 @@ export function totp(base32Secret: string, at = Date.now()): string {
   const offset = hmac[hmac.length - 1]! & 0xf;
   return String((hmac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, "0");
 }
+
+/**
+ * Moves the server's clock forward, as if that much time had really passed, then brings the page
+ * back into focus so it re-syncs with the server (the app trusts the server's clock, not the device's).
+ */
+export async function advanceTime(page: Page, minutes: number) {
+  const response = await page.request.post("/api/testing/clock/advance", {
+    data: { seconds: Math.round(minutes * 60) },
+    headers: { "X-MB-Client": "tests", "X-CSRF-TOKEN": await csrf(page) },
+  });
+  expect(response.ok()).toBeTruthy();
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange", { bubbles: true })));
+}
+
+async function csrf(page: Page): Promise<string> {
+  return ((await (await page.request.get("/api/auth/csrf")).json()) as { token: string }).token;
+}
