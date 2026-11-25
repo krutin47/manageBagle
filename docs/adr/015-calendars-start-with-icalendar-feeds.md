@@ -1,6 +1,6 @@
 # ADR-015: Calendar interoperability starts with iCalendar feeds
 
-- **Status:** Accepted — in build (export and read-only import); write-back deferred to Phase 3
+- **Status:** Accepted — export and read-only import implemented; write-back deferred to Phase 3
 - **Date:** 2026-11-25
 - **Source:** Phase 2 product requirements, P2-D
 
@@ -31,3 +31,11 @@ CalDAV (poor support in Google).
 Subscribed feeds refresh on the calendar app's schedule (Google: up to several hours). The private
 iCal address is a secret: it is stored encrypted with the app's data-protection keys and never logged.
 Fetching user-supplied URLs is a server-side request forgery risk; the limits above are tested.
+
+## Implementation state
+
+Implemented: feed link (token stored encrypted, looked up by hash), `.ics` download, connections with
+the address encrypted at rest and never returned, `Application/Calendars` (Ical.Net 5 for parsing and
+recurrence expansion; a small hand-written RFC 5545 writer), meetings in `/api/commitments`, plan
+refusal over meetings. The fetcher does not use an outbound proxy: production needs direct outbound
+HTTPS. Not yet: verification against real Google/Outlook/Apple calendars; all-day events are ignored.

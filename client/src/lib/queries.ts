@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   api, UnauthorizedError,
-  type Area, type AreaColor, type Block, type Commitment, type Preferences, type Routine, type RoutineInput, type BlockInput, type Day, type DayName, type Outcome, type PlanItem, type ProviderKey,
+  type Area, type AreaColor, type Block, type CalendarConnection, type CalendarFeed, type Commitment, type Preferences, type Routine, type RoutineInput, type BlockInput, type Day, type DayName, type Outcome, type PlanItem, type ProviderKey,
   type Review, type Status, type StopOutcome, type Task, type TaskInput, type Theme, type TimerSnapshot, type User, type WeekSummary, type WorkMode,
 } from "./api";
 import { syncServerClock } from "../features/timer/clock";
@@ -36,6 +36,8 @@ export const keys = {
     week: (monday: string) => ["commitments", monday] as const,
   },
   preferences: ["preferences"] as const,
+  calendarFeed: ["calendar-feed"] as const,
+  calendarConnections: ["calendar-connections"] as const,
 };
 
 /** How long each kind of data may be shown before it is quietly refreshed. Mutations invalidate sooner. */
@@ -428,4 +430,35 @@ export function useSavePreferences() {
     mutationFn: (body: Preferences) => api<Preferences>("/preferences", { method: "PUT", body }),
     onSuccess: (saved) => qc.setQueryData(keys.preferences, saved),
   });
+}
+
+// ---- Calendars (P2-D) ------------------------------------------------------------------------
+
+export function useCalendarFeed(enabled: boolean) {
+  return useQuery({ queryKey: keys.calendarFeed, queryFn: ({ signal }) => api<CalendarFeed>("/calendar/feed", { signal }), enabled, staleTime: Infinity });
+}
+
+export function useCalendarConnections() {
+  return useQuery({ queryKey: keys.calendarConnections, queryFn: ({ signal }) => api<CalendarConnection[]>("/calendar/connections", { signal }), staleTime: STALE.planning });
+}
+
+export function useCalendarMutations() {
+  const qc = useQueryClient();
+  const changed = (list?: CalendarConnection[]) => {
+    if (list) qc.setQueryData(keys.calendarConnections, list);
+    else qc.invalidateQueries({ queryKey: keys.calendarConnections });
+    qc.invalidateQueries({ queryKey: keys.commitments.all });
+  };
+  return {
+    regenerateFeed: useMutation({
+      mutationFn: () => api<CalendarFeed>("/calendar/feed/regenerate", { method: "POST" }),
+      onSuccess: (feed) => qc.setQueryData(keys.calendarFeed, feed),
+    }),
+    connect: useMutation({ mutationFn: (body: { name: string; url: string }) => api<CalendarConnection>("/calendar/connections", { method: "POST", body }), onSuccess: () => changed() }),
+    disconnect: useMutation({ mutationFn: (id: string) => api(`/calendar/connections/${id}`, { method: "DELETE" }), onSuccess: () => changed() }),
+    refresh: useMutation({
+      mutationFn: (force: boolean) => api<CalendarConnection[]>(`/calendar/connections/refresh${force ? "?force=true" : ""}`, { method: "POST" }),
+      onSuccess: changed,
+    }),
+  };
 }

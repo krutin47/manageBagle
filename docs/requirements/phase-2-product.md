@@ -1,6 +1,6 @@
 # Phase 2 product requirements
 
-Status: **agreed, in build** · Source: product owner, 2026-11-25 · Tracks into
+Status: **built** (A–D2) on `feature/handbook-phase-1`; D3 is Phase 3 · Source: product owner, 2026-11-25 · Tracks into
 [handbook-status.md](../handbook-status.md) (Phase 2 — product)
 
 These are the product owner's requests, restated as requirements with acceptance criteria so each

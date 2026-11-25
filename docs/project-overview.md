@@ -186,7 +186,7 @@ These describe what the code does today. New work should follow them.
 - **Client**: unit tests for time helpers, calendar layout, the day-fitting scheduler and contrast.
 - Tests are written against behaviour ("a plan is all or nothing"), not implementation.
 - **Browser**: Playwright drives the real API and client through the day plan, moving work and accounts.
-- Current count: **71 API tests, 194 client tests, 10 end-to-end tests**, all passing locally.
+- Current count: **139 API tests, 237 client tests, 16 end-to-end tests**, all passing locally.
 
 ### Git and delivery
 
@@ -279,9 +279,10 @@ The detailed, phase-by-phase list is **[handbook-status.md](handbook-status.md)*
   production backup has been demonstrated.
 - No performance measurements. No testing on real phones or with a screen reader.
 
-### Agreed for Phase 2 (product)
-Brain-dump refinements, a focus timer, daily routines with recovery breaks and reminders, and calendar
-export/import — specified in [requirements/phase-2-product.md](requirements/phase-2-product.md).
+### Phase 2 product features
+Built: brain-dump refinements, the focus timer, routines with recovery breaks and reminders, and calendar
+export/import ([requirements/phase-2-product.md](requirements/phase-2-product.md)). Still open: writing into
+Google Calendar and two-way sync (Phase 3), and notifications while the app is closed.
 
 ### Still open from the handbook
 - Phase 2's main item: use-case classes (PlanDay first) and moving database access out of endpoints.

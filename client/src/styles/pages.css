@@ -530,3 +530,21 @@
 .cal-break { position: absolute; z-index: 1; border-radius: 0 0 6px 6px; pointer-events: none;
   background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--good) 30%, transparent) 0 4px, transparent 4px 8px); }
 @media (max-width: 860px) { .routine-row { grid-template-columns: 44px 4px minmax(0, 1fr); } }
+
+/* ---- Calendars (P2-D) ---- */
+.cal-settings { display: grid; gap: 24px; }
+.cal-settings h3 { display: flex; align-items: center; gap: 8px; font-size: 15px; margin-bottom: 4px; }
+.cal-settings p { font-size: 14px; margin-bottom: 12px; max-width: 64ch; }
+.feed-link { display: flex; gap: 8px; }
+.feed-link .input { font-family: var(--font-mono); font-size: 13px; }
+.feed-help { display: grid; gap: 4px; margin: 12px 0; font-size: 13.5px; color: var(--ink-2); }
+.feed-help a { display: inline-flex; align-items: center; gap: 4px; }
+.feed-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.connection-list { display: grid; }
+.connection-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.connection-list li:first-child { border-top: 0; }
+.connection-status { display: block; font-size: 13px; color: var(--ink-2); }
+.connection-status.is-error { color: var(--bad); font-weight: 550; }
+.routine-row.is-event .agenda-bar, .fit-row.is-event .agenda-bar { background: var(--ink-3); }
+.cal-routine.is-event { background: color-mix(in srgb, var(--ink-3) 18%, var(--surface)); border-left: 3px solid var(--ink-3); border-radius: 4px; z-index: 0; }
+.cal-routine.is-event span { left: 8px; right: auto; color: var(--ink-2); }

@@ -1,6 +1,6 @@
 # ADR-014: Routines are rules, expanded on read
 
-- **Status:** Accepted — in build
+- **Status:** Accepted — implemented
 - **Date:** 2026-11-25
 - **Source:** Phase 2 product requirements, P2-C
 

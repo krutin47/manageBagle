@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate, useOutlet } from "react-router";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { TimerProvider } from "../timer/TimerProvider";
+import { CalendarRefresher } from "./CalendarRefresher";
 import { Reminders } from "./Reminders";
 import { useToast } from "../../components/toast";
 import { Button, cx, IconButton, Logo } from "../../components/ui";
@@ -160,6 +161,7 @@ export function AppShell() {
           >
             <ZoneNotice user={user} />
             <Reminders />
+            <CalendarRefresher />
             {/* A screen that fails to render is contained here; the navigation stays usable. */}
             <ErrorBoundary area="this page" resetKey={location.pathname}>{outlet}</ErrorBoundary>
           </motion.div>

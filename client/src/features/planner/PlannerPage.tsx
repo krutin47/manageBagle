@@ -193,7 +193,7 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
           {days.map((d) => (
             <div key={d} className={cx("cal-col", d === today && "is-today")} onClick={createAt(d)} >
               {commitmentsOn(d, commitments.data ?? []).map((c) => (
-                <div key={`${c.source.sourceId}-${c.source.date}`} className={cx("cal-routine", c.policy !== "NoTasks" && "is-open")} aria-hidden
+                <div key={`${c.source.sourceId}-${c.source.date}-${c.start}`} className={cx("cal-routine", c.policy !== "NoTasks" && "is-open", c.source.kind === "event" && "is-event")} aria-hidden
                   style={{ top: (Math.max(0, c.start) / 60) * HOUR, height: ((Math.min(1440, c.end) - Math.max(0, c.start)) / 60) * HOUR }}>
                   <span>{c.title}</span>
                 </div>

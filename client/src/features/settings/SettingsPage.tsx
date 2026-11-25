@@ -9,6 +9,7 @@ import { Button, ConfirmDialog, cx, Dialog, ErrorNote, Field, IconButton, Input,
 import { api, ApiError, errorMessage, type Area, type AreaColor, type User } from "../../lib/api";
 import { useDocumentTitle, useTheme } from "../../lib/hooks";
 import { AREA_COLORS, colorLabel } from "../../lib/labels";
+import { CalendarsCard } from "./CalendarsCard";
 import { RoutinesCard, YourDayCard } from "./RoutinesCard";
 import { keys, useAreaMutations, useAreas, useProviders, useUser } from "../../lib/queries";
 import { browserTimeZone } from "../../lib/time";
@@ -23,6 +24,7 @@ export function SettingsPage() {
         <ProfileCard user={user} />
         <YourDayCard />
         <RoutinesCard />
+        <CalendarsCard />
         <AreasCard />
         <SecurityCard user={user} />
         <ActivityCard />

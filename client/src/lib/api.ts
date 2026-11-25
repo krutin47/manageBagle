@@ -142,9 +142,9 @@ export interface Routine {
 
 export type RoutineInput = Omit<Routine, "id">;
 
-/** Time already spoken for on a date (a routine occurrence). `end` may be on the next date. */
+/** Time already spoken for on a date: a routine occurrence or a meeting from a connected calendar. `end` may be on the next date. */
 export interface Commitment {
-  kind: "routine";
+  kind: "routine" | "event";
   sourceId: string;
   title: string;
   date: string;
@@ -154,6 +154,20 @@ export interface Commitment {
   taskPolicy: TaskPolicy;
   areaIds: string[];
   isMeal: boolean;
+}
+
+export interface CalendarConnection {
+  id: string;
+  name: string;
+  host: string;
+  lastFetchedAt: string | null;
+  lastError: string;
+  eventCount: number;
+}
+
+export interface CalendarFeed {
+  url: string;
+  webcalUrl: string;
 }
 
 export interface Preferences {

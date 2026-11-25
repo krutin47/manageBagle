@@ -320,10 +320,10 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
                 </div>
                 <ul className="plan-fit">
                   {fixed.filter((c) => c.policy === "NoTasks" && c.end > toMinutes(from || "00:00")).map((c) => (
-                    <li key={`r-${c.source.sourceId}-${c.start}`} className="fit-row is-routine" style={{ order: c.start }}>
+                    <li key={`r-${c.source.sourceId}-${c.start}`} className={cx("fit-row is-routine", c.source.kind === "event" && "is-event")} style={{ order: c.start }}>
                       <span className="fit-time"><strong>{fromMinutes(Math.max(0, c.start))}</strong><span>{fromMinutes(c.end)}</span></span>
                       <span className="agenda-bar" aria-hidden />
-                      <span className="fit-main"><span className="fit-title"><Lock size={13} aria-hidden /> {c.title}</span><span className="fit-meta">Routine · protected</span></span>
+                      <span className="fit-main"><span className="fit-title"><Lock size={13} aria-hidden /> {c.title}</span><span className="fit-meta">{c.source.kind === "event" ? "Meeting · from your calendar" : "Routine · protected"}</span></span>
                     </li>
                   ))}
                   {ordered.map((r) => {

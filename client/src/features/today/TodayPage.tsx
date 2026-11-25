@@ -1,4 +1,4 @@
-import { CalendarClock, CalendarPlus, Check, Clock, Coffee, ListPlus, MapPin, Pencil, Plus, Repeat, Trash2, Utensils } from "lucide-react";
+import { CalendarClock, CalendarDays, CalendarPlus, Check, Clock, Coffee, ListPlus, MapPin, Pencil, Plus, Repeat, Trash2, Utensils } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { DropdownMenu } from "radix-ui";
 import { useMemo, useState, type FormEvent } from "react";
@@ -46,7 +46,7 @@ export function TodayPage() {
   const theme = themes.data?.find((t) => t.day === DAY_NAMES[parseISODate(date).getDay()]);
   const commitments = useCommitments(date);
   const routineBands = useMemo(() => commitmentsOn(date, commitments.data ?? []).map((c) => ({
-    title: c.title, start: c.start, end: c.end, isMeal: c.source.isMeal, policy: c.policy, key: `${c.source.sourceId}-${c.source.date}`,
+    title: c.title, start: c.start, end: c.end, isMeal: c.source.isMeal, policy: c.policy, key: `${c.source.sourceId}-${c.source.date}-${c.start}`, kind: c.source.kind,
   })), [date, commitments.data]);
 
   // A top-three outcome and its booked block are the same piece of work; show them as one.
@@ -313,7 +313,7 @@ function OutcomeForm({ date, outcome, areas, onClose }: { date: string; outcome:
 
 // ---- Agenda ----------------------------------------------------------------------------------
 
-type RoutineBand = { title: string; start: number; end: number; isMeal: boolean; policy: string; key: string };
+type RoutineBand = { title: string; start: number; end: number; isMeal: boolean; policy: string; key: string; kind: "routine" | "event" };
 
 function Agenda({ blocks, routines, areaById, rankByTask, showNow, onOpen }: { blocks: Block[]; routines: RoutineBand[]; areaById: Map<string, Area>; rankByTask: Map<string, number>; showNow: boolean; onOpen: (b: Block) => void }) {
   const now = useNowMinutes();
@@ -343,11 +343,11 @@ function Agenda({ blocks, routines, areaById, rankByTask, showNow, onOpen }: { b
 
 function RoutineRow({ band }: { band: RoutineBand }) {
   return (
-    <motion.li layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="routine-row" aria-label={`Routine: ${band.title}, ${fromMinutes(Math.max(0, band.start))} to ${fromMinutes(band.end)}`}>
+    <motion.li layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={cx("routine-row", band.kind === "event" && "is-event")} aria-label={`${band.kind === "event" ? "Meeting" : "Routine"}: ${band.title}, ${fromMinutes(Math.max(0, band.start))} to ${fromMinutes(band.end)}`}>
       <span className="agenda-time"><strong>{fromMinutes(Math.max(0, band.start))}</strong><span>{fromMinutes(band.end)}</span></span>
       <span className="agenda-bar" aria-hidden />
-      <span className="routine-row-title">{band.isMeal ? <Utensils size={14} aria-hidden /> : <Repeat size={14} aria-hidden />}{band.title}
-        <small>{band.policy === "NoTasks" ? "protected" : band.policy === "AnyTask" ? "open for tasks" : "for selected areas"}</small>
+      <span className="routine-row-title">{band.kind === "event" ? <CalendarDays size={14} aria-hidden /> : band.isMeal ? <Utensils size={14} aria-hidden /> : <Repeat size={14} aria-hidden />}{band.title}
+        <small>{band.kind === "event" ? "from your calendar" : band.policy === "NoTasks" ? "protected" : band.policy === "AnyTask" ? "open for tasks" : "for selected areas"}</small>
       </span>
     </motion.li>
   );

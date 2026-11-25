@@ -14,7 +14,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | Item | State | Evidence |
 |---|---|---|
 | Client lint, type-check, tests, build | Done | run locally, all pass |
-| Server build (warnings as errors) and tests against real PostgreSQL | Done | 76 tests pass |
+| Server build (warnings as errors) and tests against real PostgreSQL | Done | 139 tests pass |
 | Migrations against a disposable database | Done | every test run creates a database from migrations; release sequence run by hand |
 | Build the Docker image and run it | **Not done** | no Docker daemon where this was built; CI job `image` does it on the first pull request |
 | Trace five user journeys with timings and SQL counts | **Not done** | no measurements taken yet |
@@ -40,7 +40,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | 5 | Atomic plan and simultaneous edits tested | Done | 8 concurrent writers: exactly one wins |
 | 6 | Migrations as an explicit release step | Done | `--migrate`; readiness fails until applied |
 | 6 | Backups and a restore drill | Partial | `scripts/backup.sh`, `scripts/restore-drill.sh`; drill passed **against a local database only**. No production backups exist because no production exists. |
-| 7 | Playwright end-to-end flows | Done | 15 tests, run locally against the production build |
+| 7 | Playwright end-to-end flows | Done | 16 tests, run locally against the production build |
 | 7 | Verify the full Docker / UAT deployment | **Not done** | no image has been built, no environment exists |
 
 **Also done in Phase 1:** a queryable audit trail shown to the owner (Settings → Account activity); other sessions now end within 60 s of a password change or reset (`Auth__SessionRevalidateSeconds`), instead of Identity's 30-minute default.
@@ -58,7 +58,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 
 | Item | State | Notes |
 |---|---|---|
-| Application/use-case boundary for PlanDay, TimeBlock/Finish, Tasks/ChangeStatus | Partial | PlanDay done (`Application/Planning`, typed `Result`, architecture test); the timer use cases follow the same pattern |
+| Application/use-case boundary for PlanDay, TimeBlock/Finish, Tasks/ChangeStatus | Partial | `Application/Planning/PlanDay`, `Application/Timing/FocusTimer` (finishing blocks), `Application/Calendars/CalendarSync`, typed `Result`, architecture test. Task and area CRUD endpoints still use `DbContext` directly |
 | Pure domain time logic | Done | `Domain/CivilTime.cs` |
 | Task lifecycle; no false completion of multi-session tasks | Done | `Domain/TaskCompletion.cs` |
 | Built-in OpenAPI | Done | ADR-002 |
@@ -83,8 +83,8 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | P2-C1–C3 | Routines with task policies; fitting respects them and a day window | Done | ADR-014; server refuses plans that break a routine; 5 domain + 5 API tests, fitter tests, 1 browser test |
 | P2-C4 | Recovery breaks per focus area and per task | Done | reserved on the block, shown on Today and the calendar |
 | P2-C5 | Water and meal reminders (app open) | Done | toast, or a browser notification when the tab is in the background. Push when the app is closed: Phase 3 |
-| P2-D1 | Calendar export (subscription feed and .ics) | Not started | ADR-015 |
-| P2-D2 | Read busy time from an existing calendar | Not started | ADR-015 |
+| P2-D1 | Calendar export (subscription feed and .ics) | Done | ADR-015; private regenerable link, titles and times only; browser test |
+| P2-D2 | Read busy time from an existing calendar | Done | ADR-015; SSRF-safe fetch (13 URL + 15 address tests), recurring meetings expanded, plan refuses to book over meetings; tested against a stub server — **not yet against a real Google or Outlook calendar** |
 | P2-D3 | Write into Google Calendar, two-way sync | Phase 3 | needs Google OAuth credentials |
 
 ## Handbook requirements not yet met anywhere
