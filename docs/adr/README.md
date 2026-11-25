@@ -24,3 +24,4 @@ Decisions that are binding unless a later record supersedes them. Each states wh
 | [018](018-sentry-for-errors.md) | Errors are reported to Sentry | Accepted — implemented |
 | [019](019-web-push-without-a-library.md) | Notifications while the app is closed use standard Web Push, built in | Accepted — implemented |
 | [020](020-ai-brain-dump.md) | The AI brain dump suggests tasks; the person confirms; spend is capped | Accepted — implemented |
+| [021](021-prettier.md) | Prettier formats the client, browser tests and scripts | Accepted — implemented |
