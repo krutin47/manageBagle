@@ -48,6 +48,7 @@ jobs:
           push: true
           sbom: true
           provenance: mode=max
+          build-args: RELEASE=${{ github.sha }}
           tags: |
             ${{ steps.names.outputs.image }}:sha-${{ github.sha }}
             ${{ steps.names.outputs.image }}:tree-${{ steps.names.outputs.tree }}

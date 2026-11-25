@@ -32,7 +32,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | 2 | Tests for CSRF, spoofed headers, cross-account writes | Done | `SecurityTests`, `TransportTests`, `PlanningTests` |
 | 3 | Problem Details and trace IDs | Done | ADR-005 |
 | 3 | Sanitised structured logs | Done | JSON outside development; route templates, not URLs; no bodies |
-| 3 | Central error monitoring | Partial | traces and metrics export over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; browser errors are reported to the server log with the reference the person sees. **No backend chosen or connected, no alerts.** |
+| 3 | Central error monitoring | Done in code · **needs the Sentry DSN** | Sentry (ADR-018): server errors and browser errors, no personal data (tested with a stand-in Sentry). Previously: | traces and metrics export over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; browser errors are reported to the server log with the reference the person sees. **No backend chosen or connected, no alerts.** |
 | 4 | User time-zone setting | Done | ADR-008 |
 | 4 | DST and overnight policy | Done | tested on both transitions |
 | 4 | Migrate without changing existing dates | Done | old rows keep their wall-clock length and get no zone |

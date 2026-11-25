@@ -18,6 +18,9 @@ RUN dotnet publish server/src/ManageBagle.Api/ManageBagle.Api.csproj -c Release 
 
 # 3. One small runtime image: the API serves the client from wwwroot
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+# The commit this image was built from; reported with errors (ADR-018).
+ARG RELEASE=dev
+ENV App__Release=$RELEASE
 WORKDIR /app
 COPY --from=server /app ./
 COPY --from=client /src/client/dist ./wwwroot

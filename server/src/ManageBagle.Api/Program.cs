@@ -220,6 +220,8 @@ builder.Services.AddRateLimiter(o =>
 
 builder.Services.Configure<ForwardedHeadersOptions>(o => SecurityMiddleware.ConfigureForwardedHeaders(o, config));
 
+builder.AddErrorReporting();
+
 var app = builder.Build();
 
 // Release step: `dotnet ManageBagle.Api.dll --migrate` applies reviewed migrations, then exits.
@@ -254,6 +256,7 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 app.UseAuthentication();
+app.UseErrorReportingScope();
 // After authentication, so limits can be per account where that is what they are about.
 app.UseRateLimiter();
 app.UseRequestLogging();

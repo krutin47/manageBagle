@@ -20,6 +20,7 @@ All settings are environment variables (double underscore = nesting).
 | `AllowedHosts` | recommended | your public host name(s) |
 | `Security__AllowedOrigins__0` | no | extra origins allowed to send writes (normally none) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | no | turns on trace and metric export to a collector |
+| `Sentry__Dsn` | recommended | turns on error reporting to Sentry (ADR-018); off when unset |
 | `Auth__IdleSessionDays`, `Auth__AbsoluteSessionDays` | no | default 14 and 30 |
 | `Auth__SessionRevalidateSeconds` | no | default 60: how soon a password change ends other sessions |
 | `Auth__MfaResetDelayHours` | no | default 72: wait before a lost-second-factor recovery can finish |

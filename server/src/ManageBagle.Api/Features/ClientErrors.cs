@@ -28,6 +28,7 @@ public static class ClientErrors
                 "Client {Kind} error at {Route} (ref {Reference}, release {Release}, user {UserId}): {Message}",
                 report.Kind, route ?? "", report.Reference ?? "", report.Release ?? "",
                 user.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous", report.Message);
+            Infrastructure.ErrorReporting.ReportClientError(report.Kind, report.Message, route, report.Reference, report.Release, user.FindFirstValue(ClaimTypes.NameIdentifier));
             return Results.Accepted();
         }).RequireRateLimiting("client-errors").WithTags("Diagnostics").Produces(StatusCodes.Status202Accepted).ProducesValidationProblem();
     }
