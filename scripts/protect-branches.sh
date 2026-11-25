@@ -18,8 +18,9 @@ for BRANCH in main uat; do
     "strict": true,
     "contexts": [
       "Client (lint, types, tests, build)",
-      "Server (build, tests)",
-      "Container image builds"
+      "Server (build, tests, API contract)",
+      "Browser end-to-end",
+      "Container image builds and boots"
     ]
   },
   "enforce_admins": true,

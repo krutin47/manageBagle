@@ -1,15 +1,18 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, Download, KeyRound, Plus, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, Copy, Download, KeyRound, Link2, Plus, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
-import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 import { useToast } from "../../components/toast";
-import { Button, ConfirmDialog, cx, Dialog, ErrorNote, Field, IconButton, Input, PageHeader, Segmented, Skeleton } from "../../components/ui";
+import { Button, ConfirmDialog, cx, Dialog, ErrorNote, Field, IconButton, Input, PageHeader, Segmented, Select, Skeleton } from "../../components/ui";
 import { api, ApiError, errorMessage, type Area, type AreaColor, type User } from "../../lib/api";
 import { useDocumentTitle, useTheme } from "../../lib/hooks";
 import { AREA_COLORS, colorLabel } from "../../lib/labels";
-import { useAreaMutations, useAreas, useUser } from "../../lib/queries";
+import { CalendarsCard } from "./CalendarsCard";
+import { RoutinesCard, YourDayCard } from "./RoutinesCard";
+import { keys, useAreaMutations, useAreas, useProviders, useUser } from "../../lib/queries";
+import { browserTimeZone } from "../../lib/time";
 
 export function SettingsPage() {
   useDocumentTitle("Settings");
@@ -19,8 +22,12 @@ export function SettingsPage() {
       <PageHeader eyebrow="Your personal system" title="Settings" />
       <div className="settings">
         <ProfileCard user={user} />
+        <YourDayCard />
+        <RoutinesCard />
+        <CalendarsCard />
         <AreasCard />
         <SecurityCard user={user} />
+        <ActivityCard />
         <AppearanceCard />
         <DangerCard user={user} />
       </div>
@@ -30,7 +37,7 @@ export function SettingsPage() {
 
 function useRefreshUser() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: ["me"] });
+  return () => qc.invalidateQueries({ queryKey: keys.me });
 }
 
 // ---- Profile ---------------------------------------------------------------------------------
@@ -39,13 +46,19 @@ function ProfileCard({ user }: { user: User }) {
   const toast = useToast();
   const qc = useQueryClient();
   const [name, setName] = useState(user.displayName);
+  const [zone, setZone] = useState(user.timeZone ?? browserTimeZone());
   const [busy, setBusy] = useState(false);
+  const zones = useMemo(() => {
+    const all = typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
+    return [...new Set([zone, browserTimeZone(), ...all])].sort();
+  }, [zone]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     try {
-      qc.setQueryData(["me"], await api<User>("/auth/profile", { method: "PUT", body: { displayName: name } }));
+      qc.setQueryData(keys.me, await api<User>("/auth/profile", { method: "PUT", body: { displayName: name, timeZone: zone } }));
+      qc.invalidateQueries({ queryKey: keys.blocks.all });
       toast.success("Profile saved");
     } catch (err) {
       toast.error(errorMessage(err));
@@ -60,7 +73,10 @@ function ProfileCard({ user }: { user: User }) {
       <form className="form settings-form" onSubmit={submit}>
         <Field label="Name">{(p) => <Input {...p} required maxLength={80} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />}</Field>
         <Field label="Email" hint="Your sign-in address.">{(p) => <Input {...p} value={user.email} readOnly />}</Field>
-        <div><Button type="submit" variant="primary" loading={busy} disabled={!name.trim() || name.trim() === user.displayName}>Save profile</Button></div>
+        <Field label="Time zone" hint="Decides what “today” and “now” mean. Blocks you have already planned stay anchored to the zone they were planned in.">
+          {(p) => <Select {...p} value={zone} onChange={(e) => setZone(e.target.value)}>{zones.map((z) => <option key={z} value={z}>{z.replace(/_/g, " ")}</option>)}</Select>}
+        </Field>
+        <div><Button type="submit" variant="primary" loading={busy} disabled={!name.trim() || (name.trim() === user.displayName && zone === user.timeZone)}>Save profile</Button></div>
       </form>
     </section>
   );
@@ -143,7 +159,7 @@ function AreaRow({ area, onDelete }: { area: Area; onDelete: () => void }) {
   const [name, setName] = useState(area.name);
   const [picking, setPicking] = useState(false);
   const save = (next: { name?: string; color?: AreaColor }) => {
-    const body = { id: area.id, name: (next.name ?? area.name).trim(), color: next.color ?? area.color };
+    const body = { id: area.id, name: (next.name ?? area.name).trim(), color: next.color ?? area.color, breakMinutes: area.breakMinutes, breakPlacement: area.breakPlacement };
     if (!body.name) return setName(area.name);
     if (body.name === area.name && body.color === area.color) return;
     update.mutate(body, { onError: (e) => { setName(area.name); toast.error(errorMessage(e)); } });
@@ -152,6 +168,17 @@ function AreaRow({ area, onDelete }: { area: Area; onDelete: () => void }) {
     <div className="area-row" data-area={area.color}>
       <button type="button" className="swatch" data-area={area.color} aria-label={`Colour: ${colorLabel[area.color]}. Change colour of ${area.name}`} aria-expanded={picking} onClick={() => setPicking(!picking)} />
       <input className="cell-input" aria-label={`Name of ${area.name}`} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} onBlur={() => save({ name })} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} />
+      <select className="area-break" aria-label={`Recovery break for ${area.name}`} value={`${area.breakMinutes}|${area.breakPlacement}`}
+        onChange={(e) => {
+          const [m, placement] = e.target.value.split("|");
+          update.mutate({ id: area.id, name: area.name, color: area.color, breakMinutes: Number(m), breakPlacement: placement as Area["breakPlacement"] }, { onError: (err) => toast.error(errorMessage(err)) });
+        }}>
+        <option value={`0|${area.breakPlacement}`}>No break</option>
+        {[5, 10, 15, 20, 30].flatMap((m) => [
+          <option key={`${m}a`} value={`${m}|After`}>{m} min break after</option>,
+          <option key={`${m}b`} value={`${m}|Before`}>{m} min break before</option>,
+        ])}
+      </select>
       <IconButton size="sm" label={`Delete ${area.name}`} onClick={onDelete}><Trash2 size={15} /></IconButton>
       {picking && (
         <motion.div className="area-row-picker" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
@@ -162,10 +189,35 @@ function AreaRow({ area, onDelete }: { area: Area; onDelete: () => void }) {
   );
 }
 
+const PROVIDER_ROWS = [
+  { key: "google", name: "Google", flag: "googleLinked" },
+  { key: "microsoft", name: "Microsoft", flag: "microsoftLinked" },
+] as const;
+
+const LINK_ERRORS: Record<string, string> = {
+  link_expired: "That took too long, so nothing was connected. Start again.",
+  link_in_use: "That account is already connected to a different manageBagle account.",
+  link_failed: "That account could not be connected.",
+};
+
 // ---- Security --------------------------------------------------------------------------------
 
 function SecurityCard({ user }: { user: User }) {
   const [dialog, setDialog] = useState<"password" | "enable" | "disable" | "codes" | null>(null);
+  const providers = useProviders();
+  const [linking, setLinking] = useState<(typeof PROVIDER_ROWS)[number] & { mode: "link" | "unlink" } | null>(null);
+  const [params, setParams] = useSearchParams();
+  const toast = useToast();
+
+  // The provider round trip lands back here with its result in the address.
+  useEffect(() => {
+    const linked = params.get("linked");
+    const error = params.get("error");
+    if (!linked && !error) return;
+    if (linked) toast.success(`${PROVIDER_ROWS.find((p) => p.key === linked)?.name ?? "Account"} connected`);
+    else toast.error(LINK_ERRORS[error!] ?? "That account could not be connected.");
+    setParams({}, { replace: true });
+  }, [params, setParams, toast]);
   return (
     <section className="card" aria-labelledby="security">
       <header className="card-head"><div><h2 id="security">Sign-in &amp; security</h2></div></header>
@@ -174,7 +226,7 @@ function SecurityCard({ user }: { user: User }) {
           <span className="sec-icon"><KeyRound size={18} aria-hidden /></span>
           <div>
             <h3>Password</h3>
-            <p>{user.hasPassword ? "You sign in with your email and a password." : "No password set — you sign in with Google. Add one to also sign in by email."}</p>
+            <p>{user.hasPassword ? "You sign in with your email and a password." : "No password set — you sign in with another account. Add one to also sign in by email."}</p>
           </div>
           <Button onClick={() => setDialog("password")}>{user.hasPassword ? "Change password" : "Set a password"}</Button>
         </li>
@@ -197,15 +249,39 @@ function SecurityCard({ user }: { user: User }) {
             <Button variant="primary" onClick={() => setDialog("enable")}>Turn on</Button>
           )}
         </li>
-        <li>
-          <span className={cx("sec-icon", user.googleLinked && "is-on")}><GoogleGlyph /></span>
-          <div>
-            <h3>Google <span className={cx("badge", user.googleLinked ? "badge-good" : "badge-neutral")}>{user.googleLinked ? "Connected" : "Not connected"}</span></h3>
-            <p>{user.googleLinked ? "You can sign in with your Google account." : `Choose “Continue with Google” at sign-in using ${user.email} to connect it.`}</p>
-          </div>
-        </li>
+        {PROVIDER_ROWS.filter((p) => user[p.flag] || providers.data?.[p.key]).map((p) => {
+          const linked = user[p.flag];
+          return (
+            <li key={p.key}>
+              <span className={cx("sec-icon", linked && "is-on")}><Link2 size={18} aria-hidden /></span>
+              <div>
+                <h3>{p.name} <span className={cx("badge", linked ? "badge-good" : "badge-neutral")}>{linked ? "Connected" : "Not connected"}</span></h3>
+                <p>{linked ? `You can sign in with your ${p.name} account.` : `Connect your ${p.name} account to sign in with it. We will ask you to confirm it is you first.`}</p>
+              </div>
+              {linked
+                ? <Button variant="ghost" className="danger-text" onClick={() => setLinking({ ...p, mode: "unlink" })}>Disconnect</Button>
+                : <Button onClick={() => setLinking({ ...p, mode: "link" })}>Connect</Button>}
+            </li>
+          );
+        })}
       </ul>
 
+      <Dialog open={!!linking} onClose={() => setLinking(null)} width="sm"
+        title={linking?.mode === "unlink" ? `Disconnect ${linking.name}?` : `Connect ${linking?.name ?? ""}`}
+        description={linking?.mode === "unlink" ? `You will no longer be able to sign in with ${linking.name}.` : "Confirm it is you, then choose the account to connect."}>
+        {linking && (user.hasPassword || user.mfaEnabled || linking.mode === "unlink" ? (
+          <ConfirmIdentity<{ url?: string }>
+            user={user}
+            action={`/auth/external/${linking.key}/${linking.mode}`}
+            submitLabel={linking.mode === "unlink" ? "Disconnect" : "Continue"}
+            danger={linking.mode === "unlink"}
+            onResult={(r) => { if (r?.url) window.location.assign(r.url); }}
+            onDone={() => { if (linking.mode === "unlink") setLinking(null); }}
+          />
+        ) : (
+          <div className="dialog-body"><ErrorNote>Set a password first, so we can confirm it is you before connecting another account.</ErrorNote></div>
+        ))}
+      </Dialog>
       <Dialog open={dialog === "password"} onClose={() => setDialog(null)} title={user.hasPassword ? "Change password" : "Set a password"} width="sm">
         <PasswordForm user={user} onClose={() => setDialog(null)} />
       </Dialog>
@@ -219,14 +295,6 @@ function SecurityCard({ user }: { user: User }) {
         <RegenerateCodes user={user} onClose={() => setDialog(null)} />
       </Dialog>
     </section>
-  );
-}
-
-function GoogleGlyph() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
-      <path fill="currentColor" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7a5.4 5.4 0 0 1 0-3.44C4.68 5.16 6.66 3.58 9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.59A9 9 0 1 0 9 18c2.43 0 4.47-.8 5.96-2.18 1.7-1.57 2.68-3.88 2.68-6.62z" />
-    </svg>
   );
 }
 
@@ -433,6 +501,59 @@ function AppearanceCard() {
   );
 }
 
+const EVENT_LABELS: Record<string, string> = {
+  account_created: "Account created",
+  email_confirmed: "Email confirmed",
+  sign_in: "Signed in with password",
+  sign_in_mfa: "Signed in with authenticator",
+  sign_in_recovery_code: "Signed in with a recovery code",
+  sign_in_needs_mfa: "Password accepted, waiting for second step",
+  sign_in_failed: "Failed sign-in attempt",
+  sign_in_mfa_failed: "Wrong authenticator code",
+  sign_out: "Signed out",
+  password_changed: "Password changed",
+  password_reset: "Password reset by email",
+  mfa_enabled: "Two-step verification turned on",
+  mfa_disabled: "Two-step verification turned off",
+  mfa_reset_requested: "Recovery requested: lost second factor",
+  mfa_reset_confirmed: "Recovery confirmed by email",
+  mfa_reset_cancelled: "Recovery cancelled",
+  mfa_reset_completed: "Two-step verification turned off by recovery",
+  external_login_linked: "Account connected",
+  external_login_unlinked: "Account disconnected",
+};
+const WARNING_EVENTS = new Set(["sign_in_failed", "sign_in_mfa_failed", "mfa_reset_requested", "mfa_reset_confirmed", "mfa_reset_completed", "mfa_disabled"]);
+
+/** The account's recent security events, so the owner can spot something they did not do. */
+function ActivityCard() {
+  const activity = useQuery({
+    queryKey: ["account-activity"],
+    queryFn: ({ signal }) => api<{ event: string; detail: string; at: string }[]>("/auth/activity", { signal }),
+    staleTime: 60_000,
+  });
+  return (
+    <section className="card" aria-labelledby="activity">
+      <header className="card-head">
+        <div>
+          <h2 id="activity">Account activity</h2>
+          <p>Recent sign-ins and security changes. If you see something you did not do, change your password.</p>
+        </div>
+      </header>
+      {activity.isError ? <ErrorNote onRetry={() => activity.refetch()}>We could not load your account activity.</ErrorNote>
+        : activity.isPending ? <Skeleton height={120} radius={10} /> : (
+          <ul className="activity">
+            {activity.data.map((e, i) => (
+              <li key={i} className={cx(WARNING_EVENTS.has(e.event) && "is-warning")}>
+                <span>{EVENT_LABELS[e.event] ?? e.event.replace(/_/g, " ")}{e.detail && !e.detail.includes("_") ? ` · ${e.detail[0]!.toUpperCase()}${e.detail.slice(1)}` : ""}</span>
+                <time dateTime={e.at}>{new Date(e.at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</time>
+              </li>
+            ))}
+          </ul>
+        )}
+    </section>
+  );
+}
+
 function DangerCard({ user }: { user: User }) {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
@@ -447,7 +568,7 @@ function DangerCard({ user }: { user: User }) {
         <Button variant="danger" onClick={() => setOpen(true)}>Delete account</Button>
       </header>
       <Dialog open={open} onClose={() => setOpen(false)} title="Delete your account?" description="Everything you have planned and logged will be erased immediately." width="sm">
-        <ConfirmIdentity user={user} action="/auth/account/delete" submitLabel="Delete everything" danger onDone={() => { qc.clear(); qc.setQueryData(["me"], null); navigate("/login", { replace: true }); }} />
+        <ConfirmIdentity user={user} action="/auth/account/delete" submitLabel="Delete everything" danger onDone={() => { qc.clear(); qc.setQueryData(keys.me, null); navigate("/login", { replace: true }); }} />
       </Dialog>
     </section>
   );

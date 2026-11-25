@@ -1,4 +1,5 @@
 using ManageBagle.Api.Data;
+using ManageBagle.Api.Domain;
 using ManageBagle.Api.Features;
 
 namespace ManageBagle.Api.Tests;
@@ -11,6 +12,7 @@ public class WeekSummaryTests
         ItemStatus status = ItemStatus.Planned, int? actual = null, Guid? area = null) => new()
     {
         Date = Monday.AddDays(dayOffset), Start = TimeOnly.Parse(start), End = TimeOnly.Parse(end),
+        PlannedMinutes = CivilTime.WallMinutes(TimeOnly.Parse(start), TimeOnly.Parse(end)),
         WorkMode = mode, Status = status, ActualMinutes = actual, FocusAreaId = area, Title = "t",
     };
 
@@ -20,7 +22,7 @@ public class WeekSummaryTests
     [InlineData("23:30", "00:15", 45)] // runs past midnight, like MOD(end-start,1) in the workbook
     [InlineData("22:00", "06:00", 480)]
     public void Planned_minutes_wrap_past_midnight(string start, string end, int expected) =>
-        Assert.Equal(expected, TimeBlock.PlannedMinutesBetween(TimeOnly.Parse(start), TimeOnly.Parse(end)));
+        Assert.Equal(expected, CivilTime.WallMinutes(TimeOnly.Parse(start), TimeOnly.Parse(end)));
 
     [Fact]
     public void Totals_match_the_workbook_formulas()

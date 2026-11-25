@@ -1,9 +1,20 @@
 # Authentication
 
 Sessions are an encrypted, `HttpOnly`, `SameSite=Lax` cookie issued by ASP.NET Core Identity.
-Nothing is kept in `localStorage`, so scripts cannot read the session.
+Nothing is kept in `localStorage`, so scripts cannot read the session. A session ends after 14 days
+without a visit, and after 30 days regardless (`Auth__IdleSessionDays`, `Auth__AbsoluteSessionDays`).
 
-## The three ways in
+## Email confirmation
+
+A new account cannot sign in until its owner opens the link sent to their address (valid 2 hours).
+Registration always answers the same way, so it cannot be used to discover who has an account; if
+the address is already registered, its owner gets an email saying so. A sign-in attempt on an
+unconfirmed account offers a new link, but only after the correct password.
+
+**Locally**, with no SMTP configured, emails are printed in the API console and written to
+`server/src/ManageBagle.Api/.mail/`.
+
+## The ways in
 
 **Email and password.** Minimum 10 characters. Five wrong attempts lock the account for 10 minutes.
 
@@ -13,26 +24,31 @@ Nothing is kept in `localStorage`, so scripts cannot read the session.
    *Web application*.
 2. Add the authorised redirect URI `https://<your-host>/api/auth/external/google/callback`
    (for local development: `http://localhost:5173/api/auth/external/google/callback`).
-3. Give the API the two values:
+3. Set `Authentication:Google:ClientId` and `Authentication:Google:ClientSecret` (user-secrets
+   locally; `Authentication__Google__…` environment variables elsewhere).
 
-   ```bash
-   cd server/src/ManageBagle.Api
-   dotnet user-secrets init
-   dotnet user-secrets set "Authentication:Google:ClientId" "<id>"
-   dotnet user-secrets set "Authentication:Google:ClientSecret" "<secret>"
-   ```
+**Microsoft.** Same pattern: register a web app in the Azure portal with the redirect URI
+`https://<your-host>/api/auth/external/microsoft/callback`, then set
+`Authentication:Microsoft:ClientId` / `ClientSecret`.
 
-   In UAT and production use the environment variables `Authentication__Google__ClientId` and
-   `Authentication__Google__ClientSecret`.
+Use a **separate OAuth client per environment**.
 
-A Google sign-in with an email that already has an account is linked to that account. Only
-Google-verified addresses are accepted. If the existing account's email was never proven, its
-password and authenticator are removed during linking, so nobody can pre-register someone else's
-address and keep access to it.
+### How an outside account meets a manageBagle account (ADR-007)
+
+- It can **start a new account**. Google proves the email per sign-in, so the account is usable at
+  once; Microsoft does not, so the account confirms by email first.
+- It can be **connected to an existing account only by that account's signed-in owner**, in
+  *Settings → Sign-in & security → Connect*, after re-entering the password or an authenticator code.
+- A sign-in whose email merely matches an existing account is **refused and changes nothing**.
+- The last remaining way to sign in cannot be disconnected.
+
+**Adding SSO later.** Providers are listed in one place (`ExternalProviders`) with a flag for
+whether their email claim can be trusted. An OpenID Connect provider is one more entry plus its
+registration in `Program.cs`.
 
 **Two-step verification (MFA).** *Settings → Sign-in & security → Turn on.* Scan the QR code with
 any TOTP authenticator app and confirm with a code. Ten single-use recovery codes are shown once.
-When it is on, password *and* Google sign-ins both require the code. Turning it off, generating new
+When it is on, password, Google and Microsoft sign-ins all require the code. Turning it off, generating new
 recovery codes and deleting the account all ask for the password (or a code) again.
 
 ## Password reset email
@@ -44,16 +60,43 @@ email is written to the log in Development and an error is logged elsewhere.
 
 ## Other protections
 
-- **CSRF** – every state-changing `/api` request must carry the `X-MB-Client` header. Browsers do
-  not send custom headers cross-site without a CORS preflight, and the API allows no CORS origins.
+- **CSRF** (ADR-006) – a state-changing request needs the app's custom header, an `Origin` that is
+  this site, and an antiforgery token bound to the browser and the signed-in account.
 - **Rate limiting** – auth endpoints allow 20 requests per minute per IP (`RateLimits__AuthPerMinute`).
-- **Headers** – a strict Content-Security-Policy (no inline or third-party scripts), `X-Frame-Options: DENY`,
-  `nosniff`, HSTS outside Development, and `Cache-Control: no-store` on API responses.
-- **Data isolation** – every query is filtered by the signed-in user's id; the API tests assert that
-  one user cannot read, edit or attach to another user's data.
+  This is per instance; with more than one replica, enforce limits at the ingress.
+- **Headers** – a strict Content-Security-Policy, `X-Frame-Options: DENY`, `nosniff`, HSTS outside
+  Development, and `Cache-Control: no-store` on API responses.
+- **Data isolation** – every query is filtered by the signed-in user's id, and ids sent by the client
+  are checked for ownership.
+
+## Lost every second factor
+
+Someone who knows their password but has lost both their authenticator and every recovery code can
+recover without anyone editing the database:
+
+1. After the password step, *Lost your phone? → Start account recovery*. An email goes to the account.
+2. Its link confirms they control the mailbox and starts a **72-hour wait** (`Auth__MfaResetDelayHours`).
+   A second email says when, with a cancel link.
+3. During the wait, signing in with the authenticator or a recovery code, or the cancel link, stops it.
+4. After the wait, signing in with the password finishes it: two-step verification is turned off, all
+   other sessions end, and the owner is emailed.
+
+Every step is recorded in the account's activity.
+
+## Account activity
+
+Sign-ins (including failures), sign-outs, password changes and resets, two-step verification changes,
+recovery steps and connected accounts are stored as audit events. The owner sees the latest 30 under
+*Settings → Account activity*; each event is also a `ManageBagle.Audit` log line. No credentials, codes
+or tokens are recorded.
+
+## Sessions
+
+A password change, reset, recovery or disconnected sign-in method ends the account's other sessions
+within 60 seconds (`Auth__SessionRevalidateSeconds`).
 
 ## Known limits
 
-- New email/password accounts are not asked to confirm their address before first use.
-- There is no admin UI; a locked-out user without recovery codes needs a database-level reset of
-  `TwoFactorEnabled`.
+- Sessions on other devices cannot be listed or revoked individually.
+- Recovery relies on the account's mailbox; someone who controls both the password and the mailbox can
+  complete it, but the owner sees it coming for 72 hours by email and in their activity.

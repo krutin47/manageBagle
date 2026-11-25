@@ -6,9 +6,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ManageBagle.Api.Features;
 
-public record AreaRequest([Required, StringLength(60, MinimumLength = 1)] string Name, [Required] string Color);
+public record AreaRequest([Required, StringLength(60, MinimumLength = 1)] string Name, [Required] string Color, [Range(0, 60)] int BreakMinutes = 0, Domain.BreakPlacement BreakPlacement = Domain.BreakPlacement.After);
 
-public record AreaResponse(Guid Id, string Name, string Color, int SortOrder);
+public record AreaResponse(Guid Id, string Name, string Color, int SortOrder, int BreakMinutes, Domain.BreakPlacement BreakPlacement)
+{
+    public static AreaResponse From(FocusArea a) => new(a.Id, a.Name, a.Color, a.SortOrder, a.BreakMinutes, a.BreakPlacement);
+}
 
 public record ReorderRequest([Required] Guid[] Ids);
 
@@ -22,7 +25,7 @@ public static class AreaEndpoints
 
         g.MapGet("", async (ClaimsPrincipal user, AppDbContext db) =>
             await db.FocusAreas.Where(a => a.UserId == user.UserId()).OrderBy(a => a.SortOrder)
-                .Select(a => new AreaResponse(a.Id, a.Name, a.Color, a.SortOrder)).ToListAsync());
+                .Select(a => new AreaResponse(a.Id, a.Name, a.Color, a.SortOrder, a.BreakMinutes, a.BreakPlacement)).ToListAsync());
 
         g.MapPost("", async (AreaRequest req, ClaimsPrincipal user, AppDbContext db) =>
         {
@@ -33,10 +36,10 @@ public static class AreaEndpoints
             {
                 return HttpExtensions.Invalid("name", $"You can have up to {MaxAreas} focus areas. Fewer areas make for a clearer week.");
             }
-            var area = new FocusArea { UserId = uid, Name = req.Name.Trim(), Color = req.Color, SortOrder = existing.Count == 0 ? 0 : existing.Max() + 1 };
+            var area = new FocusArea { UserId = uid, Name = req.Name.Trim(), Color = req.Color, SortOrder = existing.Count == 0 ? 0 : existing.Max() + 1, BreakMinutes = req.BreakMinutes, BreakPlacement = req.BreakPlacement };
             db.FocusAreas.Add(area);
             await db.SaveChangesAsync();
-            return Results.Created($"/api/areas/{area.Id}", new AreaResponse(area.Id, area.Name, area.Color, area.SortOrder));
+            return Results.Created($"/api/areas/{area.Id}", AreaResponse.From(area));
         });
 
         g.MapPut("/{id:guid}", async (Guid id, AreaRequest req, ClaimsPrincipal user, AppDbContext db) =>
@@ -46,8 +49,10 @@ public static class AreaEndpoints
             if (area is null) return Results.NotFound();
             area.Name = req.Name.Trim();
             area.Color = req.Color;
+            area.BreakMinutes = req.BreakMinutes;
+            area.BreakPlacement = req.BreakPlacement;
             await db.SaveChangesAsync();
-            return Results.Ok(new AreaResponse(area.Id, area.Name, area.Color, area.SortOrder));
+            return Results.Ok(AreaResponse.From(area));
         });
 
         g.MapPut("/order", async (ReorderRequest req, ClaimsPrincipal user, AppDbContext db) =>
@@ -74,6 +79,6 @@ public static class AreaEndpoints
     }
 
     /// <summary>True when the id is null or names one of the caller's own areas.</summary>
-    public static async Task<bool> OwnsAreaAsync(this AppDbContext db, Guid userId, Guid? areaId) =>
-        areaId is null || await db.FocusAreas.AnyAsync(a => a.Id == areaId && a.UserId == userId);
+    public static async Task<bool> OwnsAreaAsync(this AppDbContext db, Guid userId, Guid? areaId, CancellationToken ct = default) =>
+        areaId is null || await db.FocusAreas.AnyAsync(a => a.Id == areaId && a.UserId == userId, ct);
 }

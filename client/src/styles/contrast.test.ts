@@ -46,6 +46,18 @@ const pairs: [string, string, number][] = [
   ["accent", "surface", 3],
   ["accent", "canvas", 3],
   ["accent-ink", "accent-tint", 4.5],
+  // Body text also sits on the tinted surfaces (welcome banner, outside-work toggle, notices).
+  ["ink", "accent-tint", 7],
+  ["ink", "warn-tint", 7],
+  ["ink-2", "warn-tint", 4.5],
+  ["ink", "good-tint", 7],
+  ["surface", "good", 4.5],
+  ["surface", "bad", 4.5],
+  ["accent", "sunken", 3],
+  // Option chips: warning text on surfaces, strong (high impact) chips.
+  ["warn", "warn-tint", 4.5],
+  ["accent-ink", "surface", 4.5],
+  ["bad", "surface", 4.5],
   ["good", "good-tint", 4.5],
   ["warn", "warn-tint", 4.5],
   ["bad", "bad-tint", 4.5],

@@ -1,19 +1,22 @@
-import { CalendarPlus, CornerDownLeft, Inbox, Pencil, Trash2 } from "lucide-react";
+import { CalendarPlus, CornerDownLeft, Inbox, MapPin, Pencil, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useToast } from "../../components/toast";
-import { AreaChip, AreaSelect, Button, cx, Dialog, EmptyState, ErrorNote, Field, IconButton, Input, PageHeader, PriorityMark, Segmented, Select, Skeleton, StatusIcon } from "../../components/ui";
-import { ApiError, errorMessage, type Area, type Task, type TaskInput, type WorkMode } from "../../lib/api";
+import { AreaChip, AreaSelect, Button, cx, Dialog, EmptyState, ErrorNote, Field, IconButton, Input, OutsideToggle, PageHeader, PriorityMark, Segmented, Select, Skeleton, StatusIcon } from "../../components/ui";
+import { ApiError, errorMessage, type Area, type Status, type Task, type TaskInput, type WorkMode } from "../../lib/api";
 import { useDocumentTitle } from "../../lib/hooks";
 import { modeLabel, PRIORITIES, STATUSES, statusLabel, WORK_MODES } from "../../lib/labels";
 import { useAreas, useBacklog, useTaskMutations } from "../../lib/queries";
+import { outsideBuffer } from "../../lib/schedule";
+import { Board } from "./Board";
 import { formatDate, formatDuration, formatHours, fromMinutes, plannedMinutes, todayISO, toMinutes } from "../../lib/time";
 
 type Filter = "open" | "scheduled" | "done" | "all";
 const PRIORITY_RANK = { High: 0, Medium: 1, Low: 2 };
 const isOpen = (t: Task) => t.status !== "Done" && t.status !== "Skipped";
-const toInput = ({ title, focusAreaId, estimatedMinutes, priority, dueDate, status, nextStep }: Task): TaskInput => ({ title, focusAreaId, estimatedMinutes, priority, dueDate, status, nextStep });
+const toInput = ({ title, focusAreaId, estimatedMinutes, priority, dueDate, status, nextStep, workMode, isOutside, impact }: Task): TaskInput => ({ title, focusAreaId, estimatedMinutes, priority, dueDate, status, nextStep, workMode, isOutside, impact });
+const BLANK: TaskInput = { title: "", focusAreaId: null, estimatedMinutes: null, priority: "Medium", dueDate: null, status: "Planned", nextStep: "", workMode: "ShallowWork", isOutside: false, impact: "Medium" };
 
 export function BacklogPage() {
   useDocumentTitle("Backlog");
@@ -21,6 +24,8 @@ export function BacklogPage() {
   const tasks = useBacklog();
   const areas = useAreas();
   const { create, update, remove } = useTaskMutations();
+  const [params, setParams] = useSearchParams();
+  const view = params.get("view") === "list" ? "list" : "board";
   const [filter, setFilter] = useState<Filter>("open");
   const [capture, setCapture] = useState("");
   const [editing, setEditing] = useState<Task | "new" | null>(null);
@@ -43,11 +48,12 @@ export function BacklogPage() {
     if (!title) return;
     setCapture("");
     create.mutate(
-      { title, focusAreaId: null, estimatedMinutes: null, priority: "Medium", dueDate: null, status: "Planned", nextStep: "" },
+      { ...BLANK, title },
       { onError: (err) => { setCapture(title); toast.error(errorMessage(err)); } },
     );
   };
 
+  const move = (t: Task, status: Status) => update.mutate({ id: t.id, ...toInput(t), status }, { onError: (e) => toast.error(errorMessage(e)) });
   const toggleDone = (t: Task) => update.mutate({ id: t.id, ...toInput(t), status: isOpen(t) ? "Done" : "Planned" }, { onError: (e) => toast.error(errorMessage(e)) });
   const destroy = (t: Task) =>
     remove.mutate(t.id, {
@@ -61,7 +67,12 @@ export function BacklogPage() {
         eyebrow="Capture first, schedule second"
         title="Backlog"
         sub="Get it out of your head here. Only move a task onto the calendar when you can commit to it."
-        actions={<Button onClick={() => setEditing("new")}>Add with details</Button>}
+        actions={
+          <>
+            <Segmented label="View" size="sm" value={view} onChange={(v) => setParams(v === "board" ? {} : { view: v }, { replace: true })} options={[{ value: "board", label: "Board" }, { value: "list", label: "List" }]} />
+            <Button onClick={() => setEditing("new")}>Add with details</Button>
+          </>
+        }
       />
 
       <form className="capture" onSubmit={quickAdd}>
@@ -71,12 +82,12 @@ export function BacklogPage() {
       </form>
 
       <div className="backlog-bar">
-        <Segmented label="Show" size="sm" value={filter} onChange={setFilter} options={[
+        {view === "board" ? <p className="backlog-tip">Drag a card to another column to change its status.</p> : <Segmented label="Show" size="sm" value={filter} onChange={setFilter} options={[
           { value: "open", label: `Open ${open.length || ""}`.trim() },
           { value: "scheduled", label: "Scheduled" },
           { value: "done", label: "Closed" },
           { value: "all", label: "All" },
-        ]} />
+        ]} />}
         <p className="backlog-total">
           <strong className="mono">{formatHours(remaining)}h</strong> of estimated work remaining
           {unestimated > 0 && <span className="muted"> · {unestimated} without an estimate</span>}
@@ -87,6 +98,8 @@ export function BacklogPage() {
         <ErrorNote onRetry={() => tasks.refetch()}>We could not load your backlog.</ErrorNote>
       ) : tasks.isPending ? (
         <div className="card stack"><Skeleton height={52} radius={10} /><Skeleton height={52} radius={10} /><Skeleton height={52} radius={10} /></div>
+      ) : view === "board" && all.length > 0 ? (
+        <Board tasks={all} areaById={areaById} onMove={move} onOpen={setEditing} onSchedule={setScheduling} />
       ) : visible.length === 0 ? (
         <div className="card">
           <EmptyState icon={<Inbox size={22} />} title={all.length === 0 ? "Your backlog is clear" : "Nothing in this view"} body={all.length === 0 ? "Type anything that is on your mind into the box above. You decide later what deserves a time block." : "Try another filter to see the rest of your tasks."} />
@@ -105,6 +118,8 @@ export function BacklogPage() {
                     <AreaChip area={t.focusAreaId ? areaById.get(t.focusAreaId) : undefined} compact />
                     <PriorityMark priority={t.priority} />
                     {t.estimatedMinutes !== null && <span className="meta-mono">{formatDuration(t.estimatedMinutes)}</span>}
+                    {t.impact === "High" && <span className="impact-tag is-high">High impact</span>}
+                    {t.isOutside && <span className="outside-tag"><MapPin size={12} aria-hidden /> outside</span>}
                     {t.dueDate && <span className={cx("due", isOpen(t) && t.dueDate < todayISO() && "is-late")}>{isOpen(t) && t.dueDate < todayISO() ? "Overdue · " : "Due "}{formatDate(t.dueDate, "short")}</span>}
                     {t.scheduledDate && <span className="scheduled"><CalendarPlus size={12} aria-hidden /> {formatDate(t.scheduledDate, "medium")}</span>}
                     {t.status === "InProgress" && <span className="status-pill" data-status="InProgress"><StatusIcon status="InProgress" size={12} />In progress</span>}
@@ -134,7 +149,7 @@ export function BacklogPage() {
 
 function TaskForm({ task, areas, onClose }: { task: Task | null; areas: Area[]; onClose: () => void }) {
   const { create, update } = useTaskMutations();
-  const [form, setForm] = useState<TaskInput>(task ? toInput(task) : { title: "", focusAreaId: null, estimatedMinutes: null, priority: "Medium", dueDate: null, status: "Planned", nextStep: "" });
+  const [form, setForm] = useState<TaskInput>(task ? toInput(task) : BLANK);
   const [error, setError] = useState<ApiError | null>(null);
   const patch = (p: Partial<TaskInput>) => setForm((f) => ({ ...f, ...p }));
 
@@ -166,10 +181,18 @@ function TaskForm({ task, areas, onClose }: { task: Task | null; areas: Area[]; 
           <Field label="Due date" optional>{(p) => <Input {...p} type="date" value={form.dueDate ?? ""} onChange={(e) => patch({ dueDate: e.target.value || null })} />}</Field>
           <Field label="Status">{(p) => <Select {...p} value={form.status} onChange={(e) => patch({ status: e.target.value as TaskInput["status"] })}>{STATUSES.map((s) => <option key={s} value={s}>{statusLabel[s]}</option>)}</Select>}</Field>
         </div>
-        <div className="field">
-          <span className="field-label">Priority</span>
-          <Segmented size="sm" label="Priority" value={form.priority} onChange={(priority) => patch({ priority })} options={PRIORITIES.map((v) => ({ value: v, label: v }))} />
+        <div className="form-grid-2">
+          <Field label="Kind of work">{(p) => <Select {...p} value={form.workMode} onChange={(e) => patch({ workMode: e.target.value as WorkMode })}>{WORK_MODES.map((m) => <option key={m} value={m}>{modeLabel[m]}</option>)}</Select>}</Field>
+          <div className="field">
+            <span className="field-label">Priority</span>
+            <Segmented label="Priority" value={form.priority} onChange={(priority) => patch({ priority })} options={PRIORITIES.map((v) => ({ value: v, label: v }))} />
+          </div>
         </div>
+        <div className="field">
+          <span className="field-label">Outcome impact <span className="field-optional">how far does finishing this move you?</span></span>
+          <Segmented label="Outcome impact" value={form.impact} onChange={(impact) => patch({ impact })} options={PRIORITIES.map((v) => ({ value: v, label: v }))} />
+        </div>
+        <OutsideToggle checked={form.isOutside} onChange={(isOutside) => patch({ isOutside })} />
       </div>
       <footer className="dialog-foot">
         <Button onClick={onClose}>Cancel</Button>
@@ -183,8 +206,9 @@ function ScheduleForm({ task, onClose }: { task: Task; onClose: () => void }) {
   const toast = useToast();
   const navigate = useNavigate();
   const { schedule } = useTaskMutations();
-  const length = task.estimatedMinutes ?? 60;
-  const [form, setForm] = useState({ date: todayISO(), start: "09:00", end: fromMinutes(9 * 60 + length), workMode: "DeepFocus" as WorkMode });
+  // Outside work gets breathing room up front, because the physical world rarely runs to the minute.
+  const length = (task.estimatedMinutes ?? 60) + (task.isOutside ? outsideBuffer(task.estimatedMinutes ?? 60) : 0);
+  const [form, setForm] = useState({ date: todayISO(), start: "09:00", end: fromMinutes(9 * 60 + length), workMode: task.workMode });
   const [error, setError] = useState<string | null>(null);
   const planned = plannedMinutes(form.start, form.end);
 
@@ -210,7 +234,7 @@ function ScheduleForm({ task, onClose }: { task: Task; onClose: () => void }) {
           <Field label="End">{(p) => <Input {...p} type="time" step={300} required value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} />}</Field>
         </div>
         <p className="duration-read" aria-live="polite">
-          <strong>{formatDuration(planned)}</strong> planned{task.estimatedMinutes !== null && planned !== task.estimatedMinutes && <> · you estimated {formatDuration(task.estimatedMinutes)}</>}
+          <strong>{formatDuration(planned)}</strong> planned{task.estimatedMinutes !== null && planned !== task.estimatedMinutes && <> · you estimated {formatDuration(task.estimatedMinutes)}{task.isOutside && ", plus a buffer because it is outside work"}</>}
         </p>
         <Field label="Work mode">{(p) => <Select {...p} value={form.workMode} onChange={(e) => setForm({ ...form, workMode: e.target.value as WorkMode })}>{WORK_MODES.map((m) => <option key={m} value={m}>{modeLabel[m]}</option>)}</Select>}</Field>
       </div>

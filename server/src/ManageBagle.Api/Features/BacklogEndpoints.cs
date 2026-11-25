@@ -13,16 +13,21 @@ public record TaskRequest(
     Priority Priority,
     DateOnly? DueDate,
     ItemStatus Status,
-    [StringLength(200)] string? NextStep);
+    [StringLength(200)] string? NextStep,
+    WorkMode WorkMode = WorkMode.DeepFocus,
+    bool IsOutside = false,
+    Priority Impact = Priority.Medium,
+    int? Version = null,
+    [Range(0, 60)] int? BreakMinutes = null);
 
 public record ScheduleRequest(DateOnly Date, TimeOnly Start, TimeOnly End, WorkMode WorkMode);
 
 public record TaskResponse(
     Guid Id, string Title, Guid? FocusAreaId, int? EstimatedMinutes, Priority Priority, DateOnly? DueDate,
-    ItemStatus Status, string NextStep, DateOnly? ScheduledDate, DateTimeOffset CreatedAt)
+    ItemStatus Status, string NextStep, WorkMode WorkMode, bool IsOutside, Priority Impact, DateOnly? ScheduledDate, DateTimeOffset CreatedAt, int Version, int? BreakMinutes)
 {
     public static TaskResponse From(BacklogTask t) => new(
-        t.Id, t.Title, t.FocusAreaId, t.EstimatedMinutes, t.Priority, t.DueDate, t.Status, t.NextStep, t.ScheduledDate, t.CreatedAt);
+        t.Id, t.Title, t.FocusAreaId, t.EstimatedMinutes, t.Priority, t.DueDate, t.Status, t.NextStep, t.WorkMode, t.IsOutside, t.Impact, t.ScheduledDate, t.CreatedAt, t.Version, t.BreakMinutes);
 }
 
 public static class BacklogEndpoints
@@ -54,6 +59,7 @@ public static class BacklogEndpoints
             var uid = user.UserId();
             var task = await db.BacklogTasks.FirstOrDefaultAsync(t => t.Id == id && t.UserId == uid);
             if (task is null) return Results.NotFound();
+            if (Versioning.Check(db, task, req.Version) is { } stale) return stale;
             if (!await db.OwnsAreaAsync(uid, req.FocusAreaId)) return HttpExtensions.Invalid("focusAreaId", "That focus area does not exist.");
             Apply(task, req);
             await db.SaveChangesAsync();
@@ -80,11 +86,13 @@ public static class BacklogEndpoints
 
             var block = new TimeBlock
             {
-                UserId = uid, Date = req.Date, Start = req.Start, End = req.End, Title = task.Title,
-                FocusAreaId = task.FocusAreaId, Priority = task.Priority, WorkMode = req.WorkMode,
+                UserId = uid, Title = task.Title,
+                FocusAreaId = task.FocusAreaId, Priority = task.Priority, WorkMode = req.WorkMode, IsOutside = task.IsOutside,
                 Notes = task.NextStep.Length > 0 ? $"Next step: {task.NextStep}" : "", BacklogTaskId = task.Id,
             };
+            if (block.Schedule(req.Date, req.Start, req.End, await db.TimeZoneOf(uid, default)) is { } gap) return BlockEndpoints.NonexistentTime(gap);
             task.ScheduledDate = req.Date;
+            task.WorkMode = req.WorkMode;
             db.TimeBlocks.Add(block);
             await db.SaveChangesAsync();
             return Results.Created($"/api/blocks/{block.Id}", new { task = TaskResponse.From(task), block = BlockResponse.From(block) });
@@ -100,5 +108,9 @@ public static class BacklogEndpoints
         task.DueDate = req.DueDate;
         task.Status = req.Status;
         task.NextStep = req.NextStep?.Trim() ?? "";
+        task.WorkMode = req.WorkMode;
+        task.IsOutside = req.IsOutside;
+        task.Impact = req.Impact;
+        task.BreakMinutes = req.BreakMinutes;
     }
 }

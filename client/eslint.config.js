@@ -9,4 +9,12 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   reactHooks.configs.flat.recommended,
   { languageOptions: { globals: globals.browser } },
+  {
+    // Shared code knows nothing about features (handbook §4.3): features may use lib/ and components/,
+    // never the other way round.
+    files: ["src/lib/**", "src/components/**"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [{ group: ["**/features/**"], message: "Shared code must not depend on a feature. Move what is shared into lib/ or components/." }] }],
+    },
+  },
 );

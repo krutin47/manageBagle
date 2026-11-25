@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { addDays, formatDuration, formatHours, fromMinutes, isValidISODate, plannedMinutes, snap, toMinutes, weekDays, weekStart } from "./time";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { nowMinutes, setTimeZone, todayISO, addDays, formatDuration, formatHours, fromMinutes, isValidISODate, plannedMinutes, snap, toMinutes, weekDays, weekStart } from "./time";
 
 describe("time helpers", () => {
   it("finds the Monday of any week", () => {
@@ -45,3 +45,33 @@ describe("time helpers", () => {
     expect(isValidISODate("yesterday")).toBe(false);
   });
 });
+
+describe("the account's time zone", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    setTimeZone(null);
+  });
+
+  it("decides what 'today' and 'now' are, wherever the device is", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-15T02:30:00Z")); // one instant…
+    setTimeZone("America/Halifax");
+    expect(todayISO()).toBe("2026-11-14"); // …is still Saturday evening in Halifax
+    expect(nowMinutes()).toBe(22 * 60 + 30);
+    setTimeZone("Europe/London");
+    expect(todayISO()).toBe("2026-11-15"); // …and already Sunday in London
+    expect(nowMinutes()).toBe(2 * 60 + 30);
+    setTimeZone("Asia/Kolkata");
+    expect(nowMinutes()).toBe(8 * 60); // half-hour offsets work too
+  });
+
+  it("follows daylight saving in that zone", () => {
+    vi.useFakeTimers();
+    setTimeZone("America/Halifax");
+    vi.setSystemTime(new Date("2026-03-08T05:59:00Z"));
+    expect(nowMinutes()).toBe(1 * 60 + 59); // 01:59 standard time
+    vi.setSystemTime(new Date("2026-03-08T06:00:00Z"));
+    expect(nowMinutes()).toBe(3 * 60); // the clock jumps straight to 03:00
+  });
+});
+

@@ -8,6 +8,7 @@ services:
       POSTGRES_PASSWORD: managebagle
       POSTGRES_DB: managebagle_dev
     ports:
+      # Host port 5434 (5432 was taken on the development machine); inside Docker it is still 5432.
       - "5434:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
@@ -25,10 +26,14 @@ services:
         condition: service_healthy
     environment:
       # Development here only so sign-in cookies work over plain http://localhost.
+      # In this mode migrations run at startup and emails are written to /app/.mail and to the log.
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__Default: Host=db;Port=5434;Database=managebagle_dev;Username=managebagle;Password=managebagle
+      # Containers talk to each other on the container port, not the host-mapped one.
+      ConnectionStrings__Default: Host=db;Port=5432;Database=managebagle_dev;Username=managebagle;Password=managebagle
       Authentication__Google__ClientId: ${GOOGLE_CLIENT_ID:-}
       Authentication__Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
+      Authentication__Microsoft__ClientId: ${MICROSOFT_CLIENT_ID:-}
+      Authentication__Microsoft__ClientSecret: ${MICROSOFT_CLIENT_SECRET:-}
     ports:
       - "8080:8080"
 

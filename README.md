@@ -6,15 +6,22 @@ A web version of the *Time-Blocking Command Center* workbook.
 | Workbook tab | In the app |
 |---|---|
 | START HERE | **Guide** – the daily loop and recommended block sizes |
-| DAILY FOCUS | **Today** – your big three outcomes, the day's schedule, end-of-day review |
+| DAILY FOCUS | **Today** – brain dump, your top three, the day's schedule, what is due soon · **Review** – optional end-of-day review |
 | TIME BLOCKS | **Planner** – week calendar or list; planned vs. actual minutes and variance |
 | WEEKLY HQ | **Week** – totals, daily scorecard, time by life area, day themes |
-| TASK BACKLOG | **Backlog** – capture first, schedule second |
+| TASK BACKLOG | **Backlog** – kanban board or list; capture first, schedule second |
 | SETTINGS | **Settings** – focus areas, plus profile, security and theme |
 
 The workbook's formulas are kept: a block that ends before it starts runs past midnight, an
 empty "actual minutes" means *not recorded* (never zero), and every dashboard number is derived
 from the time blocks.
+
+**Working on the code? Read [AGENTS.md](AGENTS.md) first.** The engineering standard is the handbook in
+`docs/handbook/`; what has been adopted so far is tracked in [docs/handbook-status.md](docs/handbook-status.md),
+and the decisions are in [docs/adr/](docs/adr/README.md).
+
+**New here? Start with [docs/project-overview.md](docs/project-overview.md)** — what the app is, how it is
+built, the standards it follows, every feature so far, and what is still open.
 
 ## Stack
 
@@ -44,8 +51,10 @@ cd client && npm install && npm run dev
 ```
 
 Open http://localhost:5173. The dev server proxies `/api` to the API on port 5242, and the
-database schema is created on first start. Password-reset emails are written to the API log
-until SMTP is configured.
+database schema is created on first start.
+
+**Signing up locally:** a new account must confirm its email. With no SMTP configured, the email is
+printed in the API's console and saved under `server/src/ManageBagle.Api/.mail/` — open the link from there.
 
 To run the production image instead: `docker compose --profile app up --build`, then open
 http://localhost:8080.
@@ -60,14 +69,21 @@ cd client && npm run lint && npm run typecheck && npm test
 dotnet test server/ManageBagle.slnx
 ```
 
+```bash
+cd e2e && npm ci && npx playwright test
+```
+
+The end-to-end tests start the API and the client themselves and need PostgreSQL running.
+
 The client tests include the WCAG contrast checks for every colour pairing in both themes. The
 API tests boot the real application against a throwaway PostgreSQL database (set
 `MB_TEST_POSTGRES` to point at a different server).
 
 ## Sign-in
 
-Email + password, Google, and two-step verification (authenticator app with recovery codes).
-Setup for Google and SMTP, and the security model, are in [docs/authentication.md](docs/authentication.md).
+Email + password, Google, Microsoft, and two-step verification (authenticator app with recovery
+codes). The Google and Microsoft buttons appear only once their credentials are configured.
+Setup for both and for SMTP, and the security model, are in [docs/authentication.md](docs/authentication.md).
 
 ## Branches and releases
 
@@ -84,3 +100,4 @@ See [docs/deployment.md](docs/deployment.md) for configuration and branch protec
 ## Design
 
 Colour tokens, type and motion rules are described in [docs/design-system.md](docs/design-system.md).
+The brain-dump flow and what is planned next are in [docs/plan-brain-dump.md](docs/plan-brain-dump.md).

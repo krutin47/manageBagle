@@ -6,11 +6,11 @@ import { useDocumentTitle } from "../../lib/hooks";
 import { useUser } from "../../lib/queries";
 
 const LOOP = [
-  { title: "Choose outcomes", body: "Pick your three outcomes for the day — not fifteen unrelated tasks.", to: "/", cta: "Open Today" },
+  { title: "Brain dump, then choose three", body: "Empty your head on Today, then pick the three outcomes with the highest value — not fifteen unrelated tasks.", to: "/", cta: "Open Today" },
   { title: "Make appointments", body: "Give each outcome a date, a start and an end. Use 5, 15, 30 or 60+ minute slots.", to: "/planner", cta: "Open Planner" },
   { title: "Batch similar work", body: "Protect one or two deep-focus blocks. Cluster email, errands and admin together.", to: "/planner", cta: "Open Planner" },
   { title: "Track reality", body: "Log the actual minutes and mark blocks done or skipped. The variance works itself out.", to: "/", cta: "Open Today" },
-  { title: "Review and adjust", body: "Check the week. Keep what works and change what keeps running over.", to: "/week", cta: "Open Week" },
+  { title: "Review and adjust", body: "Five optional minutes at the end of the day; once a week, check the bigger picture. Keep what works and change what keeps running over.", to: "/review", cta: "Open Review" },
 ];
 
 const SIZES = [

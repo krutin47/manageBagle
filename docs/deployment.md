@@ -13,20 +13,35 @@ All settings are environment variables (double underscore = nesting).
 | `ConnectionStrings__Default` | yes | PostgreSQL, e.g. `Host=…;Database=managebagle;Username=…;Password=…;SSL Mode=Require` |
 | `App__PublicUrl` | yes | e.g. `https://app.example.com` – used in emailed links |
 | `Authentication__Google__ClientId` / `…ClientSecret` | no | enables Google sign-in |
+| `Authentication__Microsoft__ClientId` / `…ClientSecret` | no | enables Microsoft sign-in |
 | `Smtp__Host`, `Smtp__Port`, `Smtp__Username`, `Smtp__Password`, `Smtp__From` | recommended | password-reset email |
-| `Database__MigrateOnStartup` | no | default `true`. Set `false` if you run more than one instance and apply migrations as a release step. |
+| `Database__MigrateOnStartup` | no | default `false`. Run migrations as a release step: `<image> --migrate`. `true` is for development. |
+| `ForwardedHeaders__KnownProxies`, `…__KnownNetworks` | **yes behind a proxy** | comma-separated IPs / CIDRs of your ingress. Only loopback is trusted by default; without this the app sees every request as plain HTTP and refuses writes. |
+| `AllowedHosts` | recommended | your public host name(s) |
+| `Security__AllowedOrigins__0` | no | extra origins allowed to send writes (normally none) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | no | turns on trace and metric export to a collector |
+| `Auth__IdleSessionDays`, `Auth__AbsoluteSessionDays` | no | default 14 and 30 |
+| `Auth__SessionRevalidateSeconds` | no | default 60: how soon a password change ends other sessions |
+| `Auth__MfaResetDelayHours` | no | default 72: wait before a lost-second-factor recovery can finish |
 | `RateLimits__AuthPerMinute` | no | default `20` |
+| `RateLimits__CalendarFetchPerMinute` | no | default `6` per account: reading connected calendars |
+| `Testing__ClockControl` | **never in UAT/Production** | lets browser tests move the server clock; the app refuses to start with it in Production |
 
 Use a **separate database and separate Google OAuth client** for UAT and production.
 
-Health endpoint: `GET /healthz` (checks the database). The image also has a Docker `HEALTHCHECK`.
+Probes: `/health/live` (process up) and `/health/ready` (database reachable and schema current).
+The image's Docker `HEALTHCHECK` uses liveness. Release, rollback and backup steps are in
+[runbooks/](runbooks/).
 
 ### Things to know
 
 - The cookie-encryption keys are stored in the database, so restarts and multiple instances keep
   users signed in.
-- The app trusts `X-Forwarded-For` / `X-Forwarded-Proto` from whatever is in front of it. Do not
-  expose port 8080 directly to the internet; put it behind your proxy.
+- Do not expose port 8080 to the internet. TLS ends at your ingress, and the app trusts
+  `X-Forwarded-*` only from the addresses you list (see the table above).
+- **Outbound HTTPS** is needed for connected calendars (P2-D2). The calendar reader connects directly — it does not use an HTTP proxy, so it can check each address it connects to — and refuses private and loopback addresses.
+- Set `App__PublicUrl`: calendar subscription links and emailed links are built from it, and calendar apps need a public address.
+- Logs are JSON, one line per event, with a trace id that also appears in error responses.
 - Applying a schema change by hand:
   `dotnet ef database update --project server/src/ManageBagle.Api` (after `dotnet tool restore` in `server/`).
 

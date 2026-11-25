@@ -1,4 +1,4 @@
-import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDashed, CircleDot, Loader2, Minus, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDashed, CircleDot, Loader2, MapPin, Minus, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { Dialog as RDialog } from "radix-ui";
 import { forwardRef, useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
@@ -149,6 +149,20 @@ export function Segmented<T extends string>({ label, value, options, onChange, s
   );
 }
 
+/** Marks work that happens out in the physical world, where queues and travel stretch the clock. */
+export function OutsideToggle({ checked, onChange, compact }: { checked: boolean; onChange: (next: boolean) => void; compact?: boolean }) {
+  return (
+    <label className={cx("outside-toggle", checked && "is-on", compact && "is-compact")} title="Outside work: errands, travel, appointments. It may take longer than planned.">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <MapPin size={15} aria-hidden />
+      <span>
+        Outside work
+        {!compact && <small>Errands, travel, appointments — the physical world may make it run long.</small>}
+      </span>
+    </label>
+  );
+}
+
 // ---- Dialog ----------------------------------------------------------------------------------
 
 interface DialogProps {
@@ -157,7 +171,7 @@ interface DialogProps {
   title: string;
   description?: string;
   children: ReactNode;
-  width?: "sm" | "md";
+  width?: "sm" | "md" | "lg" | "xl";
 }
 
 export function Dialog({ open, onClose, title, description, children, width = "md" }: DialogProps) {

@@ -1,10 +1,10 @@
-import { CircleAlert, CircleCheck, X } from "lucide-react";
+import { Bell, CircleAlert, CircleCheck, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 
 interface Toast {
   id: number;
-  kind: "success" | "error";
+  kind: "success" | "error" | "info";
   message: string;
   action?: { label: string; run: () => void };
 }
@@ -12,6 +12,7 @@ interface Toast {
 interface ToastApi {
   success: (message: string, action?: Toast["action"]) => void;
   error: (message: string) => void;
+  info: (message: string) => void;
 }
 
 const ToastContext = createContext<ToastApi | null>(null);
@@ -25,7 +26,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (toast: Omit<Toast, "id">) => {
       const id = nextId.current++;
       setToasts((list) => [...list.slice(-2), { ...toast, id }]);
-      window.setTimeout(() => dismiss(id), toast.kind === "error" || toast.action ? 7000 : 3500);
+      window.setTimeout(() => dismiss(id), toast.kind === "success" && !toast.action ? 3500 : 7000);
     },
     [dismiss],
   );
@@ -34,6 +35,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     () => ({
       success: (message, action) => push({ kind: "success", message, action }),
       error: (message) => push({ kind: "error", message }),
+      info: (message) => push({ kind: "info", message }),
     }),
     [push],
   );
@@ -55,7 +57,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
               transition={{ type: "spring", stiffness: 480, damping: 36 }}
             >
-              {t.kind === "success" ? <CircleCheck size={18} aria-hidden /> : <CircleAlert size={18} aria-hidden />}
+              {t.kind === "success" ? <CircleCheck size={18} aria-hidden /> : t.kind === "info" ? <Bell size={18} aria-hidden /> : <CircleAlert size={18} aria-hidden />}
               <span className="toast-msg">{t.message}</span>
               {t.action && (
                 <button
