@@ -96,6 +96,18 @@ export interface Task {
   breakMinutes: number | null;
 }
 
+/** AI brain dump (ADR-020). */
+export interface AiStatus { enabled: boolean; remainingToday: number }
+export interface TaskSuggestion {
+  title: string;
+  estimatedMinutes: number | null;
+  workMode: WorkMode;
+  focusAreaId: string | null;
+  impact: Priority;
+  dueDate: string | null;
+  isOutside: boolean;
+}
+
 /** One line of a brain dump. */
 export type CaptureItem = Pick<Task, "title" | "estimatedMinutes" | "focusAreaId" | "workMode" | "isOutside" | "priority" | "impact" | "dueDate" | "breakMinutes">;
 

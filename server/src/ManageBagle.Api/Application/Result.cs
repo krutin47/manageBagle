@@ -7,6 +7,10 @@ public enum FailureKind
     Validation,
     NotFound,
     Conflict,
+    /// <summary>A per-person limit was reached; trying later works (HTTP 429).</summary>
+    Limited,
+    /// <summary>The feature is switched off or paused for everyone (HTTP 503).</summary>
+    Unavailable,
 }
 
 /// <summary>
@@ -22,6 +26,10 @@ public sealed record Failure(FailureKind Kind, string Code, string Message, stri
     public static Failure NotFound(string message = "We could not find that. It may have been deleted.") => new(FailureKind.NotFound, "not_found", message);
 
     public static Failure Conflict(string code, string message) => new(FailureKind.Conflict, code, message);
+
+    public static Failure Limited(string code, string message) => new(FailureKind.Limited, code, message);
+
+    public static Failure Unavailable(string code, string message) => new(FailureKind.Unavailable, code, message);
 
     public static Failure NonexistentTime(CivilTime.Span.Nonexistent gap) => new(
         FailureKind.Validation, "nonexistent_local_time",

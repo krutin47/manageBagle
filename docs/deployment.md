@@ -28,6 +28,10 @@ All settings are environment variables (double underscore = nesting).
 | `RateLimits__RequestsPerMinute` | no | default `1200` per account (or per address when signed out), every `/api` call |
 | `Push__Subject` | no | contact address push services see (a URL or `mailto:`); defaults to `App__PublicUrl` |
 | `Push__SchedulerEnabled` | no | default `true`: sends reminders while the app is closed (ADR-019) |
+| `Ai__AnthropicApiKey` | no | turns on "Turn into tasks" in the brain dump (ADR-020) |
+| `Ai__Model` | no | default `claude-opus-5-5`; `claude-haiku-5-5` costs about 1/40th as much |
+| `Ai__MonthlyBudgetUsd`, `Ai__DailyLimitPerUser` | no | defaults `10` and `20`; the feature pauses when either is reached |
+| `Testing__ScriptedAi` | **never in UAT/Production** | browser tests only: a stand-in model; the app refuses to start with it in Production |
 | `Retention__AuditMonths` | no | default `0` (keep). Deletes account activity older than this many months, daily ([data-inventory.md](data-inventory.md)) |
 | `Database__MaxPoolSize` | no | default `30` connections per instance, unless the connection string sets `Maximum Pool Size`. Keep instances × pool + 10 ≤ PostgreSQL `max_connections` ([performance.md](performance.md)) |
 | `RateLimits__CalendarFetchPerMinute` | no | default `6` per account: reading connected calendars |

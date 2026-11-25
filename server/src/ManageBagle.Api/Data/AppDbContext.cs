@@ -24,6 +24,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
     public DbSet<PushKey> PushKeys => Set<PushKey>();
     public DbSet<PushDelivery> PushDeliveries => Set<PushDelivery>();
+    public DbSet<AiUsage> AiUsage => Set<AiUsage>();
 
     /// <summary>
     /// A task's status changes in many places (board, timer, blocks, outcomes), so when it closed is
@@ -240,6 +241,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.Key).HasMaxLength(120);
             e.HasIndex(x => new { x.UserId, x.Key, x.DueAt }).IsUnique(); // the "send once" guarantee
             e.HasIndex(x => x.SentAt); // clean-up of old rows
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<AiUsage>(e =>
+        {
+            e.Property(x => x.Model).HasMaxLength(60);
+            e.Property(x => x.CostUsd).HasPrecision(12, 6);
+            e.HasIndex(x => x.At); // this month's spend
+            e.HasIndex(x => new { x.UserId, x.At }); // one person's calls today
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }

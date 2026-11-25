@@ -15,6 +15,11 @@ export interface AccountExport {
   activity: AuditEventResponse[];
 }
 
+export interface AiStatus {
+  enabled: boolean;
+  remainingToday: number;
+}
+
 export interface AreaRequest {
   name: string;
   color: string;
@@ -450,6 +455,15 @@ export interface StatusResponse {
 
 export type StopOutcome = "Finished" | "Later" | "Drop";
 
+export interface SuggestTasksRequest {
+  text: string;
+}
+
+export interface SuggestTasksResponse {
+  tasks: TaskSuggestion[];
+  remainingToday: number;
+}
+
 export type TaskPolicy = "NoTasks" | "AnyTask" | "SelectedAreas";
 
 export interface TaskRequest {
@@ -483,6 +497,16 @@ export interface TaskResponse {
   createdAt: string;
   version: number;
   breakMinutes: number | null;
+}
+
+export interface TaskSuggestion {
+  title: string;
+  estimatedMinutes: number | null;
+  workMode: WorkMode;
+  focusAreaId: string | null;
+  impact: Priority;
+  dueDate: string | null;
+  isOutside: boolean;
 }
 
 export interface ThemeRequest {

@@ -22,6 +22,44 @@ namespace ManageBagle.Api.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("ManageBagle.Api.Data.AiUsage", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("CostUsd")
+                        .HasPrecision(12, 6)
+                        .HasColumnType("numeric(12,6)");
+
+                    b.Property<int>("InputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<int>("OutputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("At");
+
+                    b.HasIndex("UserId", "At");
+
+                    b.ToTable("AiUsage");
+                });
+
             modelBuilder.Entity("ManageBagle.Api.Data.AppUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -929,6 +967,15 @@ namespace ManageBagle.Api.Data.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("ManageBagle.Api.Data.AiUsage", b =>
+                {
+                    b.HasOne("ManageBagle.Api.Data.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("ManageBagle.Api.Data.AuditEvent", b =>

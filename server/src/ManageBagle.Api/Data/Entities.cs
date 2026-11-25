@@ -297,3 +297,15 @@ public class PushDelivery
     public DateTimeOffset DueAt { get; set; }
     public DateTimeOffset SentAt { get; set; }
 }
+
+/// <summary>One call to the AI model: what it cost, for the monthly budget and the daily limit (ADR-020). Holds no text.</summary>
+public class AiUsage
+{
+    public long Id { get; set; }
+    public Guid UserId { get; set; }
+    public DateTimeOffset At { get; set; }
+    public string Model { get; set; } = "";
+    public int InputTokens { get; set; }
+    public int OutputTokens { get; set; }
+    public decimal CostUsd { get; set; }
+}

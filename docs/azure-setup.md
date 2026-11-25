@@ -116,6 +116,11 @@ project; nothing to do for that yet.
 
 Without the key, "Turn into tasks" is hidden and the brain dump works as it does today.
 
+**Which model.** The default is Claude Opus 5.5: at roughly US$0.01–0.03 a use, US$10 covers several
+hundred uses a month. Claude Haiku 5.5 costs about 1/40th as much (thousands of uses for the same
+US$10) and is likely good enough for this simple extraction, though it is a smaller model. To switch,
+add the variable `AI_MODEL` = `claude-haiku-5-5` in the environment and redeploy.
+
 ## Reference: every setting
 
 | Name | Kind | Needed for |
@@ -128,6 +133,7 @@ Without the key, "Turn into tasks" is hidden and the brain dump works as it does
 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | variable / secret | Microsoft sign-in |
 | `SENTRY_DSN` | secret | error monitoring |
 | `ANTHROPIC_API_KEY` | secret | AI brain dump |
+| `AI_MODEL` | variable | optional: `claude-haiku-5-5` for a cheaper model |
 | `GHCR_PULL_TOKEN` | secret | only if the image package stays private |
 
 Settings fixed in the template: logs kept 30 days, database backups 35 days, account activity 13

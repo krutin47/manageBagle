@@ -668,3 +668,12 @@
 
 .push-control { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .push-control .muted { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; flex-basis: 100%; }
+
+/* ---- AI brain dump and dictation (ADR-020) ---- */
+.dump-free { display: grid; gap: 10px; }
+.dump-free-text { min-height: 120px; resize: vertical; font-size: 15px; line-height: 1.5; padding: 12px 14px; }
+.dump-free-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dump-free-note { flex: 1 1 240px; font-size: 13px; color: var(--ink-2); }
+.mic-btn { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: var(--ink-2); border: 1px solid var(--line); background: var(--surface); flex-shrink: 0; transition: background-color var(--t-fast), color var(--t-fast); }
+.mic-btn:hover { color: var(--ink); background: var(--hover); }
+.mic-btn.is-listening { background: var(--bad); color: var(--surface); border-color: var(--bad); animation: pulse-ring 1.6s var(--ease-out) infinite; }

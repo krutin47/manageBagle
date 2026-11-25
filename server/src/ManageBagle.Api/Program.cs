@@ -165,6 +165,19 @@ builder.Services.AddScoped<AccountLinks>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Planning.PlanDay>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Planning.CaptureTasks>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Tasks.ChangeTaskStatus>();
+// AI brain dump (ADR-020): off unless Ai:AnthropicApiKey is set; spend capped per month and per person per day.
+builder.Services.AddSingleton(new ManageBagle.Api.Application.Ai.AiOptions(
+    config["Ai:Model"] ?? "claude-opus-5-5", config.GetValue("Ai:MonthlyBudgetUsd", 10m), config.GetValue("Ai:DailyLimitPerUser", 20)));
+if (ManageBagle.Api.Infrastructure.Ai.ScriptedSuggestionModel.Enabled(config))
+{
+    if (builder.Environment.IsProduction()) throw new InvalidOperationException("Testing:ScriptedAi must never be enabled in Production.");
+    builder.Services.AddSingleton<ManageBagle.Api.Application.Ai.ITaskSuggestionModel, ManageBagle.Api.Infrastructure.Ai.ScriptedSuggestionModel>();
+}
+else
+{
+    builder.Services.AddSingleton<ManageBagle.Api.Application.Ai.ITaskSuggestionModel, ManageBagle.Api.Infrastructure.Ai.ClaudeTaskSuggestionModel>();
+}
+builder.Services.AddScoped<ManageBagle.Api.Application.Ai.SuggestTasks>();
 // Notifications while the app is closed (ADR-019).
 builder.Services.AddScoped<ManageBagle.Api.Infrastructure.Push.PushService>();
 builder.Services.AddScoped<ManageBagle.Api.Infrastructure.Push.PushReminders>();
@@ -288,6 +301,7 @@ app.MapSummaryEndpoints();
 app.MapClientErrorEndpoints();
 app.MapAccountExportEndpoints();
 app.MapPushEndpoints();
+app.MapAiEndpoints();
 if (TestClock.Enabled(config)) app.MapTestClock();
 
 app.MapFallback("/api/{**path}", () => HttpExtensions.Problem(StatusCodes.Status404NotFound, ErrorCodes.NotFound, "There is nothing at this address."));

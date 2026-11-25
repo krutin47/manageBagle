@@ -40,6 +40,8 @@ param microsoftClientSecret string = ''
 param sentryDsn string = ''
 @secure()
 param anthropicApiKey string = ''
+@description('Model for the AI brain dump; empty uses the app default (claude-opus-5-5).')
+param aiModel string = ''
 
 @description('Only if the image package is private: a GitHub token with read:packages.')
 @secure()
@@ -139,6 +141,7 @@ var plainEnv = [
   { name: 'Smtp__From', value: smtpFrom }
   { name: 'Authentication__Google__ClientId', value: googleClientId }
   { name: 'Authentication__Microsoft__ClientId', value: microsoftClientId }
+  { name: 'Ai__Model', value: aiModel }
   { name: 'Push__Subject', value: url } // identifies the sender to browser push services
 ]
 var secretEnv = [

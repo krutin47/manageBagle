@@ -35,6 +35,8 @@ export type Checks = [
   Assert<Matches<Api.Day, Contract.DayResponse>>,
   Assert<Matches<Api.Theme, Contract.ThemeResponse>>,
   Assert<Matches<Api.WeekSummary, Contract.WeekSummaryResponse>>,
+  Assert<Matches<Api.AiStatus, Contract.AiStatus>>,
+  Assert<Matches<Api.TaskSuggestion, Contract.TaskSuggestion>>,
   // Requests: what the client sends.
   Assert<Sends<Api.PlanItem, Contract.PlanItem>>,
   Assert<Sends<Api.CaptureItem, Contract.CaptureItem>>,

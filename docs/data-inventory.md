@@ -19,14 +19,21 @@ Updated 2026-11-25
 | Notification subscriptions (push service address and the browser's public keys) | `PushSubscriptions` | reminders while the app is closed | until turned off, signed out on that browser, rejected by the push service, or the account is deleted | device identifier |
 | Sent-reminder records | `PushDeliveries` | send each reminder once | 2 days | no content |
 | Notification keys (VAPID; private half encrypted) | `PushKeys` | sign notifications | until replaced | no |
+| AI usage records (model, token counts, cost; no text) | `AiUsage` | monthly budget and daily limit | 13 months, with account activity (`Retention__AuditMonths`) | account id only |
 | Idempotency records for "plan my day" | `IdempotencyRecords` | a repeated click saves once | 24 hours, then purged | no content beyond the plan |
 | Cookie-encryption keys | `DataProtectionKeys` | keep people signed in across restarts | managed by ASP.NET Core (90-day key lifetime) | no |
 | Application logs | wherever the host collects stdout | diagnosing faults | **set by the hosting platform; proposed 30 days** | route templates, user ids, trace ids and browser error messages — no request bodies, emails or task text |
 | Database backups | backup storage | recovery | **proposed: 35 days** (`scripts/backup.sh`) | yes, everything above |
 | Browser storage | the person's browser | unsaved brain dump (session only), theme, "already asked" flags | until the tab or browser clears it | the draft text |
 
-No analytics, advertising or third-party tracking. Nothing is sent to an AI model (P3-AI is not built;
-ADR-012 requires opt-in).
+No analytics, advertising or third-party tracking.
+
+**AI brain dump (ADR-020):** only when the person presses "Turn into tasks", that text, today's date
+and the names of their focus areas are sent to Anthropic's Claude; the reply is shown as suggestions
+and the text is not stored by the app. Anthropic's handling: see its commercial terms (API inputs are
+not used for training). **Dictation** uses the browser's speech recognition: in Chrome and Edge the
+audio goes to the browser maker's speech service, in Safari to Apple's; manageBagle never receives
+audio.
 
 ## The person's rights, in the product
 

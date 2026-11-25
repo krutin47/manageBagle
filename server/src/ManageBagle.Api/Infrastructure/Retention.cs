@@ -14,7 +14,9 @@ public sealed class RetentionService(IServiceScopeFactory scopes, IConfiguration
     {
         if (auditMonths <= 0) return 0;
         var cutoff = now.AddMonths(-auditMonths);
-        return await db.AuditEvents.Where(e => e.At < cutoff).ExecuteDeleteAsync(ct);
+        // AI usage records (cost only, no text) follow the same period.
+        return await db.AuditEvents.Where(e => e.At < cutoff).ExecuteDeleteAsync(ct)
+            + await db.AiUsage.Where(u => u.At < cutoff).ExecuteDeleteAsync(ct);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

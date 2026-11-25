@@ -50,7 +50,7 @@ jobs:
                smtpHost="${{ vars.SMTP_HOST }}" smtpUsername="${{ vars.SMTP_USERNAME }}" smtpFrom="${{ vars.SMTP_FROM }}" smtpPassword="$SMTP_PASSWORD" \
                googleClientId="${{ vars.GOOGLE_CLIENT_ID }}" googleClientSecret="$GOOGLE_CLIENT_SECRET" \
                microsoftClientId="${{ vars.MICROSOFT_CLIENT_ID }}" microsoftClientSecret="$MICROSOFT_CLIENT_SECRET" \
-               sentryDsn="$SENTRY_DSN" anthropicApiKey="$ANTHROPIC_API_KEY" \
+               sentryDsn="$SENTRY_DSN" anthropicApiKey="$ANTHROPIC_API_KEY" aiModel="${{ vars.AI_MODEL }}" \
                ghcrUsername="${{ github.repository_owner }}" ghcrPullToken="$GHCR_PULL_TOKEN" \
             --query properties.outputs -o json > outputs.json
           echo "url=$(jq -r .appUrl.value outputs.json)" >> "$GITHUB_OUTPUT"

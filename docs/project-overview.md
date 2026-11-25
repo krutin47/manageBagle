@@ -298,7 +298,7 @@ be done in code is done; what is left needs a decision or an account only the ow
 | **Container registry** | To publish and sign release images. |
 | **Expected peak users** | To agree response-time objectives ([performance.md](performance.md)). |
 | **Retention periods** | Proposed in [data-inventory.md](data-inventory.md): activity 13 months, backups 35 days, logs 30 days. |
-| **AI brain dump** (paragraph, voice, photo) | Needs a model provider, a budget and a privacy stance (ADR-012). |
+| **AI model choice** | Built on Claude Opus 5.5 within the US$10 cap; Claude Haiku 5.5 would allow about 40 times more uses. Your call (`AI_MODEL`, see azure-setup.md). |
 | **Prettier** | Adopting it reformats every file in one change. |
 
 ### Blocked by tooling

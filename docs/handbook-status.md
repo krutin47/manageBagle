@@ -90,7 +90,8 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | P2-F1–F2 | Today: "now" and a rolling top three | Done | `rollingTopThree` pure function with tests; browser test finishes #1 and sees the next move up |
 | P2-G1 | Board columns follow what happens on Today | Done | `TaskCompletion.AfterSessionChanged` (domain tests); timer start, block status and outcome tick/drop (API tests) |
 | P2-H1 | Calendar shows breaks before and after, routines, meetings, with a legend | Done | browser test checks routine label, break, key and list view |
-| P3-AI1–AI3 | Brain dump from a paragraph, voice or photo | Phase 3 | ADR-012 |
+| P3-AI1–AI2 | Brain dump from a paragraph or by voice | Done · **needs the API key** | ADR-020: suggestions only, schema-constrained, checked again by the server; US$10 monthly cap and daily limit (tested with a stand-in model; browser test with a scripted one). Not yet run against the real API: no key here |
+| P3-AI3 | Brain dump from a photo | Not started | not requested in this round |
 
 ## Phase 3 — reliability and capacity
 

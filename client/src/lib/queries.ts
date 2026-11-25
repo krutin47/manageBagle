@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
-  api, UnauthorizedError, type CaptureItem,
+  api, UnauthorizedError, type CaptureItem, type AiStatus, type TaskSuggestion,
   type Area, type AreaColor, type Block, type CalendarConnection, type CalendarFeed, type Commitment, type Preferences, type Routine, type RoutineInput, type BlockInput, type Day, type DayName, type Outcome, type PlanItem, type ProviderKey,
   type Review, type Status, type StopOutcome, type Task, type TaskInput, type Theme, type TimerSnapshot, type User, type WeekSummary, type WorkMode,
 } from "./api";
@@ -30,6 +30,7 @@ export const keys = {
   themes: ["themes"] as const,
   backlog: ["backlog"] as const,
   timer: ["timer"] as const,
+  ai: ["ai"] as const,
   routines: ["routines"] as const,
   commitments: {
     all: ["commitments"] as const,
@@ -307,6 +308,19 @@ export function useBacklog(history: "recent" | "all" = "recent") {
     queryKey: history === "all" ? [...keys.backlog, "all"] : keys.backlog,
     queryFn: ({ signal }) => api<Task[]>(history === "all" ? "/backlog?history=all" : "/backlog", { signal }),
     staleTime: STALE.planning,
+  });
+}
+
+/** Whether "Turn into tasks" is available, and how many uses are left today (ADR-020). */
+export function useAiStatus() {
+  return useQuery({ queryKey: keys.ai, queryFn: ({ signal }) => api<AiStatus>("/ai/status", { signal }), staleTime: STALE.reference });
+}
+
+export function useSuggestTasks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (text: string) => api<{ tasks: TaskSuggestion[]; remainingToday: number }>("/ai/suggest-tasks", { method: "POST", body: { text } }),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.ai }),
   });
 }
 

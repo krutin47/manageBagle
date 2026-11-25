@@ -49,6 +49,7 @@ export default defineConfig({
         Auth__MfaResetDelayHours: "0",
         // Lets tests move the server's clock together with the browser's (never available in Production).
         Testing__ClockControl: "true",
+        Testing__ScriptedAi: "true", // the "Write freely" flow without calling a real model (ADR-020)
       },
     },
     {
