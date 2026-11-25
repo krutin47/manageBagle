@@ -1,4 +1,4 @@
-import { CalendarCheck, CalendarClock, CalendarDays, CalendarPlus, Check, Clock, Coffee, MapPin, NotebookPen, Pencil, Plus, Repeat, RotateCcw, Trash2, Utensils } from "lucide-react";
+import { CalendarCheck, CalendarClock, CalendarDays, CalendarPlus, Check, Clock, Clock3, Coffee, MapPin, NotebookPen, Pencil, Play, Plus, Repeat, RotateCcw, Trash2, Utensils } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { DropdownMenu } from "radix-ui";
 import { useMemo, useState, type FormEvent } from "react";
@@ -14,7 +14,7 @@ import { addDays, nowMinutes, formatDate, formatDuration, formatHours, fromMinut
 import { BlockDialog, type BlockDraft } from "../planner/BlockDialog";
 import { Variance } from "../planner/PlannerPage";
 import { useBrainDump } from "../capture/BrainDump";
-import { TimerButton, useFocusTimer } from "../timer/TimerProvider";
+import { RunningTag, TimerButton, useFocusTimer } from "../timer/TimerProvider";
 import { dueLabel, PlanDayDialog, valueScore } from "./PlanDayDialog";
 import { rollingTopThree, type FocusItem } from "./topThree";
 
@@ -49,7 +49,7 @@ export function TodayPage() {
   const theme = themes.data?.find((t) => t.day === DAY_NAMES[parseISODate(date).getDay()]);
   const commitments = useCommitments(date);
   const routineBands = useMemo(() => commitmentsOn(date, commitments.data ?? []).map((c) => ({
-    title: c.title, start: c.start, end: c.end, isMeal: c.source.isMeal, policy: c.policy, key: `${c.source.sourceId}-${c.source.date}-${c.start}`, kind: c.source.kind,
+    title: c.title, start: c.start, end: c.end, isMeal: c.source.isMeal, policy: c.policy, key: `${c.source.sourceId}-${c.source.date}-${c.start}`, kind: c.source.kind, color: c.source.color,
   })), [date, commitments.data]);
 
   // A top-three outcome and its booked block are the same piece of work; show them as one.
@@ -112,11 +112,12 @@ export function TodayPage() {
         </motion.section>
       ) : (
         <>
-          <section className="stat-row" aria-label="Day totals">
-            <Stat label="Planned" value={formatHours(planned)} unit="h" />
-            <Stat label="Logged" value={formatHours(logged)} unit="h" note={planned > 0 && logged > 0 ? `${Math.round((logged / planned) * 100)}% of plan` : "what you record"} />
-            <Stat label="Deep focus" value={formatHours(deep)} unit="h" />
-            <Stat label="Blocks done" value={String(done)} unit={`/ ${blocks.length}`} />
+          {/* One quiet line instead of four tiles: the Week page has the full figures. */}
+          <section className="day-summary" aria-label="Day totals">
+            <span><strong>{formatHours(planned)}h</strong> planned</span>
+            <span><strong>{formatHours(logged)}h</strong> logged{planned > 0 && logged > 0 ? ` (${Math.round((logged / planned) * 100)}%)` : ""}</span>
+            <span><strong>{formatHours(deep)}h</strong> deep focus</span>
+            <span><strong>{done} / {blocks.length}</strong> blocks done</span>
           </section>
 
           {isToday && <NowCard blocks={blocks} areaById={areaById} />}
@@ -135,7 +136,11 @@ export function TodayPage() {
               <>
                 <ol className="outcomes">
                   <AnimatePresence initial={false} mode="popLayout">
-                    {rolling.current.map((item, i) =>
+                    {/* Until the day's outcomes arrive, blocks alone would look like "next in line": show placeholders. */}
+                    {day.isPending && [1, 2, 3].map((n) => (
+                      <OutcomeSlot key={`loading-${n}`} rank={n} position={n} loading date={date} onEdit={() => undefined} onSchedule={() => undefined} />
+                    ))}
+                    {!day.isPending && rolling.current.map((item, i) =>
                       item.kind === "outcome" ? (
                         <OutcomeSlot
                           key={item.key}
@@ -153,7 +158,7 @@ export function TodayPage() {
                         <NextInLine key={item.key} position={i + 1} block={item.block} area={item.block.focusAreaId ? areaById.get(item.block.focusAreaId) : undefined} onOpen={() => setDraft(item.block)} />
                       ),
                     )}
-                    {freeRanks.slice(0, Math.max(0, 3 - rolling.current.length)).map((rank, i) => (
+                    {!day.isPending && freeRanks.slice(0, Math.max(0, 3 - rolling.current.length)).map((rank, i) => (
                       <OutcomeSlot key={`empty-${rank}`} rank={rank} position={rolling.current.length + i + 1} loading={day.isPending} date={date}
                         onEdit={() => setEditing({ rank, result: "", focusAreaId: null, nextAction: "", status: "Planned", minutesNeeded: null })} onSchedule={() => undefined} />
                     ))}
@@ -200,21 +205,6 @@ export function TodayPage() {
       <OutcomeDialog date={date} outcome={editing} areas={areas.data ?? []} onClose={() => setEditing(null)} />
       <PlanDayDialog open={planning !== null} seed={planning ?? undefined} date={date} areas={areas.data ?? []} blocks={blocks} takenRanks={outcomes.map((o) => o.rank)} onClose={() => setPlanning(null)} />
     </>
-  );
-}
-
-function Stat({ label, value, unit, note }: { label: string; value: string; unit?: string; note?: string }) {
-  return (
-    <div className="stat">
-      <span className="stat-label">{label}</span>
-      <span className="stat-value">
-        <motion.span key={value} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
-          {value}
-        </motion.span>
-        {unit && <small>{unit}</small>}
-      </span>
-      {note && <span className="stat-note">{note}</span>}
-    </div>
   );
 }
 
@@ -277,7 +267,7 @@ function OutcomeSlot({ rank, position, outcome, block, area, loading, date, onEd
         </div>
       </div>
       <div className="outcome-actions">
-        {block && !isDone && <TimerButton block={block} />}
+        {block && <RunningTag block={block} />}
         <IconButton size="sm" label="Edit outcome" onClick={onEdit}><Pencil size={16} /></IconButton>
       </div>
     </motion.li>
@@ -304,7 +294,7 @@ function NextInLine({ position, block, area, onOpen }: { position: number; block
           <span className="moved-up">Next in line</span>
         </div>
       </div>
-      <div className="outcome-actions"><TimerButton block={block} /></div>
+      <div className="outcome-actions"><RunningTag block={block} /></div>
     </motion.li>
   );
 }
@@ -354,7 +344,7 @@ function NowCard({ blocks, areaById }: { blocks: Block[]; areaById: Map<string, 
   const area = focus.focusAreaId ? areaById.get(focus.focusAreaId) : undefined;
   const label = running ? "Now · timer running" : current ? "Now" : `Next · in ${formatDuration(toMinutes(focus.start) - now)}`;
   return (
-    <motion.section layout className={cx("now-card", running && "is-running")} data-area={area?.color ?? "none"} aria-labelledby="now-title">
+    <motion.section layout className={cx("now-card", running && "is-running")} data-area={area?.color ?? "none"} aria-label="Now">
       <span className="agenda-bar" aria-hidden />
       <div className="now-main">
         <span className="now-label">{label}</span>
@@ -421,7 +411,7 @@ function OutcomeForm({ date, outcome, areas, onClose }: { date: string; outcome:
 
 // ---- Agenda ----------------------------------------------------------------------------------
 
-type RoutineBand = { title: string; start: number; end: number; isMeal: boolean; policy: string; key: string; kind: "routine" | "event" };
+type RoutineBand = { title: string; start: number; end: number; isMeal: boolean; policy: string; key: string; kind: "routine" | "event"; color: string | null };
 
 function Agenda({ blocks, routines, areaById, rankByTask, showNow, onOpen }: { blocks: Block[]; routines: RoutineBand[]; areaById: Map<string, Area>; rankByTask: Map<string, number>; showNow: boolean; onOpen: (b: Block) => void }) {
   const now = useNowMinutes();
@@ -452,7 +442,7 @@ function Agenda({ blocks, routines, areaById, rankByTask, showNow, onOpen }: { b
 
 function RoutineRow({ band }: { band: RoutineBand }) {
   return (
-    <motion.li layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={cx("routine-row", band.kind === "event" && "is-event")} aria-label={`${band.kind === "event" ? "Meeting" : "Routine"}: ${band.title}, ${fromMinutes(Math.max(0, band.start))} to ${fromMinutes(band.end)}`}>
+    <motion.li layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={cx("routine-row", band.kind === "event" && "is-event", band.policy !== "NoTasks" && "is-open")} data-area={band.kind === "event" ? "none" : (band.color ?? "none")} aria-label={`${band.kind === "event" ? "Meeting" : "Routine"}: ${band.title}, ${fromMinutes(Math.max(0, band.start))} to ${fromMinutes(band.end)}`}>
       <span className="agenda-time"><strong>{fromMinutes(Math.max(0, band.start))}</strong><span>{fromMinutes(band.end)}</span></span>
       <span className="agenda-bar" aria-hidden />
       <span className="routine-row-title">{band.kind === "event" ? <CalendarDays size={14} aria-hidden /> : band.isMeal ? <Utensils size={14} aria-hidden /> : <Repeat size={14} aria-hidden />}{band.title}
@@ -462,9 +452,21 @@ function RoutineRow({ band }: { band: RoutineBand }) {
   );
 }
 
+const MENU_STATUSES: { value: Status; label: string }[] = [
+  { value: "Planned", label: "Not started" },
+  { value: "InProgress", label: "In progress" },
+  { value: "Done", label: "Done" },
+];
+
 function AgendaRow({ block, rank, area, onOpen }: { block: Block; rank?: number; area?: Area; onOpen: () => void }) {
   const toast = useToast();
   const { progress } = useBlockMutations();
+  const timer = useFocusTimer();
+  const now = useNowMinutes();
+  const open = block.status === "Planned" || block.status === "InProgress";
+  const running = timer.running?.id === block.id;
+  // Actual minutes only matter once a block has begun; before that the field is noise.
+  const begun = !open || block.status === "InProgress" || block.trackedSeconds > 0 || block.actualMinutes !== null || (block.date < todayISO()) || (block.date === todayISO() && toMinutes(block.start) <= now);
 
   const onError = (err: unknown) => toast.error(errorMessage(err));
   const setStatus = (status: Status) => {
@@ -486,6 +488,7 @@ function AgendaRow({ block, rank, area, onOpen }: { block: Block; rank?: number;
           {rank !== undefined && <b className="rank-badge" title={`Top three: #${rank}`}><span className="sr-only">Top three, number </span>{rank}</b>}
           {block.title}
         </button>
+        <RunningTag block={block} />
         <span className="agenda-meta">
           {area?.name ?? "No area"} · {modeLabel[block.workMode]} · {formatDuration(block.plannedMinutes)}
           {block.isOutside && <> · <span className="outside-tag"><MapPin size={12} aria-hidden /> outside</span></>}
@@ -494,8 +497,7 @@ function AgendaRow({ block, rank, area, onOpen }: { block: Block; rank?: number;
         </span>
       </div>
       {/* Keyed on the saved value so the field resets whenever the server's number changes. */}
-      <TimerButton block={block} />
-      <ActualInput key={block.actualMinutes ?? "empty"} label={`Actual minutes for ${block.title}`} saved={block.actualMinutes} onCommit={commitActual} />
+      {begun ? <ActualInput key={block.actualMinutes ?? "empty"} label={`Actual minutes for ${block.title}`} saved={block.actualMinutes} onCommit={commitActual} /> : <span className="actual-placeholder" aria-hidden />}
       <DropdownMenu.Root>
         <DropdownMenu.Trigger className="status-btn" data-status={block.status} aria-label={`Status: ${statusLabel[block.status]}. Change status`}>
           <StatusIcon status={block.status} size={16} />
@@ -503,12 +505,29 @@ function AgendaRow({ block, rank, area, onOpen }: { block: Block; rank?: number;
         <DropdownMenu.Portal>
           <DropdownMenu.Content className="menu" align="end" sideOffset={6}>
             <DropdownMenu.RadioGroup value={block.status} onValueChange={(v) => setStatus(v as Status)}>
-              {STATUSES.map((s) => (
-                <DropdownMenu.RadioItem key={s} value={s} className="menu-item">
-                  <StatusIcon status={s} size={16} /> {statusLabel[s]}
+              {MENU_STATUSES.map((s) => (
+                <DropdownMenu.RadioItem key={s.value} value={s.value} className="menu-item">
+                  <StatusIcon status={s.value} size={16} /> {s.label}
                 </DropdownMenu.RadioItem>
               ))}
             </DropdownMenu.RadioGroup>
+            {open && (
+              <>
+                <DropdownMenu.Separator className="menu-sep" />
+                {!running && (
+                  <DropdownMenu.Item className="menu-item" onSelect={() => timer.start(block)}>
+                    <Play size={16} aria-hidden /> Start timer now
+                  </DropdownMenu.Item>
+                )}
+                {/* Two different endings, said plainly (P2-G1): put off returns the task to To do; drop moves it to Dropped. */}
+                <DropdownMenu.Item className="menu-item" onSelect={() => timer.askToStop(block, "Later")}>
+                  <Clock3 size={16} aria-hidden /> Put off for later…
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className="menu-item danger-text" onSelect={() => timer.askToStop(block, "Drop")}>
+                  <Trash2 size={16} aria-hidden /> Drop it…
+                </DropdownMenu.Item>
+              </>
+            )}
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>

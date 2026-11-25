@@ -162,4 +162,24 @@ public class RoutineTests(ApiFactory factory)
         Assert.Equal(HttpStatusCode.NotFound, (await bob.DeleteAsync($"/api/routines/{id}")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await bob.PostAsJsonAsync("/api/routines", Routine("Work", "09:00:00", "17:00:00", "SelectedAreas", [aliceArea]))).StatusCode);
     }
+
+    [Fact]
+    public async Task Routines_and_breaks_take_a_colour_from_the_palette_and_show_it_on_the_calendar()
+    {
+        var (client, _) = await factory.NewUserAsync();
+        var lunch = new { title = "Lunch", days = "Everyday", start = "12:30:00", end = "13:15:00", taskPolicy = "NoTasks", areaIds = (Guid[]?)null, isMeal = true, color = "orange" };
+        var saved = await Json(await client.PostAsJsonAsync("/api/routines", lunch));
+        Assert.Equal("orange", saved.GetProperty("color").GetString());
+        var commitments = await client.GetFromJsonAsync<JsonElement>("/api/commitments?from=2026-11-26&to=2026-11-26");
+        Assert.Equal("orange", commitments[0].GetProperty("color").GetString());
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/routines", lunch with { color = "#ff0000" })).StatusCode);
+
+        var prefs = await Json(await client.PutAsJsonAsync("/api/preferences", new { dayStart = "08:00:00", dayEnd = "21:00:00", waterReminderMinutes = (int?)null, breakColor = "teal" }));
+        Assert.Equal("teal", prefs.GetProperty("breakColor").GetString());
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync("/api/preferences", new { dayStart = "08:00:00", dayEnd = "21:00:00", breakColor = "neon" })).StatusCode);
+        // Older clients that do not send a colour keep working; no colour means the default.
+        var plain = await Json(await client.PutAsJsonAsync("/api/preferences", new { dayStart = "08:00:00", dayEnd = "21:00:00" }));
+        Assert.Equal(JsonValueKind.Null, plain.GetProperty("breakColor").ValueKind);
+    }
 }

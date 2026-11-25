@@ -39,6 +39,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
 
         b.Entity<AppUser>().Property(u => u.DisplayName).HasMaxLength(80);
         b.Entity<AppUser>().Property(u => u.TimeZoneId).HasMaxLength(64);
+        b.Entity<AppUser>().Property(u => u.BreakColor).HasMaxLength(16);
         b.Entity<AppUser>().Property(u => u.CalendarFeedTokenProtected).HasMaxLength(500);
         b.Entity<AppUser>().Property(u => u.CalendarFeedTokenHash).HasMaxLength(64);
         b.Entity<AppUser>().HasIndex(u => u.CalendarFeedTokenHash).IsUnique().HasFilter("\"CalendarFeedTokenHash\" IS NOT NULL");
@@ -126,6 +127,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             e.Property(x => x.Title).HasMaxLength(80);
             e.Property(x => x.TaskPolicy).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.Color).HasMaxLength(16);
             e.Property(x => x.Days).HasConversion<int>();
             e.HasIndex(x => x.UserId);
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);

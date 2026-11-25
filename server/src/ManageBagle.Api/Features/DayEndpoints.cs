@@ -77,6 +77,11 @@ public static class DayEndpoints
                         : ItemStatus.Skipped;
                 }
             }
+            else if (outcome.BacklogTaskId is { } startedId && req.Status != wasStatus && await db.BacklogTasks.FirstOrDefaultAsync(t => t.Id == startedId && t.UserId == uid, ct) is { } linked)
+            {
+                // Started, or reopened: the card moves to In progress, or back out of Done.
+                linked.Status = Domain.TaskCompletion.AfterSessionChanged(linked.Status, req.Status, [], worked: req.Status == ItemStatus.InProgress).Status;
+            }
             await db.SaveChangesAsync(ct);
             return Results.Ok(ToResponse(outcome));
         });

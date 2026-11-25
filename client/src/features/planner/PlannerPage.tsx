@@ -1,14 +1,14 @@
 import { CalendarPlus, Coffee, MapPin, MoonStar, Plus } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { AreaChip, Button, cx, DateNav, EmptyState, ErrorNote, PageHeader, PriorityMark, Segmented, StatusIcon, StatusPill } from "../../components/ui";
 import { errorMessage, type Area, type Block } from "../../lib/api";
 import { useToast } from "../../components/toast";
 import { useDocumentTitle, useMediaQuery, useNowMinutes } from "../../lib/hooks";
 import { modeLabel, statusLabel } from "../../lib/labels";
 import { commitmentsOn } from "../../lib/commitments";
-import { useAreas, useBlockMutations, useCommitments, useWeekBlocks } from "../../lib/queries";
+import { useAreas, useBlockMutations, useCommitments, usePreferences, useWeekBlocks } from "../../lib/queries";
 import { formatDate, formatDuration, formatTime, formatVariance, formatWeekRange, fromMinutes, isValidISODate, nowMinutes, snap, todayISO, toMinutes, weekDays, weekStart } from "../../lib/time";
 import { BlockDialog, type BlockDraft } from "./BlockDialog";
 import { placeBlocks } from "./layout";
@@ -110,6 +110,7 @@ interface Drag {
 
 function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridProps) {
   const commitments = useCommitments(days[0]!);
+  const breakColor = usePreferences().data?.breakColor ?? "green";
   const toast = useToast();
   const { move } = useBlockMutations();
   const scroller = useRef<HTMLDivElement>(null);
@@ -195,8 +196,12 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
             <div key={d} className={cx("cal-col", d === today && "is-today")} onClick={createAt(d)} >
               {commitmentsOn(d, commitments.data ?? []).map((c) => (
                 <div key={`${c.source.sourceId}-${c.source.date}-${c.start}`} className={cx("cal-routine", c.policy !== "NoTasks" && "is-open", c.source.kind === "event" && "is-event")} aria-hidden
+                  data-area={c.source.kind === "event" ? "none" : (c.source.color ?? "none")}
                   style={{ top: (Math.max(0, c.start) / 60) * HOUR, height: ((Math.min(1440, c.end) - Math.max(0, c.start)) / 60) * HOUR }}>
-                  <span>{c.title}{c.source.kind === "event" ? "" : c.policy === "NoTasks" ? " · protected" : " · open"}</span>
+                  <span>
+                    <strong>{c.title}</strong> {fromMinutes(Math.max(0, c.start))}–{fromMinutes(c.end % 1440)}
+                    {c.source.kind === "event" ? "" : c.policy === "NoTasks" ? " · protected" : " · open"}
+                  </span>
                 </div>
               ))}
               {d === today && (
@@ -213,12 +218,16 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
                 const breaks = [p.block.breakBeforeMinutes ? `${p.block.breakBeforeMinutes} min recovery before` : "", p.block.breakAfterMinutes ? `${p.block.breakAfterMinutes} min recovery after` : ""].filter(Boolean).join(", ");
                 return [
                   p.block.breakBeforeMinutes > 0 && !dragging && (
-                    <span key={`${p.block.id}-break-before`} className="cal-break is-before" aria-hidden title={`${p.block.breakBeforeMinutes} min recovery`}
-                      style={{ top: Math.max(0, ((p.startMin - p.block.breakBeforeMinutes) / 60) * HOUR + 1), height: Math.max((p.block.breakBeforeMinutes / 60) * HOUR - 2, 6), left: `calc(${(p.lane / p.lanes) * 100}% + 2px)`, width: `calc(${100 / p.lanes}% - 4px)` }} />
+                    <span key={`${p.block.id}-break-before`} className="cal-break is-before" data-area={breakColor} aria-hidden title={`${p.block.breakBeforeMinutes} min recovery`}
+                      style={{ top: Math.max(0, ((p.startMin - p.block.breakBeforeMinutes) / 60) * HOUR + 1), height: Math.max((p.block.breakBeforeMinutes / 60) * HOUR - 2, 6), left: `calc(${(p.lane / p.lanes) * 100}% + 2px)`, width: `calc(${100 / p.lanes}% - 4px)` }}>
+                      {(p.block.breakBeforeMinutes / 60) * HOUR >= 16 && <>Break · {p.block.breakBeforeMinutes}m</>}
+                    </span>
                   ),
                   p.block.breakAfterMinutes > 0 && !dragging && (
-                    <span key={`${p.block.id}-break`} className="cal-break" aria-hidden title={`${p.block.breakAfterMinutes} min recovery`}
-                      style={{ top: (p.endMin / 60) * HOUR + 1, height: Math.max((p.block.breakAfterMinutes / 60) * HOUR - 2, 6), left: `calc(${(p.lane / p.lanes) * 100}% + 2px)`, width: `calc(${100 / p.lanes}% - 4px)` }} />
+                    <span key={`${p.block.id}-break`} className="cal-break" data-area={breakColor} aria-hidden title={`${p.block.breakAfterMinutes} min recovery`}
+                      style={{ top: (p.endMin / 60) * HOUR + 1, height: Math.max((p.block.breakAfterMinutes / 60) * HOUR - 2, 6), left: `calc(${(p.lane / p.lanes) * 100}% + 2px)`, width: `calc(${100 / p.lanes}% - 4px)` }}>
+                      {(p.block.breakAfterMinutes / 60) * HOUR >= 16 && <>Break · {p.block.breakAfterMinutes}m</>}
+                    </span>
                   ),
                   <motion.button
                     key={p.block.id}
@@ -259,13 +268,15 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
 
 /** What each kind of shape on the calendar means (P2-H1). Shapes differ in pattern and outline, not only colour. */
 function CalendarLegend() {
+  const breakColor = usePreferences().data?.breakColor ?? "green";
   return (
     <ul className="cal-legend" aria-label="Calendar key">
       <li><span className="legend-swatch is-block" aria-hidden /> Block</li>
-      <li><span className="legend-swatch is-break" aria-hidden /> Recovery break</li>
-      <li><span className="legend-swatch is-protected" aria-hidden /> Routine, protected</li>
-      <li><span className="legend-swatch is-open" aria-hidden /> Routine, open for tasks</li>
+      <li><span className="legend-swatch is-break" data-area={breakColor} aria-hidden /> Recovery break</li>
+      <li><span className="legend-swatch is-protected" data-area="none" aria-hidden /> Routine, protected (hatched)</li>
+      <li><span className="legend-swatch is-open" data-area="none" aria-hidden /> Routine, open for tasks (dashed)</li>
       <li><span className="legend-swatch is-event" aria-hidden /> Meeting from your calendar</li>
+      <li className="cal-legend-note"><Link to="/routines">Change colours in Routines</Link></li>
     </ul>
   );
 }

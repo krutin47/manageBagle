@@ -1137,7 +1137,34 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       },
@@ -2627,7 +2654,8 @@
           "minutes",
           "taskPolicy",
           "areaIds",
-          "isMeal"
+          "isMeal",
+          "color"
         ],
         "type": "object",
         "properties": {
@@ -2673,6 +2701,12 @@
           },
           "isMeal": {
             "type": "boolean"
+          },
+          "color": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -3220,6 +3254,12 @@
               "string"
             ],
             "format": "int32"
+          },
+          "breakColor": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -3227,7 +3267,8 @@
         "required": [
           "dayStart",
           "dayEnd",
-          "waterReminderMinutes"
+          "waterReminderMinutes",
+          "breakColor"
         ],
         "type": "object",
         "properties": {
@@ -3247,6 +3288,12 @@
               "string"
             ],
             "format": "int32"
+          },
+          "breakColor": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -3459,6 +3506,12 @@
           "isMeal": {
             "type": "boolean",
             "default": false
+          },
+          "color": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -3471,7 +3524,8 @@
           "end",
           "taskPolicy",
           "areaIds",
-          "isMeal"
+          "isMeal",
+          "color"
         ],
         "type": "object",
         "properties": {
@@ -3505,6 +3559,12 @@
           },
           "isMeal": {
             "type": "boolean"
+          },
+          "color": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

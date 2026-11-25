@@ -1,8 +1,9 @@
 import { Bell, Coffee, Dumbbell, Lock, Moon, Pencil, Plus, Repeat, Trash2, Utensils, Briefcase } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
+import { ColorPicker } from "../../components/ColorPicker";
 import { useToast } from "../../components/toast";
 import { Button, ConfirmDialog, cx, Dialog, ErrorNote, Field, IconButton, Input, Segmented, Select, Skeleton } from "../../components/ui";
-import { ApiError, errorMessage, type Area, type Preferences, type Routine, type RoutineInput, type TaskPolicy, type WeekdayFlag } from "../../lib/api";
+import { ApiError, errorMessage, type Area, type AreaColor, type Preferences, type Routine, type RoutineInput, type TaskPolicy, type WeekdayFlag } from "../../lib/api";
 import { useAreas, usePreferences, useRoutineMutations, useRoutines, useSavePreferences } from "../../lib/queries";
 import { trimSeconds } from "../../lib/time";
 
@@ -38,11 +39,11 @@ export function routineTemplates(areas: Area[]): { key: string; icon: ReactNode;
   // Work hours accept work-like focus areas when there are any; otherwise any task.
   const work = areas.filter((a) => /work|career|job|build|client|office/i.test(a.name)).map((a) => a.id);
   return [
-    { key: "lunch", icon: <Utensils size={15} aria-hidden />, input: { title: "Lunch", days: WORKDAYS.join(", "), start: "12:30:00", end: "13:15:00", taskPolicy: "NoTasks", areaIds: [], isMeal: true } },
-    { key: "dinner", icon: <Utensils size={15} aria-hidden />, input: { title: "Dinner", days: DAYS.map((d) => d.flag).join(", "), start: "19:00:00", end: "19:45:00", taskPolicy: "NoTasks", areaIds: [], isMeal: true } },
-    { key: "workout", icon: <Dumbbell size={15} aria-hidden />, input: { title: "Workout", days: "Monday, Wednesday, Friday", start: "07:00:00", end: "08:00:00", taskPolicy: "NoTasks", areaIds: [], isMeal: false } },
-    { key: "work", icon: <Briefcase size={15} aria-hidden />, input: { title: "Work hours", days: WORKDAYS.join(", "), start: "09:00:00", end: "17:00:00", taskPolicy: work.length ? "SelectedAreas" : "AnyTask", areaIds: work, isMeal: false } },
-    { key: "wind-down", icon: <Moon size={15} aria-hidden />, input: { title: "Wind-down", days: DAYS.map((d) => d.flag).join(", "), start: "21:30:00", end: "22:30:00", taskPolicy: "NoTasks", areaIds: [], isMeal: false } },
+    { key: "lunch", icon: <Utensils size={15} aria-hidden />, input: { title: "Lunch", days: WORKDAYS.join(", "), start: "12:30:00", end: "13:15:00", taskPolicy: "NoTasks", areaIds: [], isMeal: true, color: "orange" } },
+    { key: "dinner", icon: <Utensils size={15} aria-hidden />, input: { title: "Dinner", days: DAYS.map((d) => d.flag).join(", "), start: "19:00:00", end: "19:45:00", taskPolicy: "NoTasks", areaIds: [], isMeal: true, color: "orange" } },
+    { key: "workout", icon: <Dumbbell size={15} aria-hidden />, input: { title: "Workout", days: "Monday, Wednesday, Friday", start: "07:00:00", end: "08:00:00", taskPolicy: "NoTasks", areaIds: [], isMeal: false, color: "green" } },
+    { key: "work", icon: <Briefcase size={15} aria-hidden />, input: { title: "Work hours", days: WORKDAYS.join(", "), start: "09:00:00", end: "17:00:00", taskPolicy: work.length ? "SelectedAreas" : "AnyTask", areaIds: work, isMeal: false, color: "blue" } },
+    { key: "wind-down", icon: <Moon size={15} aria-hidden />, input: { title: "Wind-down", days: DAYS.map((d) => d.flag).join(", "), start: "21:30:00", end: "22:30:00", taskPolicy: "NoTasks", areaIds: [], isMeal: false, color: "violet" } },
   ];
 }
 
@@ -80,7 +81,7 @@ export function RoutinesCard() {
         : routines.data.length === 0 ? <p className="muted">No routines yet. Start with lunch above: it is the one most often eaten by meetings.</p> : (
           <ul className="routine-list">
             {routines.data.map((r) => (
-              <li key={r.id}>
+              <li key={r.id} data-area={r.color ?? "none"}>
                 <span className="routine-icon" aria-hidden>{r.isMeal ? <Utensils size={16} /> : r.taskPolicy === "NoTasks" ? <Lock size={16} /> : <Repeat size={16} />}</span>
                 <div>
                   <strong>{r.title}</strong>
@@ -117,13 +118,14 @@ function RoutineForm({ routine, areas, onClose }: { routine: Routine | RoutineIn
   const [policy, setPolicy] = useState<TaskPolicy>(routine?.taskPolicy ?? "NoTasks");
   const [areaIds, setAreaIds] = useState<string[]>(routine?.areaIds ?? []);
   const [isMeal, setIsMeal] = useState(routine?.isMeal ?? false);
+  const [color, setColor] = useState<AreaColor | null>(routine?.color ?? null);
   const [error, setError] = useState<ApiError | null>(null);
 
   const toggleDay = (d: WeekdayFlag) => setDays((list) => (list.includes(d) ? list.filter((x) => x !== d) : [...list, d]));
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-    const body: RoutineInput = { title, days: days.join(", "), start: `${start}:00`, end: `${end}:00`, taskPolicy: policy, areaIds: policy === "SelectedAreas" ? areaIds : [], isMeal };
+    const body: RoutineInput = { title, days: days.join(", "), start: `${start}:00`, end: `${end}:00`, taskPolicy: policy, areaIds: policy === "SelectedAreas" ? areaIds : [], isMeal, color };
     try {
       if (saved) await update.mutateAsync({ ...body, id: saved.id });
       else await create.mutateAsync(body);
@@ -168,6 +170,10 @@ function RoutineForm({ routine, areas, onClose }: { routine: Routine | RoutineIn
             {error?.field("areaIds") && <p className="field-error" role="alert">{error.field("areaIds")}</p>}
           </div>
         )}
+        <div className="field">
+          <span className="field-label">Colour on your calendar</span>
+          <ColorPicker label="Colour on your calendar" noneLabel="Neutral" value={color} onChange={setColor} />
+        </div>
         <label className="check"><input type="checkbox" checked={isMeal} onChange={(e) => setIsMeal(e.target.checked)} /> It is a meal — remind me when it starts</label>
       </div>
       <footer className="dialog-foot">
@@ -206,7 +212,7 @@ function YourDayForm({ prefs }: { prefs: Preferences }) {
   const changed = form.dayStart !== trimSeconds(prefs.dayStart) || form.dayEnd !== trimSeconds(prefs.dayEnd) || form.water !== (prefs.waterReminderMinutes === null ? "off" : String(prefs.waterReminderMinutes));
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    save.mutate({ dayStart: `${form.dayStart}:00`, dayEnd: `${form.dayEnd}:00`, waterReminderMinutes: form.water === "off" ? null : Number(form.water) },
+    save.mutate({ dayStart: `${form.dayStart}:00`, dayEnd: `${form.dayEnd}:00`, waterReminderMinutes: form.water === "off" ? null : Number(form.water), breakColor: prefs.breakColor },
       { onSuccess: () => toast.success("Saved"), onError: (err) => toast.error(errorMessage(err)) });
   };
   return (

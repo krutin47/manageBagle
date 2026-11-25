@@ -123,6 +123,8 @@ export function useWeekBlocks(anyDateInWeek: string) {
 function invalidatePlanning(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: keys.blocks.all });
   qc.invalidateQueries({ queryKey: keys.weekSummary.all });
+  // A block is a session of a task: whatever happens to it can move the task's card (P2-G1).
+  qc.invalidateQueries({ queryKey: keys.backlog });
 }
 
 /**
@@ -311,7 +313,13 @@ export function useCaptureTasks() {
 
 export function useTaskMutations() {
   const qc = useQueryClient();
-  const done = () => qc.invalidateQueries({ queryKey: keys.backlog });
+  // A card moved to Done or Dropped closes the task's blocks and top-three outcomes too.
+  const done = () => {
+    qc.invalidateQueries({ queryKey: keys.backlog });
+    qc.invalidateQueries({ queryKey: keys.blocks.all });
+    qc.invalidateQueries({ queryKey: keys.days.all });
+    qc.invalidateQueries({ queryKey: keys.timer });
+  };
   return {
     create: useMutation({ mutationFn: (body: TaskInput) => api<Task>("/backlog", { method: "POST", body }), onSuccess: done }),
     update: useMutation({

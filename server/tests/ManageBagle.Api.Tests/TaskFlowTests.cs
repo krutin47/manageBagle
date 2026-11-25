@@ -129,4 +129,79 @@ public class TaskFlowTests(ClockedFactory factory) : IClassFixture<ClockedFactor
         Assert.Equal("Skipped", after.GetProperty("status").GetString());
         Assert.Equal("Skipped", (await Task(client, task)).GetProperty("status").GetString());
     }
+
+    private DateOnly Today => DateOnly.FromDateTime(factory.Clock.GetUtcNow().UtcDateTime);
+
+    /// <summary>One task booked in two sessions: today and tomorrow, ranked #1 today.</summary>
+    private async Task<(HttpClient Client, Guid Task)> TaskOverTwoDays(string title)
+    {
+        var (client, _) = await factory.NewUserAsync();
+        var created = await Json(await client.PostAsJsonAsync("/api/backlog", new { title, estimatedMinutes = 120, priority = "High", status = "Planned", workMode = "DeepFocus" }));
+        var id = created.GetProperty("id").GetGuid();
+        foreach (var (day, rank) in new[] { (Today, (int?)1), (Today.AddDays(1), (int?)null) })
+        {
+            await Json(await client.PostAsJsonAsync($"/api/days/{day:yyyy-MM-dd}/plan", new
+            {
+                items = new[] { new { taskId = (Guid?)id, title, estimatedMinutes = 60, workMode = "DeepFocus", priority = "High", topRank = rank, start = "09:00:00", end = "10:00:00" } },
+            }));
+        }
+        return (client, id);
+    }
+
+    private async Task<JsonElement[]> Sessions(HttpClient client) =>
+        (await client.GetFromJsonAsync<JsonElement>($"/api/blocks?from={Today:yyyy-MM-dd}&to={Today.AddDays(1):yyyy-MM-dd}")).EnumerateArray().OrderBy(b => b.GetProperty("date").GetString()).ToArray();
+
+    private static async Task MoveCard(HttpClient client, Guid id, string status)
+    {
+        var t = await Task(client, id);
+        await Json(await client.PutAsJsonAsync($"/api/backlog/{id}", new
+        {
+            title = t.GetProperty("title").GetString(), estimatedMinutes = 120, priority = "High", status, workMode = "DeepFocus", version = t.GetProperty("version").GetInt32(),
+        }));
+    }
+
+    [Fact]
+    public async Task Dropping_a_card_on_the_board_takes_it_off_the_calendar_and_out_of_the_top_three()
+    {
+        var (client, task) = await TaskOverTwoDays("Old plan");
+        var today = (await Sessions(client))[0];
+        await Json(await client.PostAsJsonAsync($"/api/blocks/{today.GetProperty("id").GetGuid()}/timer/start", new { pauseRunning = false }));
+
+        await MoveCard(client, task, "Skipped");
+
+        Assert.All(await Sessions(client), b => Assert.Equal("Skipped", b.GetProperty("status").GetString()));
+        Assert.Equal(HttpStatusCode.NoContent, (await client.GetAsync("/api/timer")).StatusCode);
+        var outcome = (await client.GetFromJsonAsync<JsonElement>($"/api/days/{Today:yyyy-MM-dd}")).GetProperty("outcomes")[0];
+        Assert.Equal("Skipped", outcome.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Finishing_a_card_on_the_board_finishes_todays_session_and_cancels_later_ones()
+    {
+        var (client, task) = await TaskOverTwoDays("Wrap up");
+        await MoveCard(client, task, "Done");
+        var sessions = await Sessions(client);
+        Assert.Equal("Done", sessions[0].GetProperty("status").GetString());
+        Assert.Equal(JsonValueKind.Null, sessions[0].GetProperty("actualMinutes").ValueKind); // not recorded is not zero, nor the plan
+        Assert.Equal("Skipped", sessions[1].GetProperty("status").GetString());
+        Assert.Equal("Done", (await client.GetFromJsonAsync<JsonElement>($"/api/days/{Today:yyyy-MM-dd}")).GetProperty("outcomes")[0].GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Dropping_with_the_timer_also_cancels_the_tasks_other_sessions()
+    {
+        var (client, task) = await TaskOverTwoDays("Abandoned");
+        var today = (await Sessions(client))[0];
+        await Json(await client.PostAsJsonAsync($"/api/blocks/{today.GetProperty("id").GetGuid()}/timer/stop", new { outcome = "Drop" }));
+        Assert.All(await Sessions(client), b => Assert.Equal("Skipped", b.GetProperty("status").GetString()));
+        Assert.Equal("Skipped", (await Task(client, task)).GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Marking_a_top_three_outcome_in_progress_moves_its_card()
+    {
+        var (client, task) = await TaskOverTwoDays("Begin");
+        await Json(await client.PutAsJsonAsync($"/api/days/{Today:yyyy-MM-dd}/outcomes/1", new { result = "Begin", focusAreaId = (Guid?)null, nextAction = "", status = "InProgress", minutesNeeded = 60 }));
+        Assert.Equal("InProgress", (await Task(client, task)).GetProperty("status").GetString());
+    }
 }

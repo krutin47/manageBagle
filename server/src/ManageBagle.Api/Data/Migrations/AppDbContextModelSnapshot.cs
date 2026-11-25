@@ -31,6 +31,10 @@ namespace ManageBagle.Api.Data.Migrations
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("integer");
 
+                    b.Property<string>("BreakColor")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.Property<string>("CalendarFeedTokenHash")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
@@ -515,6 +519,10 @@ namespace ManageBagle.Api.Data.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
                     b.Property<int>("Days")
                         .HasColumnType("integer");

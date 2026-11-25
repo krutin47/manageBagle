@@ -1,9 +1,10 @@
 import { Coffee } from "lucide-react";
+import { ColorPicker } from "../../components/ColorPicker";
 import { useToast } from "../../components/toast";
 import { ErrorNote, PageHeader, Skeleton } from "../../components/ui";
-import { errorMessage, type Area } from "../../lib/api";
+import { errorMessage, type Area, type AreaColor } from "../../lib/api";
 import { useDocumentTitle } from "../../lib/hooks";
-import { useAreaMutations, useAreas } from "../../lib/queries";
+import { useAreaMutations, useAreas, usePreferences, useSavePreferences } from "../../lib/queries";
 import { RoutinesCard, YourDayCard } from "./RoutinesCard";
 
 /**
@@ -29,6 +30,11 @@ const BREAKS = [0, 5, 10, 15, 20, 30];
 /** Recovery breaks per focus area (P2-C4). A single task can override this when it is captured. */
 function BreaksCard() {
   const areas = useAreas();
+  const prefs = usePreferences();
+  const savePrefs = useSavePreferences();
+  const toast = useToast();
+  const setBreakColor = (breakColor: AreaColor) =>
+    prefs.data && savePrefs.mutate({ ...prefs.data, breakColor }, { onError: (err) => toast.error(errorMessage(err)) });
   return (
     <section className="card" aria-labelledby="breaks">
       <header className="card-head">
@@ -43,6 +49,12 @@ function BreaksCard() {
             {areas.data.map((a) => <BreakRow key={a.id} area={a} />)}
           </ul>
         )}
+      {prefs.data && (
+        <div className="field break-color">
+          <span className="field-label">Colour of breaks on your calendar</span>
+          <ColorPicker label="Colour of breaks on your calendar" value={prefs.data.breakColor ?? "green"} onChange={setBreakColor} />
+        </div>
+      )}
     </section>
   );
 }

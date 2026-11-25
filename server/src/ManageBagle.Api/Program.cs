@@ -159,6 +159,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<AccountLinks>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Planning.PlanDay>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Planning.CaptureTasks>();
+builder.Services.AddScoped<ManageBagle.Api.Application.Tasks.ChangeTaskStatus>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Timing.FocusTimer>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Calendars.CalendarSync>();
 builder.Services.AddHttpClient(SafeFetch.ClientName, c =>

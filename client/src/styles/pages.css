@@ -456,7 +456,7 @@
 }
 
 /* ---- Focus timer (P2-B) ---- */
-.agenda-row { grid-template-columns: 48px 4px minmax(0, 1fr) auto auto auto; }
+.agenda-row { grid-template-columns: 48px 4px minmax(0, 1fr) auto auto; }
 .timer-btn-wrap { display: inline-flex; align-items: center; gap: 4px; }
 .timer-elapsed { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink-2); min-width: 44px; text-align: right; }
 .timer-elapsed.is-over, .now-playing-clock.is-over { color: var(--warn); font-weight: 600; }
@@ -491,8 +491,8 @@
 @media (max-width: 860px) {
   .now-playing { left: 12px; right: 12px; bottom: calc(76px + env(safe-area-inset-bottom)); max-width: none; }
   .agenda-row { grid-template-columns: 44px 4px minmax(0, 1fr) auto; }
-  .agenda-row .timer-btn-wrap { grid-column: 3; grid-row: 2; justify-self: start; }
-  .agenda-row .actual { grid-column: 3; grid-row: 3; }
+  .agenda-row .actual { grid-column: 3; grid-row: 2; }
+  .actual-placeholder { display: none; }
 }
 .review-facts-wide { grid-column: 1 / -1; }
 .fact-note { display: block; color: var(--ink-2); font-size: 13.5px; margin-top: 2px; quotes: "“" "”"; }
@@ -627,3 +627,34 @@
 .legend-swatch.is-open { background: color-mix(in srgb, var(--line) 50%, transparent); border-left: 2px dashed var(--line-strong); }
 .legend-swatch.is-event { background: color-mix(in srgb, var(--ink-3) 18%, var(--surface)); border-left: 3px solid var(--ink-3); }
 .table-note.break-tag { display: flex; }
+
+/* ---- A calmer Today: one play button, on the Now card ---- */
+.day-summary { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 2px 2px 0; font-size: 14px; color: var(--ink-2); }
+.day-summary strong { color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
+.running-tag { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: var(--r-pill); background: var(--accent-tint); color: var(--accent-ink); font-family: var(--font-mono); font-size: 12px; font-weight: 600; width: fit-content; }
+.running-tag .now-playing-dot { width: 7px; height: 7px; }
+.agenda-row .actual { width: 86px; }
+.actual-placeholder { width: 86px; }
+.agenda-main .running-tag { margin: 2px 0; }
+.now-card .timer-btn { width: 44px; height: 44px; }
+
+/* ---- Routines and breaks in colour (chosen on the Routines page) ---- */
+.cal-routine { background: color-mix(in srgb, var(--a-tint) 75%, transparent); border-left: 3px solid var(--a-solid); border-radius: 4px; }
+.cal-routine:not(.is-open):not(.is-event) { background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--a-solid) 13%, transparent) 0 6px, transparent 6px 12px); }
+/* Open routines are a frame, not an obstacle: a dashed edge and only a hint of colour. */
+.cal-routine.is-open { background: color-mix(in srgb, var(--a-tint) 22%, transparent); border-left-style: dashed; }
+.cal-routine span { left: 8px; right: 6px; top: 3px; color: var(--a-ink); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.cal-routine span strong { font-weight: 650; }
+.cal-break { display: flex; align-items: center; justify-content: center; background: var(--a-tint); border: 1px dashed var(--a-solid); border-radius: 0 0 6px 6px; color: var(--a-ink); font-size: 10.5px; font-weight: 600; overflow: hidden; white-space: nowrap; }
+.cal-break.is-before { border-radius: 6px 6px 0 0; }
+.legend-swatch.is-break { background: var(--a-tint); border: 1px dashed var(--a-solid); }
+.legend-swatch.is-protected { background: var(--a-tint) repeating-linear-gradient(135deg, color-mix(in srgb, var(--a-solid) 25%, transparent) 0 4px, transparent 4px 8px); border-left: 3px solid var(--a-solid); }
+.legend-swatch.is-open { background: color-mix(in srgb, var(--a-tint) 60%, transparent); border-left: 3px dashed var(--a-solid); }
+.cal-legend-note { margin-left: auto; }
+.routine-row { background: color-mix(in srgb, var(--a-tint) 60%, transparent); border-radius: 10px; }
+.routine-row.is-open { background: color-mix(in srgb, var(--a-tint) 25%, transparent); }
+.routine-row .agenda-bar { background: var(--a-solid); }
+.routine-row.is-open .agenda-bar { background: repeating-linear-gradient(180deg, var(--a-solid) 0 4px, transparent 4px 7px); }
+.routine-row-title, .routine-row-title small { color: var(--a-ink); }
+.routine-list li .routine-icon { background: var(--a-tint); color: var(--a-ink); }
+.break-color { margin-top: 18px; }

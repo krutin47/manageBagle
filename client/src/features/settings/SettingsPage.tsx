@@ -4,11 +4,12 @@ import { AnimatePresence, motion } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
+import { ColorPicker } from "../../components/ColorPicker";
 import { useToast } from "../../components/toast";
 import { Button, ConfirmDialog, cx, Dialog, ErrorNote, Field, IconButton, Input, PageHeader, Segmented, Select, Skeleton } from "../../components/ui";
 import { api, ApiError, errorMessage, type Area, type AreaColor, type User } from "../../lib/api";
 import { useDocumentTitle, useTheme } from "../../lib/hooks";
-import { AREA_COLORS, colorLabel } from "../../lib/labels";
+import { colorLabel } from "../../lib/labels";
 import { CalendarsCard } from "./CalendarsCard";
 import { keys, useAreaMutations, useAreas, useProviders, useUser } from "../../lib/queries";
 import { browserTimeZone } from "../../lib/time";
@@ -80,18 +81,6 @@ function ProfileCard({ user }: { user: User }) {
 }
 
 // ---- Focus areas -----------------------------------------------------------------------------
-
-function ColorPicker({ value, onChange, label }: { value: AreaColor; onChange: (c: AreaColor) => void; label: string }) {
-  return (
-    <div className="swatches" role="radiogroup" aria-label={label}>
-      {AREA_COLORS.map((c) => (
-        <button key={c} type="button" role="radio" aria-checked={c === value} aria-label={colorLabel[c]} title={colorLabel[c]} className="swatch" data-area={c} onClick={() => onChange(c)}>
-          {c === value && <Check size={12} strokeWidth={3.5} aria-hidden />}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function AreasCard() {
   const toast = useToast();

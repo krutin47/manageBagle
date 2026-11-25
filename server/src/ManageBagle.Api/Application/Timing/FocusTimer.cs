@@ -8,7 +8,7 @@ namespace ManageBagle.Api.Application.Timing;
 /// Use cases for the focus timer (P2-B, ADR-013). Every action answers with the block as it now is and
 /// the server's clock, so a device whose clock is off still shows the right elapsed time.
 /// </summary>
-public sealed class FocusTimer(AppDbContext db, TimeProvider clock)
+public sealed class FocusTimer(AppDbContext db, TimeProvider clock, Tasks.ChangeTaskStatus taskStatus)
 {
     public sealed record Snapshot(TimeBlock Block, DateTimeOffset ServerNow, Guid? PausedBlockId = null);
 
@@ -122,8 +122,14 @@ public sealed class FocusTimer(AppDbContext db, TimeProvider clock)
                 break;
 
             case StopOutcome.Drop:
-                if (task is not null) task.Status = ItemStatus.Skipped;
                 foreach (var o in outcomes) o.Status = ItemStatus.Skipped;
+                if (task is not null)
+                {
+                    // A dropped task leaves the calendar everywhere, not only on this day.
+                    var was = task.Status;
+                    task.Status = ItemStatus.Skipped;
+                    await taskStatus.FollowAsync(task, was, ct);
+                }
                 break;
         }
 

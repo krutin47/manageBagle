@@ -141,6 +141,8 @@ export interface Routine {
   taskPolicy: TaskPolicy;
   areaIds: string[];
   isMeal: boolean;
+  /** Colour on the calendar; null is the neutral default. */
+  color: AreaColor | null;
 }
 
 export type RoutineInput = Omit<Routine, "id">;
@@ -157,6 +159,8 @@ export interface Commitment {
   taskPolicy: TaskPolicy;
   areaIds: string[];
   isMeal: boolean;
+  /** The routine's colour; always null for meetings. */
+  color: AreaColor | null;
 }
 
 export interface CalendarConnection {
@@ -177,6 +181,8 @@ export interface Preferences {
   dayStart: string;
   dayEnd: string;
   waterReminderMinutes: number | null;
+  /** Colour of recovery breaks on the calendar; null is the default green. */
+  breakColor: AreaColor | null;
 }
 
 export interface Review { biggestWin: string; interruptions: string; changeTomorrow: string }

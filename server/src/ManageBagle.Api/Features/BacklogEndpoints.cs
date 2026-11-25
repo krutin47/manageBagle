@@ -61,17 +61,19 @@ public static class BacklogEndpoints
             return Results.Created($"/api/backlog/{task.Id}", TaskResponse.From(task));
         });
 
-        g.MapPut("/{id:guid}", async (Guid id, TaskRequest req, ClaimsPrincipal user, AppDbContext db) =>
+        g.MapPut("/{id:guid}", async (Guid id, TaskRequest req, ClaimsPrincipal user, AppDbContext db, Application.Tasks.ChangeTaskStatus status, CancellationToken ct) =>
         {
             var uid = user.UserId();
-            var task = await db.BacklogTasks.FirstOrDefaultAsync(t => t.Id == id && t.UserId == uid);
+            var task = await db.BacklogTasks.FirstOrDefaultAsync(t => t.Id == id && t.UserId == uid, ct);
             if (task is null) return Results.NotFound();
             if (Versioning.Check(db, task, req.Version) is { } stale) return stale;
             if (!await db.OwnsAreaAsync(uid, req.FocusAreaId)) return HttpExtensions.Invalid("focusAreaId", "That focus area does not exist.");
+            var previous = task.Status;
             Apply(task, req);
-            await db.SaveChangesAsync();
+            await status.FollowAsync(task, previous, ct);
+            await db.SaveChangesAsync(ct);
             return Results.Ok(TaskResponse.From(task));
-        });
+        }).Produces<TaskResponse>().ProducesValidationProblem().ProducesProblem(StatusCodes.Status409Conflict);
 
         g.MapDelete("/{id:guid}", async (Guid id, ClaimsPrincipal user, AppDbContext db) =>
         {
