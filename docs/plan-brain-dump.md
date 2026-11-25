@@ -1,6 +1,6 @@
 # Plan: Brain dump, top three, and a clearer Today
 
-Status: **built on `claude/bold-hawking-q13xxd`** (sections 1–5); the "not in this change" list is open · Owner: product · Last updated: 2026-11-14
+Status: **superseded in part** — the brain dump, Plan my day and Routines were separated on 2026-11-25 (see [requirements E–H](requirements/phase-2-product.md#e-three-separate-jobs-capture-plan-pre-plan-correction-2026-11-25)); the "not in this change" list is open · Owner: product · Last updated: 2026-11-25
 
 ## Why
 

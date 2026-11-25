@@ -3,7 +3,9 @@ import { dayFromToday, signUp } from "./helpers";
 
 test("routines and recovery breaks shape the plan, and show on Today", async ({ page }) => {
   await signUp(page);
-  await page.goto("/settings");
+  // Pre-planning has its own page (P2-E3).
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Routines" }).click();
+  await expect(page).toHaveURL(/\/routines$/);
 
   // A protected lunch, and work hours that only take Build work.
   const addRoutine = async (name: string, start: string, end: string, policy: string, area?: string) => {
@@ -18,17 +20,29 @@ test("routines and recovery breaks shape the plan, and show on Today", async ({ 
     await form.getByRole("button", { name: "Add routine" }).click();
     await expect(form).toHaveCount(0);
   };
-  await addRoutine("Lunch", "12:30", "13:15", "No tasks");
+  // Lunch from a ready-made starting point: one click fills the form in, to adjust and save.
+  await page.getByRole("group", { name: "Start from a template" }).getByRole("button", { name: /Lunch/ }).click();
+  const lunch = page.getByRole("dialog", { name: "New routine" });
+  await expect(lunch.getByLabel("Name")).toHaveValue("Lunch");
+  for (const d of ["Sat", "Sun"]) await lunch.getByRole("button", { name: d, exact: true }).click(); // weekdays → every day
+  await lunch.getByRole("button", { name: "Add routine" }).click();
+  await expect(lunch).toHaveCount(0);
   await addRoutine("Work hours", "09:00", "12:30", "Only some areas", "Build / Deep work");
-  await expect(page.getByRole("region", { name: "Daily routines" })).toContainText("Every day · 12:30–13:15 · no tasks");
+  const schedule = page.getByRole("region", { name: "Fixed schedule" });
+  await expect(schedule).toContainText("Every day · 12:30–13:15 · no tasks · meal reminder");
+  await expect(page.getByRole("group", { name: "Start from a template" }).getByRole("button", { name: /Lunch/ })).toHaveCount(0);
 
   // Every Build task gets a 15-minute recovery break after it.
-  await page.getByLabel("Recovery break for Build / Deep work").selectOption({ label: "15 min break after" });
+  await page.getByLabel("Break length for Build / Deep work").selectOption({ label: "15 min break" });
+  // Breaks and routines can be given a colour; the Lunch template starts orange.
+  await page.getByRole("radiogroup", { name: "Colour of breaks on your calendar" }).getByRole("radio", { name: "Violet" }).click();
+  await expect(page.getByRole("radiogroup", { name: "Colour of breaks on your calendar" }).getByRole("radio", { name: "Violet" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByLabel("When the break for Build / Deep work happens")).toBeEnabled();
 
   const tomorrow = await dayFromToday(page, 1);
   await page.goto(`/?date=${tomorrow}`);
-  await page.getByRole("button", { name: "Start a brain dump" }).click();
-  const box = page.getByLabel("What needs doing?");
+  await page.getByRole("button", { name: "Plan my day" }).click();
+  const box = page.getByLabel("Add a new task to this plan");
   for (const t of ["Ship the importer", "Do the laundry"]) { await box.fill(t); await box.press("Enter"); }
   const ship = page.getByRole("group", { name: "Options for Ship the importer" });
   await ship.getByRole("button", { name: /^Focus area/ }).click();
@@ -53,10 +67,15 @@ test("routines and recovery breaks shape the plan, and show on Today", async ({ 
   await expect(row("Lunch")).toContainText("protected");
 
   await page.getByRole("button", { name: "Yes, add them all" }).click();
-  const schedule = page.getByRole("region", { name: "Schedule" });
-  await expect(schedule.getByLabel(/Routine: Lunch, 12:30 to 13:15/)).toBeVisible();
-  await expect(schedule).toContainText("15m recovery after");
+  const today = page.getByRole("region", { name: "Schedule" });
+  await expect(today.getByLabel(/Routine: Lunch, 12:30 to 13:15/)).toBeVisible();
+  await expect(today).toContainText("15m recovery after");
 
+  // The Planner shows the routine, the break and a key that explains them (P2-H1).
   await page.goto(`/planner?date=${tomorrow}`);
-  await expect(page.locator(".cal-routine", { hasText: "Lunch" }).first()).toBeVisible();
+  await expect(page.locator('.cal-routine[data-area="orange"]', { hasText: "Lunch" }).first()).toContainText("Lunch 12:30–13:15 · protected");
+  await expect(page.locator('.cal-break[data-area="violet"]').first()).toBeVisible();
+  await expect(page.getByRole("list", { name: "Calendar key" })).toContainText("Recovery break");
+  await page.goto(`/planner?date=${tomorrow}&view=list`);
+  await expect(page.locator(".table")).toContainText("15m recovery after");
 });

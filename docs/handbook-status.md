@@ -1,7 +1,7 @@
 # Handbook adoption status
 
 Tracks the *Production Architecture Handbook* (`docs/handbook/`) roadmap against what is actually in
-the repository. Branch: `feature/handbook-phase-1`. Last updated: 2026-11-14.
+the repository. Last updated: 2026-11-25 (branch `feature/capture-plan-preplan`).
 
 Product features requested for Phase 2 are specified in
 [requirements/phase-2-product.md](requirements/phase-2-product.md) and tracked at the end of the Phase 2 section.
@@ -14,7 +14,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | Item | State | Evidence |
 |---|---|---|
 | Client lint, type-check, tests, build | Done | run locally, all pass |
-| Server build (warnings as errors) and tests against real PostgreSQL | Done | 139 tests pass |
+| Server build (warnings as errors) and tests against real PostgreSQL | Done | 161 tests pass |
 | Migrations against a disposable database | Done | every test run creates a database from migrations; release sequence run by hand |
 | Build the Docker image and run it | **Not done** | no Docker daemon where this was built; CI job `image` does it on the first pull request |
 | Trace five user journeys with timings and SQL counts | **Not done** | no measurements taken yet |
@@ -40,7 +40,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | 5 | Atomic plan and simultaneous edits tested | Done | 8 concurrent writers: exactly one wins |
 | 6 | Migrations as an explicit release step | Done | `--migrate`; readiness fails until applied |
 | 6 | Backups and a restore drill | Partial | `scripts/backup.sh`, `scripts/restore-drill.sh`; drill passed **against a local database only**. No production backups exist because no production exists. |
-| 7 | Playwright end-to-end flows | Done | 16 tests, run locally against the production build |
+| 7 | Playwright end-to-end flows | Done | 18 tests, run locally against the production build |
 | 7 | Verify the full Docker / UAT deployment | **Not done** | no image has been built, no environment exists |
 
 **Also done in Phase 1:** a queryable audit trail shown to the owner (Settings → Account activity); other sessions now end within 60 s of a password change or reset (`Auth__SessionRevalidateSeconds`), instead of Identity's 30-minute default.
@@ -50,7 +50,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | Criterion | Met? |
 |---|---|
 | Security test suite passes | Yes |
-| Sessions persist across deployments | By design (key ring in the database); **not yet demonstrated** by restarting a deployed instance |
+| Sessions persist across deployments | Demonstrated locally: a session survived restarting an instance, and worked across two instances ([performance.md](performance.md)). Not yet on a deployed environment |
 | A tested backup restore succeeds | Locally only |
 | An ordinary user can complete the day-plan flow after a new release | Locally, in the E2E suite; not on a deployed release |
 
@@ -58,18 +58,18 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 
 | Item | State | Notes |
 |---|---|---|
-| Application/use-case boundary for PlanDay, TimeBlock/Finish, Tasks/ChangeStatus | Partial | `Application/Planning/PlanDay`, `Application/Timing/FocusTimer` (finishing blocks), `Application/Calendars/CalendarSync`, typed `Result`, architecture test. Task and area CRUD endpoints still use `DbContext` directly |
+| Application/use-case boundary for PlanDay, TimeBlock/Finish, Tasks/ChangeStatus | Done for the named use cases | `PlanDay`, `CaptureTasks`, `FocusTimer` (finishing blocks), `ChangeTaskStatus` (board → blocks and outcomes), `CalendarSync`; typed `Result`; architecture test. Plain create/read/update endpoints for areas, themes and reviews still use `DbContext` directly — see the next-but-one row |
 | Pure domain time logic | Done | `Domain/CivilTime.cs` |
 | Task lifecycle; no false completion of multi-session tasks | Done | `Domain/TaskCompletion.cs` |
 | Built-in OpenAPI | Done | ADR-002 |
-| Per-endpoint metadata | Partial | blocks and plan declare responses; other endpoints infer them |
-| Generated TypeScript contracts | **Not done** | client types are hand-written |
+| Per-endpoint metadata | Done | every `/api` endpoint declares its success response; `EndpointMetadataTests` fails otherwise. Auth responses are named records (same JSON as before) |
+| Generated TypeScript contracts | Done | ADR-016: `npm run gen:api` generates types from the contract (no new dependency); a test fails if they are stale; `contract.check.ts` fails the type check if a hand-written type drifts. It found one real drift (`Outcome.backlogTaskId`), now fixed |
 | Contract diff in CI | Done | committed snapshot + test |
-| Move endpoint EF access into application/infrastructure | **Not done** | |
-| Feature import rules | Partial | ESLint forbids `lib/` and `components/` from importing features (one violation found and fixed). Rules between features are not enforced yet |
-| Formatting and analyzers | Partial | `.editorconfig`, warnings as errors. No Prettier; `noUncheckedIndexedAccess` not enabled. **`eslint-plugin-jsx-a11y` is blocked:** it does not yet support ESLint 10, and forcing it would break `npm ci` |
+| Move endpoint EF access into application/infrastructure | Partial | every endpoint with a business rule now goes through a use case. Simple CRUD (areas, themes, reviews, outcomes) still queries `DbContext` in the endpoint; moving it would add layers without changing behaviour, so it is left until one of them gains a rule |
+| Feature import rules | Done | ESLint: `lib/` and `components/` import no feature; the building blocks `capture/` and `timer/` import no page; pages do not import each other (the Planner's block editor is the one shared exception). A capture ↔ today cycle was removed. Verified by deliberately violating each rule |
+| Formatting and analyzers | Partial | `.editorconfig`, warnings as errors, `noUncheckedIndexedAccess` on (22 places fixed, one a real guard for dragging past the visible week). No Prettier: adopting it would reformat every file in one unreviewable diff. **`eslint-plugin-jsx-a11y` is blocked:** it does not yet support ESLint 10 |
 | Dependency vulnerability scans | Done in CI definition | `npm audit`, `dotnet list package --vulnerable`; CI has not run yet |
-| Signed release artifact, SBOM | **Not done** | |
+| Signed release artifact, SBOM | Partial | SBOM (SPDX, from BuildKit) is generated and uploaded by the CI image job — **defined but not yet run**: no Docker here, and CI runs on pull requests. Signing needs a container registry: **needs you** |
 | Route lazy loading | Partial | Settings, Guide, Review. Measured: main bundle 736 KB (231 KB gzip); Guide and Review saved only 8 KB. The weight is in animation, menu and drag libraries — splitting those is Phase 3 work |
 | Targeted stale times, key factory, request cancellation | Done | ADR-003 |
 | Architecture dependency test | Done | `ArchitectureTests` |
@@ -86,6 +86,23 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | P2-D1 | Calendar export (subscription feed and .ics) | Done | ADR-015; private regenerable link, titles and times only; browser test |
 | P2-D2 | Read busy time from an existing calendar | Done | ADR-015; SSRF-safe fetch (13 URL + 15 address tests), recurring meetings expanded, plan refuses to book over meetings; tested against a stub server — **not yet against a real Google or Outlook calendar** |
 | P2-D3 | Write into Google Calendar, two-way sync | Phase 3 | needs Google OAuth credentials |
+| P2-E1–E3 | Separate brain dump (capture), Plan my day, and a Routines page | Done | capture endpoint is all-or-nothing (API tests); suggestions and duplicate detection are pure functions (client tests); browser tests for capture, plan and routines |
+| P2-F1–F2 | Today: "now" and a rolling top three | Done | `rollingTopThree` pure function with tests; browser test finishes #1 and sees the next move up |
+| P2-G1 | Board columns follow what happens on Today | Done | `TaskCompletion.AfterSessionChanged` (domain tests); timer start, block status and outcome tick/drop (API tests) |
+| P2-H1 | Calendar shows breaks before and after, routines, meetings, with a legend | Done | browser test checks routine label, break, key and list view |
+| P3-AI1–AI3 | Brain dump from a paragraph, voice or photo | Phase 3 | ADR-012 |
+
+## Phase 3 — reliability and capacity
+
+| Item | State | Notes |
+|---|---|---|
+| Workload simulation with p95/p99, DB connections, memory, request rate | Done locally | `scripts/load/run.mjs`; results in [performance.md](performance.md). One machine, not a deployment |
+| Fix highest-cost query patterns and unbounded results | Partial | connection exhaustion fixed (bounded pool), busiest route 5 → 3 queries. The backlog still returns every task; not a problem at measured sizes |
+| Ingress and global rate limits | Partial | per-account limit on every API call (`RateLimits__RequestsPerMinute`), tested. Ingress limits depend on the host: **needs you** |
+| Two-replica environment: shared keys, session continuity, trusted proxies | Done locally · draining not checked | `scripts/load/two-instances.mjs`, six checks pass. Graceful draining needs a real load balancer |
+| Queue or worker for measured costly work | Not needed yet | nothing measured is slow enough; reminders run in the browser |
+| AI classification and estimation | Not started | P3-AI1–AI3, ADR-012; needs a model provider and budget decision from you |
+| Agreed SLOs, tested rollback, alerts and runbooks | **Needs you** | objectives proposed in performance.md; rollback runbook exists but has not been run on a deployment; no monitoring backend |
 
 ## Handbook requirements not yet met anywhere
 
@@ -95,4 +112,3 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 - No recurring blocks, so the civil-time recurrence rule is untested (§10).
 - Actual start/finish instants are not recorded, only minutes (§10).
 - No data inventory, retention policy or export path (§17.3).
-- No load test, no SLO measurement (§1, Phase 3).

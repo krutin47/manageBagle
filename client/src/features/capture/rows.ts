@@ -107,3 +107,48 @@ export function dueQuickPicks(today: string): { label: string; date: string }[] 
     { label: "Next Monday", date: addDays(today, untilMonday) },
   ];
 }
+
+/** A freshly typed line. It inherits focus area and kind of work from the line above: people dump related things in runs. */
+export function newRow(key: string, title: string, last: Row | undefined): Row {
+  const fresh: Row = {
+    key, taskId: null, title, minutes: 30, minutesChosen: false, focusAreaId: last?.focusAreaId ?? null, workMode: "ShallowWork",
+    isOutside: false, impact: "Medium", dueDate: null, priorityOverride: null, breakMinutes: null, top: null,
+  };
+  return withWorkMode(fresh, last?.workMode ?? "ShallowWork");
+}
+
+const normalise = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
+/** An open backlog task that a captured line probably repeats, so the brain dump can say so instead of duplicating it. */
+export function similarTask(title: string, tasks: Task[]): Task | undefined {
+  const t = normalise(title);
+  if (t.length < 4) return undefined;
+  return tasks.find((task) => {
+    if (task.status === "Done" || task.status === "Skipped") return false;
+    const other = normalise(task.title);
+    return other === t || (other.length >= 6 && t.length >= 6 && (other.includes(t) || t.includes(other)));
+  });
+}
+
+export interface SuggestionGroup { id: "due" | "impact" | "rest"; label: string; tasks: Task[] }
+
+/**
+ * What Plan my day offers from the backlog (P2-E2): open tasks with no time booked, in three groups —
+ * overdue or due within a week (soonest first), then high impact, then the rest by value. Each task
+ * appears once.
+ */
+export function planSuggestions(tasks: Task[], today: string): SuggestionGroup[] {
+  const open = tasks.filter((t) => TaskOpen(t) && !t.scheduledDate);
+  const horizon = addDays(today, 7);
+  const byValue = (a: Task, b: Task) => valueScore(b, today) - valueScore(a, today) || a.createdAt.localeCompare(b.createdAt);
+  const due = open.filter((t) => t.dueDate !== null && t.dueDate <= horizon).sort((a, b) => a.dueDate!.localeCompare(b.dueDate!) || byValue(a, b));
+  const impact = open.filter((t) => !due.includes(t) && t.impact === "High").sort(byValue);
+  const rest = open.filter((t) => !due.includes(t) && !impact.includes(t)).sort(byValue);
+  return [
+    { id: "due" as const, label: "Overdue and due this week", tasks: due },
+    { id: "impact" as const, label: "High impact", tasks: impact },
+    { id: "rest" as const, label: "Everything else", tasks: rest },
+  ].filter((g) => g.tasks.length > 0);
+}
+
+const TaskOpen = (t: Task) => t.status === "Planned" || t.status === "InProgress";

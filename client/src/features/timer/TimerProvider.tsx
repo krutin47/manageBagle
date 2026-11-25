@@ -13,7 +13,8 @@ interface TimerApi {
   running: Block | null;
   start: (block: Block) => void;
   pause: (block: Block) => void;
-  askToStop: (block: Block) => void;
+  /** Opens "how did it go?"; `preset` picks an answer, e.g. from a block's menu. */
+  askToStop: (block: Block, preset?: StopOutcome) => void;
   busy: boolean;
 }
 
@@ -46,7 +47,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   const { data: running = null } = useRunningTimer();
   const { start, pause, extend, stop } = useTimerMutations();
   const [switchTo, setSwitchTo] = useState<{ block: Block; runningTitle: string } | null>(null);
-  const [stopping, setStopping] = useState<Block | null>(null);
+  const [stopping, setStopping] = useState<{ block: Block; preset: StopOutcome } | null>(null);
   const [timeUp, setTimeUp] = useState<Block | null>(null);
   const prompted = useRef(new Set<string>());
 
@@ -68,7 +69,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     running,
     start: (b) => begin(b),
     pause: (b) => pause.mutate(b.id, { onError: (e) => toast.error(errorMessage(e)) }),
-    askToStop: setStopping,
+    askToStop: (block, preset = "Finished") => setStopping({ block, preset }),
     busy: start.isPending || pause.isPending || stop.isPending,
   }), [running, begin, pause, toast, start.isPending, stop.isPending]);
 
@@ -96,7 +97,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   return (
     <TimerContext.Provider value={api}>
       {children}
-      <NowPlaying block={running} now={now} onPause={api.pause} onStop={setStopping} />
+      <NowPlaying block={running} now={now} onPause={api.pause} onStop={(b) => api.askToStop(b)} />
 
       <Dialog open={!!switchTo} onClose={() => setSwitchTo(null)} width="sm" title="Switch what you are working on?"
         description={switchTo ? `“${switchTo.runningTitle}” is running. Only one block can be timed at a time.` : undefined}>
@@ -120,8 +121,8 @@ export function TimerProvider({ children }: { children: ReactNode }) {
         </div>
       </Dialog>
 
-      <StopDialog block={stopping} onClose={() => setStopping(null)} onStop={async (outcome, note) => {
-        await stop.mutateAsync({ blockId: stopping!.id, outcome, note });
+      <StopDialog block={stopping?.block ?? null} preset={stopping?.preset ?? "Finished"} onClose={() => setStopping(null)} onStop={async (outcome, note) => {
+        await stop.mutateAsync({ blockId: stopping!.block.id, outcome, note });
         toast.success(outcome === "Finished" ? "Done. Time recorded." : outcome === "Later" ? "Moved back to your backlog for another time." : "Dropped.");
         setStopping(null);
       }} />
@@ -155,16 +156,17 @@ const STOP_CHOICES: { value: StopOutcome; title: string; body: string; icon: Rea
   { value: "Drop", title: "Drop it", body: "It is not happening. You can say why.", icon: <Trash2 size={18} aria-hidden /> },
 ];
 
-function StopDialog({ block, onClose, onStop }: { block: Block | null; onClose: () => void; onStop: (outcome: StopOutcome, note?: string) => Promise<void> }) {
+function StopDialog({ block, preset, onClose, onStop }: { block: Block | null; preset: StopOutcome; onClose: () => void; onStop: (outcome: StopOutcome, note?: string) => Promise<void> }) {
+  const timing = !!block?.timerStartedAt;
   return (
-    <Dialog open={!!block} onClose={onClose} width="sm" title="Stop the timer" description={block ? `How did “${block.title}” go?` : undefined}>
-      {block && <StopForm key={block.id} onClose={onClose} onStop={onStop} />}
+    <Dialog open={!!block} onClose={onClose} width="sm" title={timing ? "Stop the timer" : "Close this block"} description={block ? `How did “${block.title}” go?` : undefined}>
+      {block && <StopForm key={`${block.id}-${preset}`} preset={preset} timing={timing} onClose={onClose} onStop={onStop} />}
     </Dialog>
   );
 }
 
-function StopForm({ onClose, onStop }: { onClose: () => void; onStop: (outcome: StopOutcome, note?: string) => Promise<void> }) {
-  const [outcome, setOutcome] = useState<StopOutcome>("Finished");
+function StopForm({ preset, timing, onClose, onStop }: { preset: StopOutcome; timing: boolean; onClose: () => void; onStop: (outcome: StopOutcome, note?: string) => Promise<void> }) {
+  const [outcome, setOutcome] = useState<StopOutcome>(preset);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -198,7 +200,7 @@ function StopForm({ onClose, onStop }: { onClose: () => void; onStop: (outcome: 
         )}
       </div>
       <footer className="dialog-foot">
-        <Button onClick={onClose}>Keep timing</Button>
+        <Button onClick={onClose}>{timing ? "Keep timing" : "Cancel"}</Button>
         <Button variant={outcome === "Drop" ? "danger" : "primary"} loading={busy} onClick={submit}>
           {outcome === "Finished" ? "Mark done" : outcome === "Later" ? "Save for later" : "Drop it"}
         </Button>
@@ -228,6 +230,20 @@ export function TimerButton({ block }: { block: Block }) {
       {(isRunning || block.trackedSeconds > 0) && (
         <IconButton size="sm" label={`Stop ${block.title}`} onClick={() => timer.askToStop(isRunning ? timer.running! : block)}><Square size={13} /></IconButton>
       )}
+    </span>
+  );
+}
+
+/** A quiet "running" marker for a block shown elsewhere; the controls live on the Now card and the bar. */
+export function RunningTag({ block }: { block: Block }) {
+  const timer = useFocusTimer();
+  const isRunning = timer.running?.id === block.id && !!block.timerStartedAt;
+  const now = useTick(isRunning);
+  if (!isRunning) return null;
+  return (
+    <span className="running-tag">
+      <span className="now-playing-dot" aria-hidden />
+      <span className="sr-only">Timer running, </span>{formatClock(elapsedSeconds(timer.running!, now))}
     </span>
   );
 }

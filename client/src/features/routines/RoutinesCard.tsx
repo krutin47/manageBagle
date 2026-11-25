@@ -1,8 +1,9 @@
-import { Coffee, Lock, Pencil, Plus, Repeat, Trash2, Utensils } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { Bell, Coffee, Dumbbell, Lock, Moon, Pencil, Plus, Repeat, Trash2, Utensils, Briefcase } from "lucide-react";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { ColorPicker } from "../../components/ColorPicker";
 import { useToast } from "../../components/toast";
 import { Button, ConfirmDialog, cx, Dialog, ErrorNote, Field, IconButton, Input, Segmented, Select, Skeleton } from "../../components/ui";
-import { ApiError, errorMessage, type Area, type Preferences, type Routine, type RoutineInput, type TaskPolicy, type WeekdayFlag } from "../../lib/api";
+import { ApiError, errorMessage, type Area, type AreaColor, type Preferences, type Routine, type RoutineInput, type TaskPolicy, type WeekdayFlag } from "../../lib/api";
 import { useAreas, usePreferences, useRoutineMutations, useRoutines, useSavePreferences } from "../../lib/queries";
 import { trimSeconds } from "../../lib/time";
 
@@ -33,28 +34,54 @@ export function describeDays(days: WeekdayFlag[]): string {
 
 const POLICY_LABEL: Record<TaskPolicy, string> = { NoTasks: "No tasks", AnyTask: "Any task", SelectedAreas: "Only some areas" };
 
+/** Ready-made starting points (P2-E3): one click opens the form filled in, to adjust and save. */
+export function routineTemplates(areas: Area[]): { key: string; icon: ReactNode; input: RoutineInput }[] {
+  // Work hours accept work-like focus areas when there are any; otherwise any task.
+  const work = areas.filter((a) => /work|career|job|build|client|office/i.test(a.name)).map((a) => a.id);
+  return [
+    { key: "lunch", icon: <Utensils size={15} aria-hidden />, input: { title: "Lunch", days: WORKDAYS.join(", "), start: "12:30:00", end: "13:15:00", taskPolicy: "NoTasks", areaIds: [], isMeal: true, color: "orange" } },
+    { key: "dinner", icon: <Utensils size={15} aria-hidden />, input: { title: "Dinner", days: DAYS.map((d) => d.flag).join(", "), start: "19:00:00", end: "19:45:00", taskPolicy: "NoTasks", areaIds: [], isMeal: true, color: "orange" } },
+    { key: "workout", icon: <Dumbbell size={15} aria-hidden />, input: { title: "Workout", days: "Monday, Wednesday, Friday", start: "07:00:00", end: "08:00:00", taskPolicy: "NoTasks", areaIds: [], isMeal: false, color: "green" } },
+    { key: "work", icon: <Briefcase size={15} aria-hidden />, input: { title: "Work hours", days: WORKDAYS.join(", "), start: "09:00:00", end: "17:00:00", taskPolicy: work.length ? "SelectedAreas" : "AnyTask", areaIds: work, isMeal: false, color: "blue" } },
+    { key: "wind-down", icon: <Moon size={15} aria-hidden />, input: { title: "Wind-down", days: DAYS.map((d) => d.flag).join(", "), start: "21:30:00", end: "22:30:00", taskPolicy: "NoTasks", areaIds: [], isMeal: false, color: "violet" } },
+  ];
+}
+
 export function RoutinesCard() {
   const routines = useRoutines();
   const areas = useAreas();
   const { remove } = useRoutineMutations();
   const toast = useToast();
-  const [editing, setEditing] = useState<Routine | "new" | null>(null);
+  const [editing, setEditing] = useState<Routine | RoutineInput | "new" | null>(null);
+  const existing = new Set((routines.data ?? []).map((r) => r.title.trim().toLowerCase()));
+  const templates = routineTemplates(areas.data ?? []).filter((t) => !existing.has(t.input.title.toLowerCase()));
   const [deleting, setDeleting] = useState<Routine | null>(null);
 
   return (
     <section className="card" aria-labelledby="routines">
       <header className="card-head">
         <div>
-          <h2 id="routines">Daily routines</h2>
+          <h2 id="routines">Fixed schedule</h2>
           <p>Time that is already spoken for — meals, workouts, work hours. Planning starts around it, and you decide what may go inside.</p>
         </div>
         <Button icon={<Plus size={16} aria-hidden />} onClick={() => setEditing("new")}>Add routine</Button>
       </header>
+      {templates.length > 0 && (
+        <div className="routine-templates" role="group" aria-label="Start from a template">
+          <span className="field-label">Start from</span>
+          {templates.map((t) => (
+            <button key={t.key} type="button" className="suggest-chip" onClick={() => setEditing(t.input)}>
+              {t.icon} {t.input.title}
+              <em>{trimSeconds(t.input.start)}–{trimSeconds(t.input.end)}</em>
+            </button>
+          ))}
+        </div>
+      )}
       {routines.isPending ? <Skeleton height={80} radius={10} /> : routines.isError ? <ErrorNote onRetry={() => routines.refetch()}>We could not load your routines.</ErrorNote>
-        : routines.data.length === 0 ? <p className="muted">No routines yet. Start with lunch: it is the one most often eaten by meetings.</p> : (
+        : routines.data.length === 0 ? <p className="muted">No routines yet. Start with lunch above: it is the one most often eaten by meetings.</p> : (
           <ul className="routine-list">
             {routines.data.map((r) => (
-              <li key={r.id}>
+              <li key={r.id} data-area={r.color ?? "none"}>
                 <span className="routine-icon" aria-hidden>{r.isMeal ? <Utensils size={16} /> : r.taskPolicy === "NoTasks" ? <Lock size={16} /> : <Repeat size={16} />}</span>
                 <div>
                   <strong>{r.title}</strong>
@@ -68,8 +95,11 @@ export function RoutinesCard() {
             ))}
           </ul>
         )}
-      <Dialog open={!!editing} onClose={() => setEditing(null)} title={editing === "new" ? "New routine" : "Edit routine"}>
-        {editing && <RoutineForm key={editing === "new" ? "new" : editing.id} routine={editing === "new" ? null : editing} areas={areas.data ?? []} onClose={() => setEditing(null)} />}
+      <Dialog open={!!editing} onClose={() => setEditing(null)} title={editing === null || editing === "new" || !("id" in editing) ? "New routine" : "Edit routine"}>
+        {editing && (
+          <RoutineForm key={editing === "new" ? "new" : "id" in editing ? editing.id : editing.title}
+            routine={editing === "new" ? null : editing} areas={areas.data ?? []} onClose={() => setEditing(null)} />
+        )}
       </Dialog>
       <ConfirmDialog open={!!deleting} onClose={() => setDeleting(null)} title={`Delete “${deleting?.title}”?`} body="Planned blocks are not affected." confirmLabel="Delete routine"
         loading={remove.isPending} onConfirm={() => deleting && remove.mutate(deleting.id, { onSuccess: () => setDeleting(null), onError: (e) => toast.error(errorMessage(e)) })} />
@@ -77,7 +107,9 @@ export function RoutinesCard() {
   );
 }
 
-function RoutineForm({ routine, areas, onClose }: { routine: Routine | null; areas: Area[]; onClose: () => void }) {
+/** `routine` is an existing routine to edit, a template to start from, or null for a blank one. */
+function RoutineForm({ routine, areas, onClose }: { routine: Routine | RoutineInput | null; areas: Area[]; onClose: () => void }) {
+  const saved = routine && "id" in routine ? routine : null;
   const { create, update } = useRoutineMutations();
   const [title, setTitle] = useState(routine?.title ?? "");
   const [days, setDays] = useState<WeekdayFlag[]>(routine ? parseDays(routine.days) : WORKDAYS);
@@ -86,15 +118,16 @@ function RoutineForm({ routine, areas, onClose }: { routine: Routine | null; are
   const [policy, setPolicy] = useState<TaskPolicy>(routine?.taskPolicy ?? "NoTasks");
   const [areaIds, setAreaIds] = useState<string[]>(routine?.areaIds ?? []);
   const [isMeal, setIsMeal] = useState(routine?.isMeal ?? false);
+  const [color, setColor] = useState<AreaColor | null>(routine?.color ?? null);
   const [error, setError] = useState<ApiError | null>(null);
 
   const toggleDay = (d: WeekdayFlag) => setDays((list) => (list.includes(d) ? list.filter((x) => x !== d) : [...list, d]));
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-    const body: RoutineInput = { title, days: days.join(", "), start: `${start}:00`, end: `${end}:00`, taskPolicy: policy, areaIds: policy === "SelectedAreas" ? areaIds : [], isMeal };
+    const body: RoutineInput = { title, days: days.join(", "), start: `${start}:00`, end: `${end}:00`, taskPolicy: policy, areaIds: policy === "SelectedAreas" ? areaIds : [], isMeal, color };
     try {
-      if (routine) await update.mutateAsync({ ...body, id: routine.id });
+      if (saved) await update.mutateAsync({ ...body, id: saved.id });
       else await create.mutateAsync(body);
       onClose();
     } catch (err) {
@@ -137,11 +170,15 @@ function RoutineForm({ routine, areas, onClose }: { routine: Routine | null; are
             {error?.field("areaIds") && <p className="field-error" role="alert">{error.field("areaIds")}</p>}
           </div>
         )}
+        <div className="field">
+          <span className="field-label">Colour on your calendar</span>
+          <ColorPicker label="Colour on your calendar" noneLabel="Neutral" value={color} onChange={setColor} />
+        </div>
         <label className="check"><input type="checkbox" checked={isMeal} onChange={(e) => setIsMeal(e.target.checked)} /> It is a meal — remind me when it starts</label>
       </div>
       <footer className="dialog-foot">
         <Button onClick={onClose}>Cancel</Button>
-        <Button type="submit" variant="primary" loading={create.isPending || update.isPending} disabled={!title.trim() || days.length === 0}>{routine ? "Save routine" : "Add routine"}</Button>
+        <Button type="submit" variant="primary" loading={create.isPending || update.isPending} disabled={!title.trim() || days.length === 0}>{saved ? "Save routine" : "Add routine"}</Button>
       </footer>
     </form>
   );
@@ -159,8 +196,8 @@ export function YourDayCard() {
     <section className="card" aria-labelledby="your-day">
       <header className="card-head">
         <div>
-          <h2 id="your-day">Your day</h2>
-          <p>Automatic planning stays inside these hours. Reminders only appear during them.</p>
+          <h2 id="your-day">Your day and reminders</h2>
+          <p>Automatic planning stays inside these hours. Reminders only appear during them; meal reminders come from routines marked as a meal.</p>
         </div>
       </header>
       {prefs.data ? <YourDayForm key={JSON.stringify(prefs.data)} prefs={prefs.data} /> : <Skeleton height={80} radius={10} />}
@@ -175,7 +212,7 @@ function YourDayForm({ prefs }: { prefs: Preferences }) {
   const changed = form.dayStart !== trimSeconds(prefs.dayStart) || form.dayEnd !== trimSeconds(prefs.dayEnd) || form.water !== (prefs.waterReminderMinutes === null ? "off" : String(prefs.waterReminderMinutes));
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    save.mutate({ dayStart: `${form.dayStart}:00`, dayEnd: `${form.dayEnd}:00`, waterReminderMinutes: form.water === "off" ? null : Number(form.water) },
+    save.mutate({ dayStart: `${form.dayStart}:00`, dayEnd: `${form.dayEnd}:00`, waterReminderMinutes: form.water === "off" ? null : Number(form.water), breakColor: prefs.breakColor },
       { onSuccess: () => toast.success("Saved"), onError: (err) => toast.error(errorMessage(err)) });
   };
   return (
@@ -185,7 +222,24 @@ function YourDayForm({ prefs }: { prefs: Preferences }) {
         <Field label="Day ends">{(p) => <Input {...p} type="time" step={300} value={form.dayEnd} onChange={(e) => setForm({ ...form, dayEnd: e.target.value })} />}</Field>
         <Field label="Drink water reminder">{(p) => <Select {...p} value={form.water} onChange={(e) => setForm({ ...form, water: e.target.value })}>{WATER.map((w) => <option key={w.value} value={w.value}>{w.label}</option>)}</Select>}</Field>
       </div>
-      <div><Button type="submit" variant="primary" icon={<Coffee size={16} aria-hidden />} loading={save.isPending} disabled={!changed}>Save</Button></div>
+      <div className="your-day-foot">
+        <Button type="submit" variant="primary" icon={<Coffee size={16} aria-hidden />} loading={save.isPending} disabled={!changed}>Save</Button>
+        <NotificationPermission />
+      </div>
     </form>
+  );
+}
+
+/** Reminders show as toasts in the app; with permission they also show while the tab is in the background (P2-C5). */
+function NotificationPermission() {
+  const supported = typeof window !== "undefined" && "Notification" in window;
+  const [state, setState] = useState(() => (supported ? Notification.permission : "denied"));
+  if (!supported) return null;
+  if (state === "granted") return <span className="muted"><Bell size={14} aria-hidden /> Notifications on while the app is open in a tab</span>;
+  if (state === "denied") return <span className="muted">Browser notifications are blocked; reminders still appear in the app.</span>;
+  return (
+    <Button variant="ghost" icon={<Bell size={16} aria-hidden />} onClick={() => void Notification.requestPermission().then(setState, () => undefined)}>
+      Also notify me in the background
+    </Button>
   );
 }

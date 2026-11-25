@@ -93,6 +93,9 @@ export interface Task {
   breakMinutes: number | null;
 }
 
+/** One line of a brain dump. */
+export type CaptureItem = Pick<Task, "title" | "estimatedMinutes" | "focusAreaId" | "workMode" | "isOutside" | "priority" | "impact" | "dueDate" | "breakMinutes">;
+
 export type TaskInput = Omit<Task, "id" | "scheduledDate" | "createdAt" | "version" | "breakMinutes"> & { breakMinutes?: number | null };
 
 export interface Outcome {
@@ -102,8 +105,8 @@ export interface Outcome {
   nextAction: string;
   status: Status;
   minutesNeeded: number | null;
-  /** Present when the outcome came from a planned task; ticking either finishes both. */
-  backlogTaskId?: string | null;
+  /** Set when the outcome came from a planned task; ticking either finishes both. */
+  backlogTaskId: string | null;
 }
 
 export type ProviderKey = "google" | "microsoft";
@@ -138,6 +141,8 @@ export interface Routine {
   taskPolicy: TaskPolicy;
   areaIds: string[];
   isMeal: boolean;
+  /** Colour on the calendar; null is the neutral default. */
+  color: AreaColor | null;
 }
 
 export type RoutineInput = Omit<Routine, "id">;
@@ -154,6 +159,8 @@ export interface Commitment {
   taskPolicy: TaskPolicy;
   areaIds: string[];
   isMeal: boolean;
+  /** The routine's colour; always null for meetings. */
+  color: AreaColor | null;
 }
 
 export interface CalendarConnection {
@@ -174,6 +181,8 @@ export interface Preferences {
   dayStart: string;
   dayEnd: string;
   waterReminderMinutes: number | null;
+  /** Colour of recovery breaks on the calendar; null is the default green. */
+  breakColor: AreaColor | null;
 }
 
 export interface Review { biggestWin: string; interruptions: string; changeTomorrow: string }

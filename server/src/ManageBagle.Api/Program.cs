@@ -51,8 +51,13 @@ if (!string.IsNullOrWhiteSpace(config["OTEL_EXPORTER_OTLP_ENDPOINT"]))
         .WithMetrics(m => m.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddOtlpExporter());
 }
 
+// Each instance takes at most Database:MaxPoolSize connections (default 30) unless the connection
+// string sets "Maximum Pool Size" itself. Instances × pool must stay under PostgreSQL's
+// max_connections, or overload turns into errors instead of a short queue (docs/performance.md).
 builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(
-    config.GetConnectionString("Default") ?? throw new InvalidOperationException("ConnectionStrings:Default is not configured.")));
+    ManageBagle.Api.Infrastructure.Database.WithPoolLimit(
+        config.GetConnectionString("Default") ?? throw new InvalidOperationException("ConnectionStrings:Default is not configured."),
+        config.GetValue("Database:MaxPoolSize", 30))));
 
 // Keys that encrypt auth cookies live in the database so they survive restarts and scale-out.
 builder.Services.AddDataProtection().SetApplicationName("manageBagle").PersistKeysToDbContext<AppDbContext>();
@@ -158,6 +163,8 @@ builder.Services.AddSingleton<IAppEmailSender, AppEmailSender>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<AccountLinks>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Planning.PlanDay>();
+builder.Services.AddScoped<ManageBagle.Api.Application.Planning.CaptureTasks>();
+builder.Services.AddScoped<ManageBagle.Api.Application.Tasks.ChangeTaskStatus>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Timing.FocusTimer>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Calendars.CalendarSync>();
 builder.Services.AddHttpClient(SafeFetch.ClientName, c =>
@@ -184,6 +191,16 @@ builder.Services.AddRateLimiter(o =>
         ctx.HttpContext.Response.Headers.RetryAfter = "60";
         await HttpExtensions.Problem(StatusCodes.Status429TooManyRequests, ErrorCodes.RateLimited, "Too many attempts. Wait a minute and try again.").ExecuteAsync(ctx.HttpContext);
     };
+    // A ceiling on every API call per account (or per address when signed out), so one runaway
+    // client or script cannot take the capacity everyone shares. Far above what a person does:
+    // the load test's busiest simulated user made about 16 requests a second (docs/performance.md).
+    var perMinute = config.GetValue("RateLimits:RequestsPerMinute", 1200);
+    o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+        ctx.Request.Path.StartsWithSegments("/api")
+            ? RateLimitPartition.GetFixedWindowLimiter(
+                ctx.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = perMinute, Window = TimeSpan.FromMinutes(1) })
+            : RateLimitPartition.GetNoLimiter("not-api"));
     var authLimit = config.GetValue("RateLimits:AuthPerMinute", 20);
     o.AddPolicy("auth", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",

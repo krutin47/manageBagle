@@ -4,15 +4,15 @@ import { describe, expect, it } from "vitest";
 /** Parses tokens.css so the test checks the real shipped values, not a copy. */
 function readTokens(theme: "light" | "dark"): Record<string, string> {
   const css = readFileSync(new URL("./tokens.css", import.meta.url), "utf8");
-  const [light, dark] = css.split(':root[data-theme="dark"]');
+  const [light = "", dark = ""] = css.split(':root[data-theme="dark"]');
   const tokens: Record<string, string> = {};
-  for (const m of light.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})/gi)) tokens[m[1]] = m[2];
-  if (theme === "dark") for (const m of dark.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})/gi)) tokens[m[1]] = m[2];
+  for (const m of light.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})/gi)) tokens[m[1]!] = m[2]!;
+  if (theme === "dark") for (const m of dark.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})/gi)) tokens[m[1]!] = m[2]!;
   return tokens;
 }
 
 function luminance(hex: string): number {
-  const [r, g, b] = [1, 3, 5].map((i) => {
+  const [r = 0, g = 0, b = 0] = [1, 3, 5].map((i) => {
     const c = parseInt(hex.slice(i, i + 2), 16) / 255;
     return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
   });
@@ -20,7 +20,7 @@ function luminance(hex: string): number {
 }
 
 export function contrast(a: string, b: string): number {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  const [hi = 0, lo = 0] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 }
 
@@ -74,7 +74,7 @@ describe.each(["light", "dark"] as const)("WCAG AA contrast — %s theme", (them
   it.each(pairs)("%s on %s is at least %s:1", (fg, bg, min) => {
     expect(t[fg], `missing token --${fg}`).toBeDefined();
     expect(t[bg], `missing token --${bg}`).toBeDefined();
-    const ratio = contrast(t[fg], t[bg]);
+    const ratio = contrast(t[fg]!, t[bg]!);
     expect(ratio, `${t[fg]} on ${t[bg]} = ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(min);
   });
 });

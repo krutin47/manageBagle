@@ -5,9 +5,9 @@ import { advanceTime, signUp } from "./helpers";
 test.describe.configure({ mode: "serial" });
 
 async function planOneBlock(page: import("@playwright/test").Page, title: string, minutes = "30m") {
-  await page.getByRole("button", { name: "Start a brain dump" }).click();
-  await page.getByLabel("What needs doing?").fill(title);
-  await page.getByLabel("What needs doing?").press("Enter");
+  await page.getByRole("button", { name: "Plan my day" }).click();
+  await page.getByLabel("Add a new task to this plan").fill(title);
+  await page.getByLabel("Add a new task to this plan").press("Enter");
   if (minutes !== "30m") {
     await page.getByRole("group", { name: `Options for ${title}` }).getByRole("button", { name: /^Length/ }).click();
     await page.getByRole("menuitemradio", { name: minutes }).click();
@@ -21,9 +21,10 @@ test("press play, pause, and the time worked is recorded and survives a reload",
   await signUp(page);
   await page.goto("/");
   await planOneBlock(page, "Write the report");
-  const schedule = page.getByRole("region", { name: "Schedule" });
-
-  await schedule.getByRole("button", { name: "Start timer for Write the report" }).click();
+  // One play button on Today: on the Now card.
+  const now = page.getByRole("region", { name: "Now" });
+  await expect(page.getByRole("region", { name: "Schedule" }).getByRole("button", { name: /Start timer/ })).toHaveCount(0);
+  await now.getByRole("button", { name: "Start timer for Write the report" }).click();
   const bar = page.getByRole("region", { name: "Focus timer" });
   await expect(bar).toContainText("Write the report");
 
@@ -33,39 +34,38 @@ test("press play, pause, and the time worked is recorded and survives a reload",
   await expect(bar).toHaveCount(0);
 
   await page.reload();
-  const row = page.getByRole("region", { name: "Schedule" });
-  await expect(row.getByRole("button", { name: "Resume timer for Write the report" })).toBeVisible();
-  await expect(row.getByLabel("Actual minutes for Write the report")).toHaveValue("12");
+  await expect(page.getByRole("region", { name: "Now" }).getByRole("button", { name: "Resume timer for Write the report" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Schedule" }).getByLabel("Actual minutes for Write the report")).toHaveValue("12");
 });
 
 test("only one block runs at a time; starting another asks first", async ({ page }) => {
   await signUp(page);
   await page.goto("/");
   await planOneBlock(page, "First thing");
-  await page.getByRole("button", { name: "Brain dump", exact: true }).click();
-  await page.getByLabel("What needs doing?").fill("Second thing");
-  await page.getByLabel("What needs doing?").press("Enter");
-  await page.getByRole("button", { name: /Next: top three/ }).click();
-  await page.getByRole("button", { name: /Next: fit into the day/ }).click();
-  await page.getByRole("button", { name: "Add to the day" }).click();
+  await planOneBlock(page, "Second thing");
 
   const schedule = page.getByRole("region", { name: "Schedule" });
-  await schedule.getByRole("button", { name: "Start timer for First thing" }).click();
+  const now = page.getByRole("region", { name: "Now" });
+  await now.getByRole("button", { name: "Start timer for First thing" }).click();
   await expect(page.getByRole("region", { name: "Focus timer" })).toContainText("First thing");
-  await schedule.getByRole("button", { name: "Start timer for Second thing" }).click();
+  // Something else can still be started, from its row's menu.
+  await schedule.locator(".agenda-row", { hasText: "Second thing" }).getByRole("button", { name: /Change status/ }).click();
+  await page.getByRole("menuitem", { name: "Start timer now" }).click();
   const ask = page.getByRole("dialog", { name: "Switch what you are working on?" });
   await expect(ask).toContainText("“First thing” is running");
   await ask.getByRole("button", { name: /Pause it and start/ }).click();
   await expect(page.getByRole("region", { name: "Focus timer" })).toContainText("Second thing");
-  // Paused within a second or two, so it has no time banked and offers "Start" again.
-  await expect(schedule.getByRole("button", { name: /(Start|Resume) timer for First thing/ })).toBeVisible();
+  // The Now card follows what is running.
+  await expect(now).toContainText("Second thing");
+  await expect(schedule.locator(".agenda-row", { hasText: "Second thing" }).locator(".running-tag")).toBeVisible();
+  await expect(schedule.locator(".agenda-row", { hasText: "First thing" }).locator(".running-tag")).toHaveCount(0);
 });
 
 test("time's up asks whether more time is needed, and stopping can drop the task with a note", async ({ page }) => {
   await signUp(page);
   await page.goto("/");
   await planOneBlock(page, "Tidy the garage", "15m");
-  await page.getByRole("region", { name: "Schedule" }).getByRole("button", { name: "Start timer for Tidy the garage" }).click();
+  await page.getByRole("region", { name: "Now" }).getByRole("button", { name: "Start timer for Tidy the garage" }).click();
 
   await advanceTime(page, 15.1);
   const timeUp = page.getByRole("dialog", { name: "Time's up" });

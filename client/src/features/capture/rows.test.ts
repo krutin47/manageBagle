@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Area } from "../../lib/api";
-import { dueQuickPicks, priorityFromDue, priorityOf, rowFromTask, sortRows, topicGroups, valueScore, withWorkMode, type Row } from "./brainDump";
+import type { Area, Task } from "../../lib/api";
+import { dueQuickPicks, newRow, planSuggestions, priorityFromDue, similarTask, priorityOf, rowFromTask, sortRows, topicGroups, valueScore, withWorkMode, type Row } from "./rows";
 
 const TODAY = "2026-11-25"; // a Wednesday
 const areas: Area[] = [
@@ -76,4 +76,43 @@ describe("due-date quick picks (P2-A6)", () => {
   it("offers today, tomorrow, this Friday and next Monday", () =>
     expect(dueQuickPicks(TODAY).map((p) => p.date)).toEqual(["2026-11-25", "2026-11-26", "2026-11-27", "2026-11-30"]));
   it("on a Friday, 'this Friday' means next week's", () => expect(dueQuickPicks("2026-11-27")[2]!.date).toBe("2026-12-04"));
+});
+
+const task = (p: Partial<Task>): Task => ({
+  id: `t${n++}`, title: "task", focusAreaId: null, estimatedMinutes: 30, priority: "Low", dueDate: null, status: "Planned", nextStep: "", workMode: "ShallowWork",
+  isOutside: false, impact: "Medium", scheduledDate: null, createdAt: "2026-11-01T00:00:00Z", version: 1, breakMinutes: null, ...p,
+});
+
+describe("plan my day suggests from the backlog (P2-E2)", () => {
+  const tasks = [
+    task({ title: "Later, high impact", impact: "High", dueDate: "2026-12-20" }),
+    task({ title: "Due Friday", dueDate: "2026-11-27" }),
+    task({ title: "Overdue", dueDate: "2026-11-20" }),
+    task({ title: "Someday" }),
+    task({ title: "Already booked", dueDate: "2026-11-25", scheduledDate: "2026-11-25" }),
+    task({ title: "Finished", dueDate: "2026-11-25", status: "Done" }),
+  ];
+  it("groups open, unbooked tasks: due soon first, then high impact, then the rest", () => {
+    expect(planSuggestions(tasks, TODAY).map((g) => [g.id, g.tasks.map((t) => t.title)])).toEqual([
+      ["due", ["Overdue", "Due Friday"]],
+      ["impact", ["Later, high impact"]],
+      ["rest", ["Someday"]],
+    ]);
+  });
+  it("leaves out empty groups", () => expect(planSuggestions([task({ title: "Someday" })], TODAY).map((g) => g.id)).toEqual(["rest"]));
+});
+
+describe("brain dump capture (P2-E1)", () => {
+  it("spots a line that repeats an open backlog task", () => {
+    const open = [task({ title: "Renew passport!" }), task({ title: "Call the bank", status: "Done" })];
+    expect(similarTask("renew passport", open)?.title).toBe("Renew passport!");
+    expect(similarTask("Renew passport before trip", open)?.title).toBe("Renew passport!");
+    expect(similarTask("Call the bank", open)).toBeUndefined(); // finished tasks do not count
+    expect(similarTask("tax", [task({ title: "tax" })])).toBeUndefined(); // too short to judge
+  });
+  it("starts a new line with the focus area and kind of work of the one above", () => {
+    const above = row({ focusAreaId: "build", workMode: "DeepFocus" });
+    const fresh = newRow("x", "Next thing", above);
+    expect([fresh.focusAreaId, fresh.workMode, fresh.minutes]).toEqual(["build", "DeepFocus", 120]);
+  });
 });

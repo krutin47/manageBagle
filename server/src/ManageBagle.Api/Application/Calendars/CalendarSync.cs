@@ -128,9 +128,14 @@ public sealed class CalendarSync(AppDbContext db, IHttpClientFactory http, IData
 
     /// <summary>Imported busy events touching the given dates, in the account's time zone.</summary>
     public static async Task<IReadOnlyList<(Guid ConnectionId, string Title, DateOnly Date, TimeOnly Start, TimeOnly End, int Minutes)>> BusyOnAsync(
-        AppDbContext db, Guid userId, DateOnly from, DateOnly to, CancellationToken ct)
+        AppDbContext db, Guid userId, DateOnly from, DateOnly to, CancellationToken ct) =>
+        await BusyOnAsync(db, userId, from, to, TimeZones.Find(await db.Users.Where(u => u.Id == userId).Select(u => u.TimeZoneId).FirstOrDefaultAsync(ct)), ct);
+
+    /// <summary>As above, for a caller that already knows the account's zone (saves a query).</summary>
+    public static async Task<IReadOnlyList<(Guid ConnectionId, string Title, DateOnly Date, TimeOnly Start, TimeOnly End, int Minutes)>> BusyOnAsync(
+        AppDbContext db, Guid userId, DateOnly from, DateOnly to, TimeZoneInfo? accountZone, CancellationToken ct)
     {
-        var zone = TimeZones.Find(await db.Users.Where(u => u.Id == userId).Select(u => u.TimeZoneId).FirstOrDefaultAsync(ct)) ?? TimeZoneInfo.Utc;
+        var zone = accountZone ?? TimeZoneInfo.Utc;
         var windowStart = new DateTimeOffset(from.AddDays(-1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
         var windowEnd = new DateTimeOffset(to.AddDays(2).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
         var events = await db.ExternalEvents.AsNoTracking()

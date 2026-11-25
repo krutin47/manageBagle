@@ -16,6 +16,7 @@ import { setTimeZone } from "./lib/time";
 const SettingsPage = lazy(() => import("./features/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 // Visited rarely, so not part of the first download (handbook §5.4).
 const GuidePage = lazy(() => import("./features/guide/GuidePage").then((m) => ({ default: m.GuidePage })));
+const RoutinesPage = lazy(() => import("./features/routines/RoutinesPage").then((m) => ({ default: m.RoutinesPage })));
 const ReviewPage = lazy(() => import("./features/review/ReviewPage").then((m) => ({ default: m.ReviewPage })));
 
 function Splash() {
@@ -90,6 +91,7 @@ export function App() {
         <Route path="/week" element={<WeekPage />} />
         <Route path="/planner" element={<PlannerPage />} />
         <Route path="/backlog" element={<BacklogPage />} />
+        <Route path="/routines" element={<Suspense fallback={null}><RoutinesPage /></Suspense>} />
         <Route path="/review" element={<Suspense fallback={null}><ReviewPage /></Suspense>} />
         <Route path="/guide" element={<Suspense fallback={null}><GuidePage /></Suspense>} />
         <Route path="/settings" element={<Suspense fallback={null}><SettingsPage /></Suspense>} />

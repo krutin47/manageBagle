@@ -1,6 +1,6 @@
 # Phase 2 product requirements
 
-Status: **built** (A–D2) on `feature/handbook-phase-1`; D3 is Phase 3 · Source: product owner, 2026-11-25 · Tracks into
+Status: A–D2 built (merged to `dev`); E–H built on `feature/capture-plan-preplan`; D3 and AI are Phase 3 · Source: product owner, 2026-11-25 · Tracks into
 [handbook-status.md](../handbook-status.md) (Phase 2 — product)
 
 These are the product owner's requests, restated as requirements with acceptance criteria so each
@@ -166,6 +166,81 @@ Writing blocks directly into Google Calendar, and keeping both sides in step, ne
 API with OAuth consent per user. Recorded for **Phase 3** (see ADR-015).
 
 ---
+
+## E. Three separate jobs: capture, plan, pre-plan (correction, 2026-11-25)
+
+The first build merged capturing and planning into one "brain dump" flow and tucked routines into
+Settings. That is not what was asked. They are three different jobs, done at different moments, and
+each gets its own place:
+
+| Job | Question it answers | Where | Result |
+|---|---|---|---|
+| **Brain dump** (capture) | "What is on my mind?" | a button available on every page | tasks in the backlog, nothing scheduled |
+| **Plan my day** | "What will I do today, and when?" | Today | top three chosen from the backlog, blocks on the calendar |
+| **Pre-plan** (routines) | "What does every day already hold?" | its own page, *Routines* | lunch, workouts, work hours, breaks, reminders |
+
+### P2-E1 Brain dump only captures
+Type (later: speak or photograph) everything on your mind; each line becomes a backlog task with
+its details (length, kind of work, focus area, impact, due date, recovery break, outside work). It
+does not choose a top three and does not book time. One save, all or nothing.
+
+### P2-E2 Planning is its own step
+*Plan my day* starts from the backlog: it suggests what is overdue, due soon or high impact, lets the
+person pick, then choose the top three, then fits them into the day around routines and meetings.
+A task can still be typed in during planning when something new comes up.
+
+*Decision:* "the brain dump should suggest tasks from the backlog" is met here, in planning. The
+brain dump itself only captures; it points out a line that repeats an open backlog task instead of
+offering backlog tasks to add.
+
+### P2-E3 Pre-planning has its own page
+*Routines* is a main page, not a Settings card. It holds the fixed daily schedule (P2-C1, C2), the day
+window, recovery breaks per focus area (P2-C4) and reminders (P2-C5). Adding a routine takes one click
+from ready-made starting points (Lunch, Dinner, Workout, Work hours, Wind-down) that can then be
+adjusted.
+
+## F. Today shows what is happening now
+
+### P2-F1 Now
+The top of Today shows the block that is running (or happening now, or next), with its timer.
+
+### P2-F2 A rolling top three
+Today always shows the three most important things still open. When one is finished or dropped, it
+leaves the three and the next task in line moves up — the day's remaining tasks in priority order
+(top-three ranks first, then priority, then start time). Finished and dropped ones are listed below
+as done for the day.
+
+## G. One task, one state everywhere
+
+### P2-G1 The board follows Today
+Whatever happens to a task on Today shows on the Backlog board in the right column:
+
+| On Today | Board column |
+|---|---|
+| timer started, or block set in progress | In progress |
+| finished (all of the task's sessions) | Done |
+| finished one session of several | In progress |
+| put off for later | To do (unscheduled) or In progress if time was worked |
+| dropped | Dropped |
+
+## H. The Planner shows everything that shapes the day
+
+### P2-H1 Breaks and fixed time on the calendar
+The week calendar shows recovery breaks before **and** after blocks, routines (protected, open, or
+for selected areas) and meetings from connected calendars, each visually distinct and labelled, plus a
+legend. The list view shows a block's breaks too.
+
+## Later — AI-assisted brain dump (Phase 3, per ADR-012)
+
+Recorded now so the capture design leaves room for it. Nothing here is built.
+
+- **P3-AI1 Paragraph to tasks:** write one paragraph; it is split into tasks with suggested length,
+  focus area, kind of work and due date, which the person confirms or corrects.
+- **P3-AI2 Voice:** speak instead of typing; transcribed, then handled as P3-AI1.
+- **P3-AI3 Photo:** photograph a list, whiteboard or note; the text is read, then handled as P3-AI1.
+
+Rules (ADR-012): opt-in, suggestions only, the person confirms before anything is saved, strict
+output schema and cost caps, and the brain dump keeps working without any model.
 
 ## Order of work
 

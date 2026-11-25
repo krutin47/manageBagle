@@ -1,35 +1,21 @@
-import { ArrowLeft, ArrowRight, CalendarDays, Check, Clock, Coffee, CornerDownLeft, Gauge, Inbox, Lock, MapPin, Plus, Sparkles, Wand2, X, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarClock, Check, CornerDownLeft, Gauge, Inbox, Lock, Plus, Sparkles, Wand2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useToast } from "../../components/toast";
-import { DateChip, OptionChip, Tip } from "../../components/OptionChip";
-import { Button, cx, Dialog, ErrorNote, IconButton, Segmented } from "../../components/ui";
-import { errorMessage, type Area, type Block, type PlanItem, type Priority, type Task, type WorkMode } from "../../lib/api";
-import { dueQuickPicks, priorityOf, rowFromTask, sortRows, topicGroups, valueScore, withWorkMode, type Row, type SortMode } from "./brainDump";
-
-export { valueScore };
-import { modeLabel, PRIORITIES, WORK_MODES } from "../../lib/labels";
+import { Button, cx, Dialog, ErrorNote, Segmented } from "../../components/ui";
+import { errorMessage, type Area, type Block, type PlanItem, type Task } from "../../lib/api";
+import { modeLabel } from "../../lib/labels";
 import { busyFromBlocks, commitmentsOn } from "../../lib/commitments";
 import { useBacklog, useCommitments, usePlanDay, usePreferences } from "../../lib/queries";
 import { proposeSchedule } from "../../lib/schedule";
-import { addDays, formatDate, formatDuration, fromMinutes, nowMinutes, snap, todayISO, toMinutes } from "../../lib/time";
+import { formatDate, formatDuration, fromMinutes, nowMinutes, snap, todayISO, toMinutes } from "../../lib/time";
+import { dueLabel, TaskRows } from "../capture/TaskRows";
+import { newRow, planSuggestions, priorityOf, rowFromTask, valueScore, type Row, type SortMode } from "../capture/rows";
 
-const LENGTHS = [15, 30, 45, 60, 90, 120, 180, 240];
-const STEPS = ["Brain dump", "Pick your top three", "Fit it into the day"];
-const SORTS: { value: SortMode; label: string }[] = [
-  { value: "written", label: "As written" },
-  { value: "topic", label: "Topic" },
-  { value: "impact", label: "Impact" },
-  { value: "due", label: "Due date" },
-];
-const OUTSIDE_TIP = "Outside work — errands, travel, appointments. Adds a buffer because the physical world runs late.";
+export { dueLabel, valueScore };
 
-export function dueLabel(due: string, today = todayISO()): string {
-  if (due < today) return "Overdue";
-  if (due === today) return "Due today";
-  if (due === addDays(today, 1)) return "Due tomorrow";
-  return `Due ${formatDate(due, "medium")}`;
-}
+const STEPS = ["Choose from your backlog", "Pick your top three", "Fit it into the day"];
+
 
 interface Props {
   open: boolean;
@@ -37,14 +23,18 @@ interface Props {
   areas: Area[];
   blocks: Block[];
   takenRanks: number[];
-  /** Tasks to start the dump with, e.g. one picked from "Due soon". */
+  /** Tasks already chosen when it opens, e.g. one picked from "Due soon". */
   seed?: Task[];
   onClose: () => void;
 }
 
-export function BrainDumpDialog({ open, date, areas, blocks, takenRanks, seed, onClose }: Props) {
+/**
+ * Plan my day (P2-E2): choose from the backlog, pick the top three, fit them around routines and
+ * meetings. Separate from the brain dump, which only captures.
+ */
+export function PlanDayDialog({ open, date, areas, blocks, takenRanks, seed, onClose }: Props) {
   return (
-    <Dialog open={open} onClose={onClose} title={date === todayISO() ? "Brain dump" : `Brain dump for ${formatDate(date, "long")}`} description="Empty your head. Then pick the three that matter most and let the day take shape." width="xl">
+    <Dialog open={open} onClose={onClose} title={date === todayISO() ? "Plan my day" : `Plan ${formatDate(date, "long")}`} description="Choose from your backlog, pick the three that matter most, and fit them around your routines and meetings." width="xl">
       {open && <PlanFlow date={date} areas={areas} blocks={blocks} takenRanks={takenRanks} seed={seed} onClose={onClose} />}
     </Dialog>
   );
@@ -62,46 +52,37 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
   const [step, setStep] = useState(0);
   const [rows, setRows] = useState<Row[]>(() => (seed ?? []).map(rowFromTask));
   const [sort, setSort] = useState<SortMode>("written");
+  const [showAll, setShowAll] = useState(false);
   const [batch, setBatch] = useState(true);
   const [text, setText] = useState("");
   const [from, setFrom] = useState(() => fromMinutes(defaultStart(date, blocks)));
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
-  const nextKey = useRef(1);
   const sent = useRef({ fingerprint: "", key: "" });
 
   // Ranks already held by outcomes that are not part of this plan stay theirs.
   const freeRanks = [1, 2, 3].filter((r) => !takenRanks.includes(r));
-  const patch = (key: string, p: Partial<Row>) => setRows((list) => list.map((r) => (r.key === key ? { ...r, ...p } : r)));
 
   const add = (e: FormEvent) => {
     e.preventDefault();
     const title = text.trim();
     if (!title) return;
-    const last = rows.at(-1);
-    // A new line inherits topic and kind of work from the one above: people dump related things in runs.
-    const fresh: Row = { key: `n${nextKey.current++}`, taskId: null, title, minutes: 30, minutesChosen: false, focusAreaId: last?.focusAreaId ?? null, workMode: "ShallowWork", isOutside: false, impact: "Medium", dueDate: null, priorityOverride: null, breakMinutes: null, top: null };
-    setRows([...rows, withWorkMode(fresh, last?.workMode ?? "ShallowWork")]);
+    setRows((list) => [...list, newRow(crypto.randomUUID(), title, list.filter((r) => r.taskId === null).at(-1))]);
     setText("");
     input.current?.focus();
   };
 
-  const addTask = (t: Task) => setRows((list) => [...list, rowFromTask(t)]);
+  const toggleTask = (t: Task) => setRows((list) => (list.some((r) => r.taskId === t.id) ? list.filter((r) => r.taskId !== t.id) : [...list, rowFromTask(t)]));
 
-  // Suggestions: open, unbooked backlog tasks — what is due soonest first, then what is worth most.
+  // What the backlog offers: due soon, then high impact, then the rest (P2-E2). Seeded tasks stay listed even if booked elsewhere.
   const today = todayISO();
-  const suggestions = (backlog.data ?? [])
-    .filter((t) => t.status !== "Done" && t.status !== "Skipped" && !t.scheduledDate && !rows.some((r) => r.taskId === t.id))
-    .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999") || valueScore(b, today) - valueScore(a, today));
-
-  const view = sortRows(rows, sort, areas);
+  const groups = useMemo(() => planSuggestions(backlog.data ?? [], today), [backlog.data, today]);
   const areaOf = (id: string | null) => areas.find((a) => a.id === id);
-  const areaOptions = [{ value: "", label: "No focus area", area: "none" }, ...areas.map((a) => ({ value: a.id, label: a.name, area: a.color as string }))];
 
   const suggestTop = () =>
     setRows((list) => {
       const best = [...list].sort((a, b) => valueScore(b, today) - valueScore(a, today)).slice(0, freeRanks.length);
-      return list.map((r) => ({ ...r, top: best.includes(r) ? freeRanks[best.indexOf(r)] : null }));
+      return list.map((r) => ({ ...r, top: best.includes(r) ? (freeRanks[best.indexOf(r)] ?? null) : null }));
     });
 
   const toggleTop = (key: string) =>
@@ -137,7 +118,7 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
   const goNext = () => {
     // With three tasks or fewer there is nothing to choose between: they are the top three.
     if (step === 0 && picked === 0 && rows.length <= freeRanks.length) {
-      setRows(rows.map((r, i) => ({ ...r, top: freeRanks[i] })));
+      setRows(rows.map((r, i) => ({ ...r, top: freeRanks[i] ?? null })));
     }
     setStep(step + 1);
   };
@@ -185,89 +166,52 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
           <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16, transition: { duration: 0.1 } }} transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}>
             {step === 0 && (
               <div className="plan-step">
-                <form className="capture plan-capture" onSubmit={add}>
-                  <Plus size={18} aria-hidden />
-                  <input ref={input} autoFocus aria-label="What needs doing?" placeholder="What needs doing? Type it and press Enter…" maxLength={200} value={text} onChange={(e) => setText(e.target.value)} />
-                  <kbd aria-hidden><CornerDownLeft size={12} /> Enter</kbd>
-                </form>
-
-                {rows.length === 0 ? (
-                  <p className="plan-hint">Write everything down first — one line each, no sorting, no judging. You will pick your top three next.</p>
-                ) : (
-                  <>
-                    {rows.length > 1 && (
-                      <div className="dump-sort">
-                        <span className="field-label" id="dump-sort-label">Sort by</span>
-                        <Segmented size="sm" label="Sort the list by" value={sort} onChange={setSort} options={SORTS} />
-                        <span className="sr-only" aria-live="polite">{`Sorted ${SORTS.find((x) => x.value === sort)!.label.toLowerCase()}`}</span>
-                      </div>
-                    )}
-                    <ul className="dump-rows">
-                      <AnimatePresence initial={false}>
-                        {(sort === "topic" ? topicGroups(view) : [{ focusAreaId: undefined, rows: view }]).flatMap((group) => [
-                          ...(group.focusAreaId !== undefined ? [
-                            <motion.li layout="position" key={`h-${group.focusAreaId ?? "none"}`} className="dump-group" data-area={areaOf(group.focusAreaId)?.color ?? "none"}>
-                              <span className="area-dot" aria-hidden />{areaOf(group.focusAreaId)?.name ?? "No focus area"}
-                              <span className="dump-group-count">{group.rows.length} · {formatDuration(group.rows.reduce((t, r) => t + r.minutes, 0))}</span>
-                            </motion.li>,
-                          ] : []),
-                          ...group.rows.map((r) => {
-                            const area = areaOf(r.focusAreaId);
-                            const late = r.dueDate !== null && r.dueDate <= today;
-                            return (
-                              <motion.li key={r.key} layout="position" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.18 }} className="dump-row" data-area={area?.color ?? "none"}>
-                                <span className="agenda-bar" aria-hidden />
-                                <input className="cell-input plan-title" aria-label="Task" maxLength={200} value={r.title} onChange={(e) => patch(r.key, { title: e.target.value })} />
-                                <IconButton size="sm" label={`Remove ${r.title}`} onClick={() => setRows(rows.filter((x) => x.key !== r.key))}><X size={15} /></IconButton>
-                                <div className="dump-chips" role="group" aria-label={`Options for ${r.title}`}>
-                                  <OptionChip label="Length" icon={<Clock size={13} aria-hidden />} value={String(r.minutes)}
-                                    options={[...new Set([...LENGTHS, r.minutes])].sort((x, y) => x - y).map((m) => ({ value: String(m), label: formatDuration(m) }))}
-                                    onChange={(v) => patch(r.key, { minutes: Number(v), minutesChosen: true })} />
-                                  <OptionChip label="Kind of work" icon={<Zap size={13} aria-hidden />} value={r.workMode}
-                                    options={WORK_MODES.map((m) => ({ value: m, label: modeLabel[m] }))}
-                                    onChange={(v) => setRows((list) => list.map((x) => (x.key === r.key ? withWorkMode(x, v as WorkMode) : x)))} />
-                                  <OptionChip label="Focus area" area={area?.color ?? "none"} value={r.focusAreaId ?? ""} options={areaOptions}
-                                    onChange={(v) => patch(r.key, { focusAreaId: v || null })} />
-                                  <OptionChip label="Outcome impact" icon={<Gauge size={13} aria-hidden />} strong={r.impact === "High"} value={r.impact}
-                                    options={PRIORITIES.map((v) => ({ value: v, label: `${v} impact` }))}
-                                    onChange={(v) => patch(r.key, { impact: v as Priority })} />
-                                  <OptionChip label="Recovery break" icon={<Coffee size={13} aria-hidden />} value={r.breakMinutes === null ? "area" : String(r.breakMinutes)}
-                                    options={[
-                                      { value: "area", label: area && area.breakMinutes > 0 ? `${formatDuration(area.breakMinutes)} break (area)` : "No break" },
-                                      ...[0, 5, 10, 15, 20, 30].map((m) => ({ value: String(m), label: m === 0 ? "No break" : `${formatDuration(m)} break` })),
-                                    ].filter((o, i, all) => all.findIndex((x) => x.label === o.label) === i)}
-                                    onChange={(v) => patch(r.key, { breakMinutes: v === "area" ? null : Number(v) })} />
-                                  <DateChip label="Due date" icon={<CalendarDays size={13} aria-hidden />} value={r.dueDate} warn={late}
-                                    display={r.dueDate ? dueLabel(r.dueDate, today) : "No due date"} quickPicks={dueQuickPicks(today)}
-                                    onChange={(v) => patch(r.key, { dueDate: v, priorityOverride: null })} />
-                                  <Tip content={OUTSIDE_TIP}>
-                                    <button type="button" className={cx("opt-chip opt-icon", r.isOutside && "is-on")} aria-pressed={r.isOutside} aria-label="Outside work" onClick={() => patch(r.key, { isOutside: !r.isOutside })}>
-                                      <MapPin size={15} aria-hidden />
-                                    </button>
-                                  </Tip>
-                                </div>
-                              </motion.li>
-                            );
-                          }),
-                        ])}
-                      </AnimatePresence>
-                    </ul>
-                  </>
+                {groups.length === 0 && (
+                  <p className="plan-hint">Nothing open and unbooked in your backlog. Type what this day needs below{rows.length ? "" : ", or empty your head with Brain dump first"}.</p>
                 )}
+                {groups.map((g) => {
+                  const shown = g.id === "rest" && !showAll ? g.tasks.slice(0, 6) : g.tasks;
+                  return (
+                    <section key={g.id} className="choose-group" aria-labelledby={`choose-${g.id}`}>
+                      <h3 id={`choose-${g.id}`} className="field-label">{g.id === "due" ? <CalendarClock size={14} aria-hidden /> : g.id === "impact" ? <Gauge size={14} aria-hidden /> : <Inbox size={14} aria-hidden />} {g.label}</h3>
+                      <ul className="choose-list">
+                        {shown.map((t) => {
+                          const chosen = rows.some((r) => r.taskId === t.id);
+                          const area = areaOf(t.focusAreaId);
+                          return (
+                            <li key={t.id}>
+                              <button type="button" className={cx("choose-row", chosen && "is-on")} aria-pressed={chosen} data-area={area?.color ?? "none"} onClick={() => toggleTask(t)}>
+                                <span className="choose-check" aria-hidden>{chosen && <Check size={14} strokeWidth={3} />}</span>
+                                <span className="choose-title">{t.title}</span>
+                                <span className="choose-meta">
+                                  {t.impact === "High" && <span className="impact-tag is-high">High impact</span>}
+                                  {area?.name ?? "No focus area"}{t.estimatedMinutes !== null && <> · {formatDuration(t.estimatedMinutes)}</>}
+                                  {t.status === "InProgress" && <> · started</>}
+                                  {t.dueDate && <> · <span className={cx(t.dueDate <= today && "due is-late")}>{dueLabel(t.dueDate, today)}</span></>}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      {g.id === "rest" && g.tasks.length > 6 && (
+                        <button type="button" className="link-btn" onClick={() => setShowAll(!showAll)}>{showAll ? "Show fewer" : `Show all ${g.tasks.length}`}</button>
+                      )}
+                    </section>
+                  );
+                })}
 
-                {suggestions.length > 0 && (
-                  <div className="plan-suggest">
-                    <span className="field-label"><Inbox size={14} aria-hidden /> Suggested from your backlog — due soonest first</span>
-                    <div className="plan-suggest-list">
-                      {suggestions.slice(0, 8).map((t) => (
-                        <button key={t.id} type="button" className="suggest-chip" onClick={() => addTask(t)}>
-                          <Plus size={12} aria-hidden /> {t.title}
-                          {t.dueDate && <em className={cx(t.dueDate <= today && "is-late")}>{dueLabel(t.dueDate, today)}</em>}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <section className="plan-suggest" aria-labelledby="plan-new">
+                  <h3 id="plan-new" className="field-label"><Plus size={14} aria-hidden /> Something new for {date === today ? "today" : "this day"}?</h3>
+                  <form className="capture plan-capture" onSubmit={add}>
+                    <Plus size={18} aria-hidden />
+                    <input ref={input} aria-label="Add a new task to this plan" placeholder="Type a task and press Enter…" maxLength={200} value={text} onChange={(e) => setText(e.target.value)} />
+                    <kbd aria-hidden><CornerDownLeft size={12} /> Enter</kbd>
+                  </form>
+                  {rows.some((r) => r.taskId === null) && (
+                    <TaskRows rows={rows.filter((r) => r.taskId === null)} setRows={setRows} areas={areas} sort={sort} onSort={setSort} />
+                  )}
+                </section>
               </div>
             )}
 
@@ -360,7 +304,7 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
         {step > 0 ? <Button icon={<ArrowLeft size={16} aria-hidden />} onClick={() => setStep(step - 1)}>Back</Button> : <Button onClick={onClose}>Cancel</Button>}
         {step < 2 && (
           <Button variant="primary" disabled={rows.length === 0 || rows.some((r) => !r.title.trim())} onClick={goNext}>
-            {step === 0 ? "Next: top three" : picked === 0 && freeRanks.length > 0 ? "Skip" : "Next: fit into the day"} <ArrowRight size={16} aria-hidden />
+            {step === 0 ? `Next: top three${rows.length ? ` (${rows.length} chosen)` : ""}` : picked === 0 && freeRanks.length > 0 ? "Skip" : "Next: fit into the day"} <ArrowRight size={16} aria-hidden />
           </Button>
         )}
         {step === 2 && (

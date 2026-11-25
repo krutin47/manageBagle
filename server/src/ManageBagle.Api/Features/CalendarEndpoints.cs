@@ -38,7 +38,7 @@ public static class CalendarEndpoints
             if (to < from || to.DayNumber - from.DayNumber > 366) return HttpExtensions.Invalid("to", "Export at most a year at a time.");
             var ics = await sync.ExportAsync(user.UserId(), from, to, ct);
             return Results.File(System.Text.Encoding.UTF8.GetBytes(ics), "text/calendar; charset=utf-8", $"managebagle-{from:yyyyMMdd}-{to:yyyyMMdd}.ics");
-        });
+        }).Produces(StatusCodes.Status200OK, contentType: "text/calendar");
 
         // The subscription link calendar apps poll. The token is the only credential: no cookie, read-only.
         app.MapGet("/api/calendar/feed/{token}.ics", async (string token, HttpContext http, CalendarSync sync, CancellationToken ct) =>
@@ -47,7 +47,7 @@ public static class CalendarEndpoints
             if (ics is null) return Results.NotFound();
             http.Response.Headers.CacheControl = "private, max-age=300";
             return Results.Text(ics, "text/calendar; charset=utf-8");
-        }).RequireRateLimiting("calendar-feed").ExcludeFromDescription();
+        }).RequireRateLimiting("calendar-feed").ExcludeFromDescription().Produces(StatusCodes.Status200OK, contentType: "text/calendar");
 
         // ---- Import busy time (P2-D2) ----
         g.MapGet("/connections", async (ClaimsPrincipal user, CalendarSync sync, CancellationToken ct) =>
@@ -63,7 +63,8 @@ public static class CalendarEndpoints
             .RequireRateLimiting("calendar-fetch");
 
         g.MapDelete("/connections/{id:guid}", async (Guid id, ClaimsPrincipal user, CalendarSync sync, CancellationToken ct) =>
-            await sync.DisconnectAsync(user.UserId(), id, ct) ? Results.NoContent() : Results.NotFound());
+            await sync.DisconnectAsync(user.UserId(), id, ct) ? Results.NoContent() : Results.NotFound())
+            .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound);
     }
 
     private static CalendarFeedResponse Feed(AccountLinks links, string token)

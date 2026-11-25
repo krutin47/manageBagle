@@ -39,50 +39,58 @@ public static class DayEndpoints
                 new ReviewResponse(review?.BiggestWin ?? "", review?.Interruptions ?? "", review?.ChangeTomorrow ?? ""));
         });
 
-        g.MapPut("/outcomes/{rank:int}", async (DateOnly date, int rank, OutcomeRequest req, ClaimsPrincipal user, AppDbContext db) =>
+        g.MapPut("/outcomes/{rank:int}", async (DateOnly date, int rank, OutcomeRequest req, ClaimsPrincipal user, AppDbContext db, TimeProvider clock, CancellationToken ct) =>
         {
             if (rank is < 1 or > 3) return HttpExtensions.Invalid("rank", "A day has three outcomes: rank 1, 2 or 3.");
             var uid = user.UserId();
             if (!await db.OwnsAreaAsync(uid, req.FocusAreaId)) return HttpExtensions.Invalid("focusAreaId", "That focus area does not exist.");
 
-            var outcome = await db.DailyOutcomes.FirstOrDefaultAsync(o => o.UserId == uid && o.Date == date && o.Rank == rank);
+            var outcome = await db.DailyOutcomes.FirstOrDefaultAsync(o => o.UserId == uid && o.Date == date && o.Rank == rank, ct);
             if (outcome is null)
             {
                 outcome = new DailyOutcome { UserId = uid, Date = date, Rank = rank };
                 db.DailyOutcomes.Add(outcome);
             }
+            var wasStatus = outcome.Status;
             outcome.Result = req.Result.Trim();
             outcome.FocusAreaId = req.FocusAreaId;
             outcome.NextAction = req.NextAction?.Trim() ?? "";
             outcome.Status = req.Status;
             outcome.MinutesNeeded = req.MinutesNeeded;
 
-            // An outcome that came from a planned task carries that day's blocks and the task with it.
-            if (outcome.BacklogTaskId is { } taskId && req.Status == ItemStatus.Done)
+            // An outcome that came from a planned task carries that day's blocks and the task with it (P2-G1).
+            if (outcome.BacklogTaskId is { } taskId && req.Status != wasStatus && req.Status is ItemStatus.Done or ItemStatus.Skipped)
             {
-                // Ticking the outcome finishes that day's sessions. The task itself is finished only if
-                // it has no open session left on another day.
-                var blocks = await db.TimeBlocks.Where(b => b.UserId == uid && b.BacklogTaskId == taskId).ToListAsync();
-                foreach (var block in blocks.Where(b => b.Date == date))
+                var blocks = await db.TimeBlocks.Where(b => b.UserId == uid && b.BacklogTaskId == taskId).ToListAsync(ct);
+                foreach (var block in blocks.Where(b => b.Date == date && Domain.TaskCompletion.IsOpen(b.Status)))
                 {
-                    block.Status = ItemStatus.Done;
-                    block.ActualMinutes ??= block.PlannedMinutes;
+                    block.PauseTimer(clock.GetUtcNow()); // a running timer banks its time first
+                    block.Status = req.Status;
+                    if (req.Status == ItemStatus.Done) block.ActualMinutes ??= block.PlannedMinutes;
                 }
-                var task = await db.BacklogTasks.FirstOrDefaultAsync(t => t.Id == taskId && t.UserId == uid);
+                var task = await db.BacklogTasks.FirstOrDefaultAsync(t => t.Id == taskId && t.UserId == uid, ct);
                 if (task is not null)
                 {
-                    task.Status = Domain.TaskCompletion.AfterSessionFinished(task.Status, blocks.Where(b => b.Date != date).Select(b => b.Status));
+                    // Finished: done only if no session is open on another day. Dropped: the task is dropped.
+                    task.Status = req.Status == ItemStatus.Done
+                        ? Domain.TaskCompletion.AfterSessionFinished(task.Status, blocks.Where(b => b.Date != date).Select(b => b.Status))
+                        : ItemStatus.Skipped;
                 }
             }
-            await db.SaveChangesAsync();
+            else if (outcome.BacklogTaskId is { } startedId && req.Status != wasStatus && await db.BacklogTasks.FirstOrDefaultAsync(t => t.Id == startedId && t.UserId == uid, ct) is { } linked)
+            {
+                // Started, or reopened: the card moves to In progress, or back out of Done.
+                linked.Status = Domain.TaskCompletion.AfterSessionChanged(linked.Status, req.Status, [], worked: req.Status == ItemStatus.InProgress).Status;
+            }
+            await db.SaveChangesAsync(ct);
             return Results.Ok(ToResponse(outcome));
-        });
+        }).Produces<OutcomeResponse>().ProducesValidationProblem();
 
         g.MapDelete("/outcomes/{rank:int}", async (DateOnly date, int rank, ClaimsPrincipal user, AppDbContext db) =>
         {
             await db.DailyOutcomes.Where(o => o.UserId == user.UserId() && o.Date == date && o.Rank == rank).ExecuteDeleteAsync();
             return Results.NoContent();
-        });
+        }).Produces(StatusCodes.Status204NoContent);
 
         g.MapPut("/review", async (DateOnly date, ReviewRequest req, ClaimsPrincipal user, AppDbContext db) =>
         {
@@ -125,7 +133,7 @@ public static class DayEndpoints
             theme.Review = req.Review?.Trim() ?? "";
             await db.SaveChangesAsync();
             return Results.Ok(new ThemeResponse(day, theme.PrimaryFocus, theme.Outcome, theme.Review));
-        });
+        }).Produces<ThemeResponse>().ProducesValidationProblem();
     }
 
     private static readonly DayOfWeek[] WeekOrder =

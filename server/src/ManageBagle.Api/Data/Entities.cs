@@ -22,6 +22,8 @@ public class AppUser : IdentityUser<Guid>
     public TimeOnly? DayEnd { get; set; }
     /// <summary>Minutes between "drink water" reminders; null when switched off (P2-C5).</summary>
     public int? WaterReminderMinutes { get; set; }
+    /// <summary>Colour of recovery breaks on the calendar, one of <see cref="AreaColors.All"/>; null is the default green.</summary>
+    public string? BreakColor { get; set; }
     /// <summary>Calendar feed (P2-D1): the secret part of the subscription address, encrypted, and its hash for lookup.</summary>
     public string? CalendarFeedTokenProtected { get; set; }
     public string? CalendarFeedTokenHash { get; set; }
@@ -52,6 +54,8 @@ public class Routine
     public TimeOnly End { get; set; }
     public Domain.TaskPolicy TaskPolicy { get; set; } = Domain.TaskPolicy.NoTasks;
     public bool IsMeal { get; set; }
+    /// <summary>One of <see cref="AreaColors.All"/>; null shows the neutral default.</summary>
+    public string? Color { get; set; }
     public List<RoutineArea> Areas { get; set; } = [];
 
     public Domain.RoutineRule ToRule() => new(Id, Title, Days, Start, End, TaskPolicy, Areas.Select(a => a.FocusAreaId).ToList(), IsMeal);

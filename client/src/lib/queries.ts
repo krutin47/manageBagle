@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
-  api, UnauthorizedError,
+  api, UnauthorizedError, type CaptureItem,
   type Area, type AreaColor, type Block, type CalendarConnection, type CalendarFeed, type Commitment, type Preferences, type Routine, type RoutineInput, type BlockInput, type Day, type DayName, type Outcome, type PlanItem, type ProviderKey,
   type Review, type Status, type StopOutcome, type Task, type TaskInput, type Theme, type TimerSnapshot, type User, type WeekSummary, type WorkMode,
 } from "./api";
@@ -123,6 +123,8 @@ export function useWeekBlocks(anyDateInWeek: string) {
 function invalidatePlanning(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: keys.blocks.all });
   qc.invalidateQueries({ queryKey: keys.weekSummary.all });
+  // A block is a session of a task: whatever happens to it can move the task's card (P2-G1).
+  qc.invalidateQueries({ queryKey: keys.backlog });
 }
 
 /**
@@ -300,9 +302,25 @@ export function useBacklog() {
   return useQuery({ queryKey: keys.backlog, queryFn: ({ signal }) => api<Task[]>("/backlog", { signal }), staleTime: STALE.planning });
 }
 
+/** The brain dump (P2-E1): many tasks into the backlog in one all-or-nothing save; nothing is booked. */
+export function useCaptureTasks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: CaptureItem[]) => api<Task[]>("/backlog/capture", { method: "POST", body: { items } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.backlog }),
+  });
+}
+
 export function useTaskMutations() {
   const qc = useQueryClient();
   const done = () => qc.invalidateQueries({ queryKey: keys.backlog });
+  // A card moved to Done or Dropped closes the task's blocks and top-three outcomes too (P2-G1).
+  const statusChanged = () => {
+    done();
+    qc.invalidateQueries({ queryKey: keys.blocks.all });
+    qc.invalidateQueries({ queryKey: keys.days.all });
+    qc.invalidateQueries({ queryKey: keys.timer });
+  };
   return {
     create: useMutation({ mutationFn: (body: TaskInput) => api<Task>("/backlog", { method: "POST", body }), onSuccess: done }),
     update: useMutation({
@@ -317,7 +335,7 @@ export function useTaskMutations() {
       },
       onSuccess: (saved) => qc.setQueryData<Task[]>(keys.backlog, (list) => list?.map((t) => (t.id === saved.id ? saved : t))),
       onError: (_e, _v, ctx) => qc.setQueryData(keys.backlog, ctx?.previous),
-      onSettled: done,
+      onSettled: statusChanged,
     }),
     remove: useMutation({ mutationFn: (id: string) => api(`/backlog/${id}`, { method: "DELETE" }), onSuccess: done }),
     schedule: useMutation({

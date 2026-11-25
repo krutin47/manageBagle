@@ -20,6 +20,10 @@ public record TaskRequest(
     int? Version = null,
     [Range(0, 60)] int? BreakMinutes = null);
 
+public record CaptureRequest([Required, MinLength(1), MaxLength(60)] Application.Planning.CaptureItem[] Items);
+
+public record ScheduledTaskResponse(TaskResponse Task, BlockResponse Block);
+
 public record ScheduleRequest(DateOnly Date, TimeOnly Start, TimeOnly End, WorkMode WorkMode);
 
 public record TaskResponse(
@@ -43,6 +47,11 @@ public static class BacklogEndpoints
             return tasks.Select(TaskResponse.From);
         });
 
+        // The brain dump: many tasks captured at once, all or nothing (P2-E1).
+        g.MapPost("/capture", async (CaptureRequest req, ClaimsPrincipal user, Application.Planning.CaptureTasks capture, CancellationToken ct) =>
+            (await capture.HandleAsync(user.UserId(), req.Items, ct)).ToHttp(tasks => Results.Ok(tasks.Select(TaskResponse.From))))
+            .Produces<IEnumerable<TaskResponse>>().ProducesValidationProblem();
+
         g.MapPost("", async (TaskRequest req, ClaimsPrincipal user, AppDbContext db) =>
         {
             var uid = user.UserId();
@@ -52,19 +61,21 @@ public static class BacklogEndpoints
             db.BacklogTasks.Add(task);
             await db.SaveChangesAsync();
             return Results.Created($"/api/backlog/{task.Id}", TaskResponse.From(task));
-        });
+        }).Produces<TaskResponse>(StatusCodes.Status201Created).ProducesValidationProblem();
 
-        g.MapPut("/{id:guid}", async (Guid id, TaskRequest req, ClaimsPrincipal user, AppDbContext db) =>
+        g.MapPut("/{id:guid}", async (Guid id, TaskRequest req, ClaimsPrincipal user, AppDbContext db, Application.Tasks.ChangeTaskStatus status, CancellationToken ct) =>
         {
             var uid = user.UserId();
-            var task = await db.BacklogTasks.FirstOrDefaultAsync(t => t.Id == id && t.UserId == uid);
+            var task = await db.BacklogTasks.FirstOrDefaultAsync(t => t.Id == id && t.UserId == uid, ct);
             if (task is null) return Results.NotFound();
             if (Versioning.Check(db, task, req.Version) is { } stale) return stale;
             if (!await db.OwnsAreaAsync(uid, req.FocusAreaId)) return HttpExtensions.Invalid("focusAreaId", "That focus area does not exist.");
+            var previous = task.Status;
             Apply(task, req);
-            await db.SaveChangesAsync();
+            await status.FollowAsync(task, previous, ct);
+            await db.SaveChangesAsync(ct);
             return Results.Ok(TaskResponse.From(task));
-        });
+        }).Produces<TaskResponse>().ProducesValidationProblem().ProducesProblem(StatusCodes.Status409Conflict);
 
         g.MapDelete("/{id:guid}", async (Guid id, ClaimsPrincipal user, AppDbContext db) =>
         {
@@ -73,7 +84,7 @@ public static class BacklogEndpoints
             db.BacklogTasks.Remove(task);
             await db.SaveChangesAsync();
             return Results.NoContent();
-        });
+        }).Produces(StatusCodes.Status204NoContent);
 
         // "Capture first, schedule second": turn a task into a committed block on the calendar.
         g.MapPost("/{id:guid}/schedule", async (Guid id, ScheduleRequest req, ClaimsPrincipal user, AppDbContext db) =>
@@ -95,8 +106,8 @@ public static class BacklogEndpoints
             task.WorkMode = req.WorkMode;
             db.TimeBlocks.Add(block);
             await db.SaveChangesAsync();
-            return Results.Created($"/api/blocks/{block.Id}", new { task = TaskResponse.From(task), block = BlockResponse.From(block) });
-        });
+            return Results.Created($"/api/blocks/{block.Id}", new ScheduledTaskResponse(TaskResponse.From(task), BlockResponse.From(block)));
+        }).Produces<ScheduledTaskResponse>(StatusCodes.Status201Created).ProducesValidationProblem();
     }
 
     private static void Apply(BacklogTask task, TaskRequest req)

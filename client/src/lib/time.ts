@@ -7,7 +7,7 @@ export function toISODate(d: Date): string {
 }
 
 export function parseISODate(iso: string): Date {
-  const [y, m, d] = iso.split("-").map(Number);
+  const [y = 1970, m = 1, d = 1] = iso.split("-").map(Number);
   return new Date(y, m - 1, d);
 }
 
@@ -73,7 +73,7 @@ export function formatWeekRange(start: string): string {
 
 /** "09:30" or "09:30:00" → 570 */
 export function toMinutes(time: string): number {
-  const [h, m] = time.split(":").map(Number);
+  const [h = 0, m = 0] = time.split(":").map(Number);
   return h * 60 + m;
 }
 
