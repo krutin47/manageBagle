@@ -1,6 +1,6 @@
 # Phase 2 product requirements
 
-Status: A–D2 built (merged to `dev`); **E–H in build** on `feature/capture-plan-preplan`; D3 and AI are Phase 3 · Source: product owner, 2026-11-25 · Tracks into
+Status: A–D2 built (merged to `dev`); E–H built on `feature/capture-plan-preplan`; D3 and AI are Phase 3 · Source: product owner, 2026-11-25 · Tracks into
 [handbook-status.md](../handbook-status.md) (Phase 2 — product)
 
 These are the product owner's requests, restated as requirements with acceptance criteria so each
@@ -188,6 +188,10 @@ does not choose a top three and does not book time. One save, all or nothing.
 *Plan my day* starts from the backlog: it suggests what is overdue, due soon or high impact, lets the
 person pick, then choose the top three, then fits them into the day around routines and meetings.
 A task can still be typed in during planning when something new comes up.
+
+*Decision:* "the brain dump should suggest tasks from the backlog" is met here, in planning. The
+brain dump itself only captures; it points out a line that repeats an open backlog task instead of
+offering backlog tasks to add.
 
 ### P2-E3 Pre-planning has its own page
 *Routines* is a main page, not a Settings card. It holds the fixed daily schedule (P2-C1, C2), the day

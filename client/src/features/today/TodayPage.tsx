@@ -1,4 +1,4 @@
-import { CalendarClock, CalendarDays, CalendarPlus, Check, Clock, Coffee, ListPlus, MapPin, Pencil, Plus, Repeat, Trash2, Utensils } from "lucide-react";
+import { CalendarCheck, CalendarClock, CalendarDays, CalendarPlus, Check, Clock, Coffee, MapPin, NotebookPen, Pencil, Plus, Repeat, RotateCcw, Trash2, Utensils } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { DropdownMenu } from "radix-ui";
 import { useMemo, useState, type FormEvent } from "react";
@@ -13,8 +13,10 @@ import { useAreas, useBacklog, useCommitments, useBlockMutations, useDay, useDay
 import { addDays, nowMinutes, formatDate, formatDuration, formatHours, fromMinutes, isValidISODate, parseISODate, snap, todayISO, toMinutes } from "../../lib/time";
 import { BlockDialog, type BlockDraft } from "../planner/BlockDialog";
 import { Variance } from "../planner/PlannerPage";
-import { TimerButton } from "../timer/TimerProvider";
-import { BrainDumpDialog, dueLabel, valueScore } from "./BrainDumpDialog";
+import { useBrainDump } from "../capture/BrainDump";
+import { TimerButton, useFocusTimer } from "../timer/TimerProvider";
+import { dueLabel, PlanDayDialog, valueScore } from "./PlanDayDialog";
+import { rollingTopThree, type FocusItem } from "./topThree";
 
 const DAY_NAMES: DayName[] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -36,8 +38,9 @@ export function TodayPage() {
   const themes = useThemes();
   const [draft, setDraft] = useState<BlockDraft | null>(null);
   const [editing, setEditing] = useState<Outcome | null>(null);
-  // null = closed; otherwise the tasks to start the brain dump with (possibly none).
-  const [dumping, setDumping] = useState<Task[] | null>(null);
+  // null = closed; otherwise the tasks already chosen when Plan my day opens (possibly none).
+  const [planning, setPlanning] = useState<Task[] | null>(null);
+  const brainDump = useBrainDump();
   const backlog = useBacklog();
 
   const areaById = useMemo(() => new Map((areas.data ?? []).map((a) => [a.id, a])), [areas.data]);
@@ -51,7 +54,8 @@ export function TodayPage() {
 
   // A top-three outcome and its booked block are the same piece of work; show them as one.
   const rankByTask = useMemo(() => new Map(outcomes.filter((o) => o.backlogTaskId).map((o) => [o.backlogTaskId!, o.rank])), [outcomes]);
-  const blockFor = (o: Outcome) => (o.backlogTaskId ? blocks.find((b) => b.backlogTaskId === o.backlogTaskId) : undefined);
+  const rolling = useMemo(() => rollingTopThree(outcomes, blocks), [outcomes, blocks]);
+  const freeRanks = [1, 2, 3].filter((r) => !outcomes.some((o) => o.rank === r));
 
   const planned = blocks.reduce((s, b) => s + b.plannedMinutes, 0);
   const logged = blocks.reduce((s, b) => s + (b.actualMinutes ?? 0), 0);
@@ -79,8 +83,8 @@ export function TodayPage() {
               <Input type="date" className="date-jump" aria-label="Jump to date" value={date} onChange={(e) => e.target.value && setParams({ date: e.target.value }, { replace: true })} />
             </DateNav>
             {!blank && (
-              <Button variant="primary" icon={<ListPlus size={18} aria-hidden />} onClick={() => setDumping([])}>
-                Brain dump
+              <Button variant="primary" icon={<CalendarCheck size={18} aria-hidden />} onClick={() => setPlanning([])}>
+                Plan my day
               </Button>
             )}
           </>
@@ -91,16 +95,17 @@ export function TodayPage() {
         <motion.section className="plan-hero" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
           <div>
             <h2>{isToday ? "What does today need to hold?" : "Nothing planned for this day yet"}</h2>
-            <p>Brain dump everything on your mind, pick the three with the highest value, and it gets fitted into the day for you.</p>
+            <p>Choose from your backlog, pick the three with the highest value, and they are fitted around your routines and meetings.</p>
             <div className="plan-hero-actions">
-              <Button variant="primary" size="lg" icon={<ListPlus size={18} aria-hidden />} onClick={() => setDumping([])}>
-                Start a brain dump
+              <Button variant="primary" size="lg" icon={<CalendarCheck size={18} aria-hidden />} onClick={() => setPlanning([])}>
+                Plan my day
               </Button>
+              <Button icon={<NotebookPen size={18} aria-hidden />} onClick={brainDump.open}>Empty your head first</Button>
               <button type="button" className="link-btn" onClick={() => newBlock()}>or add a single block</button>
             </div>
           </div>
           <ol className="plan-hero-steps" aria-hidden>
-            <li><b>1</b> Brain dump</li>
+            <li><b>1</b> Choose from your backlog</li>
             <li><b>2</b> Pick your top three</li>
             <li><b>3</b> Fit it into the day</li>
           </ol>
@@ -114,35 +119,51 @@ export function TodayPage() {
             <Stat label="Blocks done" value={String(done)} unit={`/ ${blocks.length}`} />
           </section>
 
+          {isToday && <NowCard blocks={blocks} areaById={areaById} />}
+
           <section aria-labelledby="big3" className="today-section">
             <header className="section-head">
               <span className="section-step">1</span>
               <div>
                 <h2 id="big3">Top three</h2>
-                <p>If only these get done, today was a good day.</p>
+                <p>If only these get done, today was a good day. Finish one and the next in line moves up.</p>
               </div>
             </header>
             {day.isError ? (
               <ErrorNote onRetry={() => day.refetch()}>We could not load this day.</ErrorNote>
             ) : (
-              <ol className="outcomes">
-                {[1, 2, 3].map((rank) => {
-                  const outcome = outcomes.find((o) => o.rank === rank);
-                  return (
-                    <OutcomeSlot
-                      key={rank}
-                      rank={rank}
-                      loading={day.isPending}
-                      outcome={outcome}
-                      block={outcome && blockFor(outcome)}
-                      area={outcome?.focusAreaId ? areaById.get(outcome.focusAreaId) : undefined}
-                      date={date}
-                      onEdit={() => setEditing(outcome ?? { rank, result: "", focusAreaId: null, nextAction: "", status: "Planned", minutesNeeded: null })}
-                      onSchedule={(o) => newBlock({ title: o.result, focusAreaId: o.focusAreaId, priority: "High" }, o.minutesNeeded ?? 60)}
-                    />
-                  );
-                })}
-              </ol>
+              <>
+                <ol className="outcomes">
+                  <AnimatePresence initial={false} mode="popLayout">
+                    {rolling.current.map((item, i) =>
+                      item.kind === "outcome" ? (
+                        <OutcomeSlot
+                          key={item.key}
+                          rank={item.outcome.rank}
+                          position={i + 1}
+                          loading={day.isPending}
+                          outcome={item.outcome}
+                          block={item.block}
+                          area={item.outcome.focusAreaId ? areaById.get(item.outcome.focusAreaId) : undefined}
+                          date={date}
+                          onEdit={() => setEditing(item.outcome)}
+                          onSchedule={(o) => newBlock({ title: o.result, focusAreaId: o.focusAreaId, priority: "High" }, o.minutesNeeded ?? 60)}
+                        />
+                      ) : (
+                        <NextInLine key={item.key} position={i + 1} block={item.block} area={item.block.focusAreaId ? areaById.get(item.block.focusAreaId) : undefined} onOpen={() => setDraft(item.block)} />
+                      ),
+                    )}
+                    {freeRanks.slice(0, Math.max(0, 3 - rolling.current.length)).map((rank, i) => (
+                      <OutcomeSlot key={`empty-${rank}`} rank={rank} position={rolling.current.length + i + 1} loading={day.isPending} date={date}
+                        onEdit={() => setEditing({ rank, result: "", focusAreaId: null, nextAction: "", status: "Planned", minutesNeeded: null })} onSchedule={() => undefined} />
+                    ))}
+                  </AnimatePresence>
+                </ol>
+                {!day.isPending && rolling.current.length === 0 && freeRanks.length === 0 && (
+                  <p className="plan-hint">Everything you chose for {isToday ? "today" : "this day"} is done. Plan a little more, or call it a day.</p>
+                )}
+                <DoneToday items={rolling.done} date={date} />
+              </>
             )}
           </section>
 
@@ -163,7 +184,7 @@ export function TodayPage() {
               ) : blocksQuery.isPending ? (
                 <div className="stack"><Skeleton height={56} radius={10} /><Skeleton height={56} radius={10} /><Skeleton height={56} radius={10} /></div>
               ) : blocks.length === 0 ? (
-                <EmptyState icon={<CalendarPlus size={22} />} title="Nothing has a time yet" body="An outcome without a slot is a wish. Give your top three real time on the clock." action={<Button variant="primary" onClick={() => setDumping([])}>Brain dump</Button>} />
+                <EmptyState icon={<CalendarPlus size={22} />} title="Nothing has a time yet" body="An outcome without a slot is a wish. Give your top three real time on the clock." action={<Button variant="primary" onClick={() => setPlanning([])}>Plan my day</Button>} />
               ) : (
                 <Agenda blocks={blocks} routines={routineBands} areaById={areaById} rankByTask={rankByTask} showNow={isToday} onOpen={setDraft} />
               )}
@@ -173,11 +194,11 @@ export function TodayPage() {
         </>
       )}
 
-      <DueSoon tasks={backlog.data ?? []} areaById={areaById} date={date} onAdd={(t) => setDumping([t])} />
+      <DueSoon tasks={backlog.data ?? []} areaById={areaById} date={date} onAdd={(t) => setPlanning([t])} />
 
       <BlockDialog draft={draft} areas={areas.data ?? []} onClose={() => setDraft(null)} />
       <OutcomeDialog date={date} outcome={editing} areas={areas.data ?? []} onClose={() => setEditing(null)} />
-      <BrainDumpDialog open={dumping !== null} seed={dumping ?? undefined} date={date} areas={areas.data ?? []} blocks={blocks} takenRanks={outcomes.map((o) => o.rank)} onClose={() => setDumping(null)} />
+      <PlanDayDialog open={planning !== null} seed={planning ?? undefined} date={date} areas={areas.data ?? []} blocks={blocks} takenRanks={outcomes.map((o) => o.rank)} onClose={() => setPlanning(null)} />
     </>
   );
 }
@@ -199,32 +220,35 @@ function Stat({ label, value, unit, note }: { label: string; value: string; unit
 
 // ---- Big three -------------------------------------------------------------------------------
 
-function OutcomeSlot({ rank, outcome, block, area, loading, date, onEdit, onSchedule }: { rank: number; outcome?: Outcome; block?: Block; area?: Area; loading: boolean; date: string; onEdit: () => void; onSchedule: (o: Outcome) => void }) {
+const slotMotion = { layout: true, initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, scale: 0.97, transition: { duration: 0.15 } }, transition: { duration: 0.24, ease: [0.22, 1, 0.36, 1] } } as const;
+
+/** `position` is where it sits in today's three; `rank` is the number it was given when chosen. */
+function OutcomeSlot({ rank, position, outcome, block, area, loading, date, onEdit, onSchedule }: { rank: number; position: number; outcome?: Outcome; block?: Block; area?: Area; loading: boolean; date: string; onEdit: () => void; onSchedule: (o: Outcome) => void }) {
   const { saveOutcome } = useDayMutations(date);
   if (loading) {
     return (
-      <li className="outcome"><span className="outcome-rank">{rank}</span><div className="outcome-body"><Skeleton height={18} width="70%" /><Skeleton height={12} width="40%" /></div></li>
+      <li className="outcome"><span className="outcome-rank">{position}</span><div className="outcome-body"><Skeleton height={18} width="70%" /><Skeleton height={12} width="40%" /></div></li>
     );
   }
   if (!outcome) {
     return (
-      <li className="outcome is-empty">
-        <span className="outcome-rank">{rank}</span>
+      <motion.li {...slotMotion} className="outcome is-empty">
+        <span className="outcome-rank">{position}</span>
         <button type="button" className="outcome-add" onClick={onEdit}>
-          <Plus size={16} aria-hidden /> {rank === 1 ? "What must be true by tonight?" : "Add an outcome"}
+          <Plus size={16} aria-hidden /> {position === 1 ? "What must be true by tonight?" : "Add an outcome"}
         </button>
-      </li>
+      </motion.li>
     );
   }
   const isDone = outcome.status === "Done";
   return (
-    <li className={cx("outcome", isDone && "is-done")}>
+    <motion.li {...slotMotion} className={cx("outcome", isDone && "is-done")}>
       <button
         type="button"
         className="outcome-check"
         role="checkbox"
         aria-checked={isDone}
-        aria-label={`Outcome ${rank} done`}
+        aria-label={`Outcome ${rank} done: ${outcome.result}`}
         onClick={() => saveOutcome.mutate({ ...outcome, status: isDone ? "Planned" : "Done" })}
       >
         <AnimatePresence initial={false} mode="wait">
@@ -234,7 +258,7 @@ function OutcomeSlot({ rank, outcome, block, area, loading, date, onEdit, onSche
             </motion.span>
           ) : (
             <motion.span key="rank" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              {rank}
+              {position}
             </motion.span>
           )}
         </AnimatePresence>
@@ -253,9 +277,93 @@ function OutcomeSlot({ rank, outcome, block, area, loading, date, onEdit, onSche
         </div>
       </div>
       <div className="outcome-actions">
+        {block && !isDone && <TimerButton block={block} />}
         <IconButton size="sm" label="Edit outcome" onClick={onEdit}><Pencil size={16} /></IconButton>
       </div>
-    </li>
+    </motion.li>
+  );
+}
+
+/** A task that moved up into today's three because an earlier one was finished or dropped (P2-F2). */
+function NextInLine({ position, block, area, onOpen }: { position: number; block: Block; area?: Area; onOpen: () => void }) {
+  const toast = useToast();
+  const { progress } = useBlockMutations();
+  const finish = () => {
+    // With no time recorded, assume the plan; time from the timer is kept as it is.
+    const fill = block.actualMinutes === null && block.trackedSeconds === 0 && !block.timerStartedAt ? { actualMinutes: block.plannedMinutes } : {};
+    progress.mutate({ block, status: "Done", ...fill }, { onError: (err) => toast.error(errorMessage(err)) });
+  };
+  return (
+    <motion.li {...slotMotion} className="outcome is-next-in-line">
+      <button type="button" className="outcome-check" role="checkbox" aria-checked={false} aria-label={`Done: ${block.title}`} onClick={finish}>{position}</button>
+      <div className="outcome-body">
+        <button type="button" className="row-link outcome-result" onClick={onOpen}>{block.title}</button>
+        <div className="outcome-meta">
+          <AreaChip area={area} compact />
+          <span className="outcome-when"><Clock size={13} aria-hidden /> {block.start.slice(0, 5)}–{block.end.slice(0, 5)}</span>
+          <span className="moved-up">Next in line</span>
+        </div>
+      </div>
+      <div className="outcome-actions"><TimerButton block={block} /></div>
+    </motion.li>
+  );
+}
+
+/** Finished and dropped items leave the three and are kept here, each one click from being reopened. */
+function DoneToday({ items, date }: { items: FocusItem[]; date: string }) {
+  const toast = useToast();
+  const { saveOutcome } = useDayMutations(date);
+  const { progress } = useBlockMutations();
+  if (items.length === 0) return null;
+  const onError = (err: unknown) => toast.error(errorMessage(err));
+  const reopen = (item: FocusItem) =>
+    item.kind === "outcome" ? saveOutcome.mutate({ ...item.outcome, status: "Planned" }, { onError }) : progress.mutate({ block: item.block, status: "Planned" }, { onError });
+  const done = items.filter((i) => i.status === "Done").length;
+  return (
+    <details className="done-today">
+      <summary>Done for the day <span>{done} finished{items.length > done ? ` · ${items.length - done} dropped or put off` : ""}</span></summary>
+      <ul>
+        {items.map((item) => {
+          const title = item.kind === "outcome" ? item.outcome.result : item.block.title;
+          return (
+            <li key={item.key} data-status={item.status}>
+              <StatusIcon status={item.status} size={15} />
+              <span className="done-title">{title}</span>
+              <em>{item.status === "Done" ? "Done" : statusLabel[item.status]}</em>
+              <IconButton size="sm" label={`Reopen ${title}`} onClick={() => reopen(item)}><RotateCcw size={14} /></IconButton>
+            </li>
+          );
+        })}
+      </ul>
+    </details>
+  );
+}
+
+/** P2-F1: what is running, or happening now, or next — with its timer — at the top of Today. */
+function NowCard({ blocks, areaById }: { blocks: Block[]; areaById: Map<string, Area> }) {
+  const timer = useFocusTimer();
+  const now = useNowMinutes();
+  const isOpen = (b: Block) => b.status === "Planned" || b.status === "InProgress";
+  const ends = (b: Block) => toMinutes(b.start) + b.plannedMinutes;
+  const running = timer.running ? blocks.find((b) => b.id === timer.running!.id) : undefined;
+  const current = running ?? blocks.find((b) => isOpen(b) && toMinutes(b.start) <= now && ends(b) > now);
+  const upcoming = blocks.filter((b) => isOpen(b) && toMinutes(b.start) > now && b.id !== current?.id).sort((a, b) => toMinutes(a.start) - toMinutes(b.start));
+  const focus = current ?? upcoming[0];
+  const then = current ? upcoming[0] : upcoming[1];
+  if (!focus) return null;
+  const area = focus.focusAreaId ? areaById.get(focus.focusAreaId) : undefined;
+  const label = running ? "Now · timer running" : current ? "Now" : `Next · in ${formatDuration(toMinutes(focus.start) - now)}`;
+  return (
+    <motion.section layout className={cx("now-card", running && "is-running")} data-area={area?.color ?? "none"} aria-labelledby="now-title">
+      <span className="agenda-bar" aria-hidden />
+      <div className="now-main">
+        <span className="now-label">{label}</span>
+        <h2 id="now-title" className="now-title">{focus.title}</h2>
+        <span className="now-meta">{focus.start.slice(0, 5)}–{focus.end.slice(0, 5)} · {area?.name ?? "No area"} · {modeLabel[focus.workMode]}</span>
+        {then && <span className="now-then">Then {then.title} at {then.start.slice(0, 5)}</span>}
+      </div>
+      <TimerButton block={focus} />
+    </motion.section>
   );
 }
 
@@ -317,7 +425,8 @@ type RoutineBand = { title: string; start: number; end: number; isMeal: boolean;
 
 function Agenda({ blocks, routines, areaById, rankByTask, showNow, onOpen }: { blocks: Block[]; routines: RoutineBand[]; areaById: Map<string, Area>; rankByTask: Map<string, number>; showNow: boolean; onOpen: (b: Block) => void }) {
   const now = useNowMinutes();
-  const nowIndex = showNow ? blocks.findIndex((b) => toMinutes(b.start) + b.plannedMinutes > now) : -1;
+  // The marker sits above the first block still to do; finished or dropped blocks are not "next".
+  const nowIndex = showNow ? blocks.findIndex((b) => (b.status === "Planned" || b.status === "InProgress") && toMinutes(b.start) + b.plannedMinutes > now) : -1;
   // Routines sit between the blocks at their own time; they are context, not something to tick off.
   // A routine starting at the same time as a block comes first: it is the frame the block sits in.
   const routinesBefore = (i: number) => routines.filter((r) => r.start > (i === 0 ? -Infinity : toMinutes(blocks[i - 1]!.start)) && r.start <= toMinutes(blocks[i]!.start));

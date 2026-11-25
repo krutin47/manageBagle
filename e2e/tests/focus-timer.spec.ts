@@ -5,9 +5,9 @@ import { advanceTime, signUp } from "./helpers";
 test.describe.configure({ mode: "serial" });
 
 async function planOneBlock(page: import("@playwright/test").Page, title: string, minutes = "30m") {
-  await page.getByRole("button", { name: "Start a brain dump" }).click();
-  await page.getByLabel("What needs doing?").fill(title);
-  await page.getByLabel("What needs doing?").press("Enter");
+  await page.getByRole("button", { name: "Plan my day" }).click();
+  await page.getByLabel("Add a new task to this plan").fill(title);
+  await page.getByLabel("Add a new task to this plan").press("Enter");
   if (minutes !== "30m") {
     await page.getByRole("group", { name: `Options for ${title}` }).getByRole("button", { name: /^Length/ }).click();
     await page.getByRole("menuitemradio", { name: minutes }).click();
@@ -42,12 +42,7 @@ test("only one block runs at a time; starting another asks first", async ({ page
   await signUp(page);
   await page.goto("/");
   await planOneBlock(page, "First thing");
-  await page.getByRole("button", { name: "Brain dump", exact: true }).click();
-  await page.getByLabel("What needs doing?").fill("Second thing");
-  await page.getByLabel("What needs doing?").press("Enter");
-  await page.getByRole("button", { name: /Next: top three/ }).click();
-  await page.getByRole("button", { name: /Next: fit into the day/ }).click();
-  await page.getByRole("button", { name: "Add to the day" }).click();
+  await planOneBlock(page, "Second thing");
 
   const schedule = page.getByRole("region", { name: "Schedule" });
   await schedule.getByRole("button", { name: "Start timer for First thing" }).click();

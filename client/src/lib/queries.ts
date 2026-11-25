@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
-  api, UnauthorizedError,
+  api, UnauthorizedError, type CaptureItem,
   type Area, type AreaColor, type Block, type CalendarConnection, type CalendarFeed, type Commitment, type Preferences, type Routine, type RoutineInput, type BlockInput, type Day, type DayName, type Outcome, type PlanItem, type ProviderKey,
   type Review, type Status, type StopOutcome, type Task, type TaskInput, type Theme, type TimerSnapshot, type User, type WeekSummary, type WorkMode,
 } from "./api";
@@ -298,6 +298,15 @@ export function useSaveTheme() {
 
 export function useBacklog() {
   return useQuery({ queryKey: keys.backlog, queryFn: ({ signal }) => api<Task[]>("/backlog", { signal }), staleTime: STALE.planning });
+}
+
+/** The brain dump (P2-E1): many tasks into the backlog in one all-or-nothing save; nothing is booked. */
+export function useCaptureTasks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: CaptureItem[]) => api<Task[]>("/backlog/capture", { method: "POST", body: { items } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.backlog }),
+  });
 }
 
 export function useTaskMutations() {

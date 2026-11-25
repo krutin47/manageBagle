@@ -1,10 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { BookOpen, CalendarRange, ChartNoAxesColumn, Inbox, LogOut, Moon, NotebookPen, Settings, Sun, Target, X } from "lucide-react";
+import { BookOpen, CalendarRange, ChartNoAxesColumn, Inbox, LogOut, Moon, NotebookPen, Repeat, Settings, Sun, Target, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { DropdownMenu } from "radix-ui";
 import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate, useOutlet } from "react-router";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
+import { BrainDumpButton, BrainDumpProvider } from "../capture/BrainDump";
 import { TimerProvider } from "../timer/TimerProvider";
 import { CalendarRefresher } from "./CalendarRefresher";
 import { Reminders } from "./Reminders";
@@ -18,6 +19,7 @@ import { browserTimeZone } from "../../lib/time";
 const NAV = [
   { to: "/", label: "Today", icon: Target, end: true },
   { to: "/planner", label: "Planner", icon: CalendarRange },
+  { to: "/routines", label: "Routines", icon: Repeat },
   { to: "/week", label: "Week", icon: ChartNoAxesColumn },
   { to: "/backlog", label: "Backlog", icon: Inbox },
   { to: "/review", label: "Review", icon: NotebookPen },
@@ -92,6 +94,7 @@ export function AppShell() {
 
   return (
     <TimerProvider>
+    <BrainDumpProvider>
     <div className="shell">
       <a href="#main" className="skip-link">
         Skip to content
@@ -101,6 +104,9 @@ export function AppShell() {
         <NavLink to="/" className="sidebar-logo" aria-label="manageBagle — Today">
           <Logo />
         </NavLink>
+
+        {/* Capture is one click from every page (P2-E1). */}
+        <BrainDumpButton />
 
         <nav aria-label="Main" className="nav">
           {NAV.map(({ to, label, icon: Icon, end, desktopOnly }) => (
@@ -168,6 +174,7 @@ export function AppShell() {
         </AnimatePresence>
       </main>
     </div>
+    </BrainDumpProvider>
     </TimerProvider>
   );
 }

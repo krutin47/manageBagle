@@ -6,7 +6,8 @@ import { useDocumentTitle } from "../../lib/hooks";
 import { useUser } from "../../lib/queries";
 
 const LOOP = [
-  { title: "Brain dump, then choose three", body: "Empty your head on Today, then pick the three outcomes with the highest value — not fifteen unrelated tasks.", to: "/", cta: "Open Today" },
+  { title: "Brain dump, then choose three", body: "Empty your head with Brain dump, on any page — it all goes to your backlog. Then Plan my day on Today: choose from the backlog and pick the three outcomes with the highest value, not fifteen unrelated tasks.", to: "/", cta: "Open Today" },
+  { title: "Set up what every day holds", body: "Lunch, workouts, work hours and recovery breaks live on Routines. Set them once and planning works around them.", to: "/routines", cta: "Open Routines" },
   { title: "Make appointments", body: "Give each outcome a date, a start and an end. Use 5, 15, 30 or 60+ minute slots.", to: "/planner", cta: "Open Planner" },
   { title: "Batch similar work", body: "Protect one or two deep-focus blocks. Cluster email, errands and admin together.", to: "/planner", cta: "Open Planner" },
   { title: "Track reality", body: "Log the actual minutes and mark blocks done or skipped. The variance works itself out.", to: "/", cta: "Open Today" },

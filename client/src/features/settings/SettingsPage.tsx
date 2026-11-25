@@ -3,14 +3,13 @@ import { Check, Copy, Download, KeyRound, Link2, Plus, ShieldCheck, ShieldOff, T
 import { AnimatePresence, motion } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { useToast } from "../../components/toast";
 import { Button, ConfirmDialog, cx, Dialog, ErrorNote, Field, IconButton, Input, PageHeader, Segmented, Select, Skeleton } from "../../components/ui";
 import { api, ApiError, errorMessage, type Area, type AreaColor, type User } from "../../lib/api";
 import { useDocumentTitle, useTheme } from "../../lib/hooks";
 import { AREA_COLORS, colorLabel } from "../../lib/labels";
 import { CalendarsCard } from "./CalendarsCard";
-import { RoutinesCard, YourDayCard } from "./RoutinesCard";
 import { keys, useAreaMutations, useAreas, useProviders, useUser } from "../../lib/queries";
 import { browserTimeZone } from "../../lib/time";
 
@@ -22,8 +21,6 @@ export function SettingsPage() {
       <PageHeader eyebrow="Your personal system" title="Settings" />
       <div className="settings">
         <ProfileCard user={user} />
-        <YourDayCard />
-        <RoutinesCard />
         <CalendarsCard />
         <AreasCard />
         <SecurityCard user={user} />
@@ -121,7 +118,7 @@ function AreasCard() {
       <header className="card-head">
         <div>
           <h2 id="areas">Focus areas</h2>
-          <p>The parts of your life you plan time for. They colour your blocks and group your week.</p>
+          <p>The parts of your life you plan time for. They colour your blocks and group your week. Recovery breaks per area are set on the <Link to="/routines">Routines</Link> page.</p>
         </div>
       </header>
       {areas.isPending ? <Skeleton height={200} radius={10} /> : (
@@ -168,17 +165,6 @@ function AreaRow({ area, onDelete }: { area: Area; onDelete: () => void }) {
     <div className="area-row" data-area={area.color}>
       <button type="button" className="swatch" data-area={area.color} aria-label={`Colour: ${colorLabel[area.color]}. Change colour of ${area.name}`} aria-expanded={picking} onClick={() => setPicking(!picking)} />
       <input className="cell-input" aria-label={`Name of ${area.name}`} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} onBlur={() => save({ name })} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} />
-      <select className="area-break" aria-label={`Recovery break for ${area.name}`} value={`${area.breakMinutes}|${area.breakPlacement}`}
-        onChange={(e) => {
-          const [m, placement] = e.target.value.split("|");
-          update.mutate({ id: area.id, name: area.name, color: area.color, breakMinutes: Number(m), breakPlacement: placement as Area["breakPlacement"] }, { onError: (err) => toast.error(errorMessage(err)) });
-        }}>
-        <option value={`0|${area.breakPlacement}`}>No break</option>
-        {[5, 10, 15, 20, 30].flatMap((m) => [
-          <option key={`${m}a`} value={`${m}|After`}>{m} min break after</option>,
-          <option key={`${m}b`} value={`${m}|Before`}>{m} min break before</option>,
-        ])}
-      </select>
       <IconButton size="sm" label={`Delete ${area.name}`} onClick={onDelete}><Trash2 size={15} /></IconButton>
       {picking && (
         <motion.div className="area-row-picker" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>

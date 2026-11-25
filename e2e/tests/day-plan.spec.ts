@@ -1,14 +1,15 @@
 import { expect, test } from "@playwright/test";
 import { dayFromToday, signUp } from "./helpers";
 
-test("a new person can plan a day from a brain dump, work it, and find it again after reloading", async ({ page }) => {
+test("the brain dump only captures; Plan my day chooses from the backlog, and the three roll on as work is finished", async ({ page }) => {
   await signUp(page);
   // Plan tomorrow: a whole empty day, so the result does not depend on what time the test runs.
   const tomorrow = await dayFromToday(page, 1);
-  await page.goto(`/?date=${tomorrow}`);
 
-  await page.getByRole("button", { name: "Start a brain dump" }).click();
-  const box = page.getByLabel("What needs doing?");
+  // Capture is one click from any page (P2-E1) — here, the Planner.
+  await page.goto("/planner");
+  await page.getByRole("button", { name: "Brain dump", exact: true }).click();
+  const box = page.getByLabel("What is on your mind?");
   for (const task of ["Ship the importer", "Reply to recruiter emails", "Pick up suit from tailor", "Pay electricity bill"]) {
     await box.fill(task);
     await box.press("Enter");
@@ -44,7 +45,21 @@ test("a new person can plan a day from a brain dump, work it, and find it again 
   await page.getByRole("radiogroup", { name: "Sort the list by" }).getByRole("radio", { name: "Impact" }).check();
   await expect(page.locator(".dump-row .plan-title").first()).toHaveValue("Ship the importer");
 
-  await page.getByRole("button", { name: /Next: top three/ }).click();
+  // Saving puts everything in the backlog and books nothing: the brain dump does not plan.
+  await page.getByRole("button", { name: "Save to backlog" }).click();
+  await expect(page.getByText("4 tasks added to your backlog")).toBeVisible();
+  await page.goto(`/?date=${tomorrow}`);
+  await expect(page.getByRole("heading", { name: "Nothing planned for this day yet" })).toBeVisible();
+
+  // Plan my day starts from the backlog (P2-E2): what is due soon is offered first.
+  await page.getByRole("button", { name: "Plan my day" }).click();
+  const plan = page.getByRole("dialog");
+  await expect(plan.getByRole("region", { name: "Overdue and due this week" })).toContainText("Pay electricity bill");
+  for (const task of ["Ship the importer", "Reply to recruiter emails", "Pick up suit from tailor", "Pay electricity bill"]) {
+    await plan.getByRole("button", { name: new RegExp(`^${task}`) }).click();
+  }
+  await expect(plan.getByRole("button", { name: /^Ship the importer/ })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: /Next: top three \(4 chosen\)/ }).click();
   await page.getByRole("button", { name: "Suggest for me" }).click();
   await expect(page.locator(".pick-row.is-top").first()).toContainText("Ship the importer"); // impact outranks the rest
 
@@ -57,24 +72,32 @@ test("a new person can plan a day from a brain dump, work it, and find it again 
   await expect(schedule.locator(".agenda-title", { hasText: "Ship the importer" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Day totals" })).toContainText("/ 4");
 
-  // …ticking the top outcome finishes its block too (one piece of work, one tick)…
-  await page.getByRole("checkbox", { name: "Outcome 1 done" }).click();
+  // …finishing the first of the three finishes its block, and the next task in line moves up (P2-F2)…
+  const three = page.getByRole("region", { name: "Top three" });
+  await page.getByRole("checkbox", { name: "Outcome 1 done: Ship the importer" }).click();
   await expect(schedule.getByRole("button", { name: /Status: Done/ })).toHaveCount(1);
+  await expect(three.locator(".outcome")).toHaveCount(3);
+  await expect(three.getByText("Next in line", { exact: true })).toBeVisible();
+  await expect(three.getByText("Done for the day")).toBeVisible();
 
   // …and all of it is still there after a reload: it was saved, not just shown.
   await page.reload();
   await expect(schedule.getByRole("button", { name: /Status: Done/ })).toHaveCount(1);
   await expect(schedule.locator(".agenda-title", { hasText: "Pick up suit from tailor" })).toBeVisible();
-  await expect(page.getByRole("checkbox", { name: "Outcome 1 done" })).toBeChecked();
+  await expect(three.getByText("Next in line", { exact: true })).toBeVisible();
+
+  // The board shows the same state (P2-G1).
+  await page.goto("/backlog");
+  await expect(page.locator('.board-col[data-status="Done"]')).toContainText("Ship the importer");
 });
 
 test("a double click on the final button saves the plan once", async ({ page }) => {
   await signUp(page);
   const tomorrow = await dayFromToday(page, 1);
   await page.goto(`/?date=${tomorrow}`);
-  await page.getByRole("button", { name: "Start a brain dump" }).click();
-  await page.getByLabel("What needs doing?").fill("Write the report");
-  await page.getByLabel("What needs doing?").press("Enter");
+  await page.getByRole("button", { name: "Plan my day" }).click();
+  await page.getByLabel("Add a new task to this plan").fill("Write the report");
+  await page.getByLabel("Add a new task to this plan").press("Enter");
   await page.getByRole("button", { name: /Next: top three/ }).click();
   await page.getByRole("button", { name: /Next: fit into the day/ }).click();
   await page.getByRole("button", { name: "Add to the day" }).dblclick();
@@ -88,8 +111,8 @@ test("the day plan works on a phone with the keyboard and without sideways scrol
   await signUp(page);
   const tomorrow = await dayFromToday(page, 1);
   await page.goto(`/?date=${tomorrow}`);
-  await page.getByRole("button", { name: "Start a brain dump" }).click();
-  await page.getByLabel("What needs doing?").fill("Call the bank");
+  await page.getByRole("button", { name: "Plan my day" }).click();
+  await page.getByLabel("Add a new task to this plan").fill("Call the bank");
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: /Next: top three/ }).click();
   await page.getByRole("button", { name: /Next: fit into the day/ }).click();
@@ -105,4 +128,22 @@ test("the day plan works on a phone with the keyboard and without sideways scrol
   await expect(page.getByRole("region", { name: "Schedule" })).toContainText("15:00");
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+});
+
+test("a brain dump left unsaved is still there when it is opened again, and a pasted list becomes one task per line", async ({ page }) => {
+  await signUp(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Brain dump", exact: true }).click();
+  await page.getByLabel("What is on your mind?").focus();
+  await page.evaluate(() => {
+    const data = new DataTransfer();
+    data.setData("text/plain", "- Book dentist\n- Renew passport\n3. Call mum");
+    document.activeElement!.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(page.locator(".dump-row .plan-title")).toHaveCount(3);
+  await expect(page.locator(".dump-row .plan-title").last()).toHaveValue("Call mum");
+  await page.keyboard.press("Escape");
+  await page.reload();
+  await page.getByRole("button", { name: "Brain dump", exact: true }).click();
+  await expect(page.locator(".dump-row .plan-title")).toHaveCount(3);
 });

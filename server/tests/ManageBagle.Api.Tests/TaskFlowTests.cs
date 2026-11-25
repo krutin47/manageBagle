@@ -103,4 +103,30 @@ public class TaskFlowTests(ClockedFactory factory) : IClassFixture<ClockedFactor
         await Json(await client.PatchAsJsonAsync($"/api/blocks/{id}/progress", new { status = "Planned", version = done.GetProperty("version").GetInt32() }));
         Assert.Equal("Planned", (await Task(client, task)).GetProperty("status").GetString());
     }
+
+    [Fact]
+    public async Task Ticking_a_top_three_outcome_on_today_stops_its_timer_and_finishes_the_card()
+    {
+        var (client, block, task) = await PlannedTask("Finish report");
+        var id = block.GetProperty("id").GetGuid();
+        await Json(await client.PostAsJsonAsync($"/api/blocks/{id}/timer/start", new { pauseRunning = false }));
+        factory.Clock.Advance(TimeSpan.FromMinutes(20));
+        await Json(await client.PutAsJsonAsync("/api/days/2026-11-26/outcomes/1", new { result = "Finish report", focusAreaId = (Guid?)null, nextAction = "", status = "Done", minutesNeeded = 60 }));
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.GetAsync("/api/timer")).StatusCode);
+        var after = (await client.GetFromJsonAsync<JsonElement>("/api/blocks?from=2026-11-26&to=2026-11-26"))[0];
+        Assert.Equal("Done", after.GetProperty("status").GetString());
+        Assert.Equal(20, after.GetProperty("actualMinutes").GetInt32()); // the time worked, not the plan
+        Assert.Equal("Done", (await Task(client, task)).GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Dropping_a_top_three_outcome_drops_its_block_and_card()
+    {
+        var (client, _, task) = await PlannedTask("Old idea");
+        await Json(await client.PutAsJsonAsync("/api/days/2026-11-26/outcomes/1", new { result = "Old idea", focusAreaId = (Guid?)null, nextAction = "", status = "Skipped", minutesNeeded = 60 }));
+        var after = (await client.GetFromJsonAsync<JsonElement>("/api/blocks?from=2026-11-26&to=2026-11-26"))[0];
+        Assert.Equal("Skipped", after.GetProperty("status").GetString());
+        Assert.Equal("Skipped", (await Task(client, task)).GetProperty("status").GetString());
+    }
 }

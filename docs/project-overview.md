@@ -29,8 +29,8 @@ code follows, what exists today, and what is still open. Deeper detail lives in 
 manageBagle is a personal time-blocking planner. It started as a web version of the
 *Time-Blocking Command Center* spreadsheet and keeps that method:
 
-1. **Brain dump** everything on your mind.
-2. **Pick the three** outcomes with the highest value for the day.
+1. **Brain dump** everything on your mind into the backlog (from any page).
+2. **Plan my day**: choose from the backlog and **pick the three** outcomes with the highest value.
 3. **Give them time** on the calendar, batching similar work.
 4. **Track reality** — log the minutes each block really took.
 5. **Review** the day and the week, and adjust.
@@ -210,19 +210,37 @@ These describe what the code does today. New work should follow them.
 - Edit display name; delete account and all its data.
 - New accounts start with eight focus areas and seven day themes, all editable.
 
+Capturing, planning and pre-planning are three separate jobs (requirements P2-E):
+
+### Brain dump (every page)
+- A button in the navigation opens it anywhere. It only **captures**: each line becomes a backlog
+  task; nothing is booked and no top three is chosen. One all-or-nothing save (`POST /api/backlog/capture`).
+- Per task: length, kind of work, focus area, outcome impact, due date (priority follows it),
+  recovery break, outside-work flag. Sort by topic, impact or due date.
+- A pasted list becomes one task per line; a line that repeats an open backlog task is pointed out.
+- The unsaved list survives closing the dialog and reloading the tab (this device only).
+
 ### Today
-- **Brain dump**: three steps — dump tasks, pick the top three, fit them into the day.
-  - Per task: duration, priority, outcome impact, due date, kind of work, focus area, outside-work flag.
-  - Sort the list by topic, impact or due date.
-  - Suggestions from the backlog, due-soonest first.
-  - "Suggest for me" proposes the top three by impact, priority and due date.
-  - Fits tasks around existing blocks; batches by focus area; pads outside work by 25 % (min 10 min).
-  - What does not fit stays in the backlog. Saved in one request.
-- **Top three** cards showing each outcome's booked time; tick to finish.
+- **Plan my day**: choose from the backlog (overdue and due this week first, then high impact, then
+  the rest), type in anything new, pick the top three ("Suggest for me" ranks by impact, then due
+  date), and fit them around routines, meetings and existing blocks. Batches by focus area; pads
+  outside work by 25 % (min 10 min); what does not fit stays in the backlog. Saved in one request.
+- **Now**: the block that is running, happening now, or next, with its timer and what comes after.
+- **Top three, rolling**: the open outcomes in rank order; when one is finished or dropped, the next
+  task in line moves up (by priority, then start time). Finished and dropped items move to
+  "Done for the day", each one click from being reopened.
+- **The board follows**: starting a timer or a block moves its card to In progress; putting it off
+  returns it to To do, unscheduled; finishing all its sessions moves it to Done; dropping it to Dropped.
 - **Schedule**: the day's blocks with status menu, actual minutes, variance, and a "now / next" marker.
 - **Due soon**: unbooked tasks that are overdue or due within 7 days, with "Add to today".
 - Day totals: planned, logged, deep focus, blocks done. Day theme shown in the header.
-- Move between days; empty days show a single invitation to brain dump.
+- Move between days; empty days show a single invitation to plan the day.
+
+### Routines (pre-planning)
+- Fixed daily schedule: routines with weekdays, times, and whether tasks may go inside (none, any,
+  or selected focus areas). One-click templates: Lunch, Dinner, Workout, Work hours, Wind-down.
+- Recovery breaks per focus area, before or after each task.
+- The day window, the drink-water reminder, meal reminders and browser-notification permission.
 
 ### Planner
 - Week **calendar** with overlapping blocks side by side, a current-time line, per-day totals.
@@ -231,6 +249,8 @@ These describe what the code does today. New work should follow them.
 - Block editor: date, start, end, quick lengths, focus area, priority, kind of work, outside flag,
   status, actual minutes, notes; overnight blocks supported.
 - One-day view with a day strip on phones.
+- Recovery breaks before and after blocks, routines (protected or open) and meetings, with a key;
+  the list view shows each block's breaks.
 
 ### Week
 - Totals: planned, logged, deep-focus hours, blocks done %.

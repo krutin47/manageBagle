@@ -6,7 +6,7 @@ A web version of the *Time-Blocking Command Center* workbook.
 | Workbook tab | In the app |
 |---|---|
 | START HERE | **Guide** – the daily loop and recommended block sizes |
-| DAILY FOCUS | **Today** – brain dump, your top three, the day's schedule, what is due soon · **Review** – optional end-of-day review |
+| DAILY FOCUS | **Brain dump** (every page) – capture into the backlog · **Today** – plan my day, now, a rolling top three, the schedule, what is due soon · **Routines** – fixed daily schedule, breaks, reminders · **Review** – optional end-of-day review |
 | TIME BLOCKS | **Planner** – week calendar or list; planned vs. actual minutes and variance |
 | WEEKLY HQ | **Week** – totals, daily scorecard, time by life area, day themes |
 | TASK BACKLOG | **Backlog** – kanban board or list; capture first, schedule second |

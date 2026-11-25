@@ -93,6 +93,9 @@ export interface Task {
   breakMinutes: number | null;
 }
 
+/** One line of a brain dump. */
+export type CaptureItem = Pick<Task, "title" | "estimatedMinutes" | "focusAreaId" | "workMode" | "isOutside" | "priority" | "impact" | "dueDate" | "breakMinutes">;
+
 export type TaskInput = Omit<Task, "id" | "scheduledDate" | "createdAt" | "version" | "breakMinutes"> & { breakMinutes?: number | null };
 
 export interface Outcome {

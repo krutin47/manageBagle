@@ -1,4 +1,4 @@
-import { CalendarPlus, MapPin, MoonStar, Plus } from "lucide-react";
+import { CalendarPlus, Coffee, MapPin, MoonStar, Plus } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import { useSearchParams } from "react-router";
@@ -56,6 +56,7 @@ export function PlannerPage() {
       {view === "calendar" ? (
         <>
           {narrow && <DayStrip days={weekDays(start)} selected={date} blocks={blocks.data ?? []} onSelect={(d) => setParam({ date: d })} />}
+          <CalendarLegend />
           <WeekGrid days={days} blocks={blocks.data ?? []} loading={blocks.isPending} areaById={areaById} onCreate={newBlock} onOpen={(b) => setDraft(b)} />
         </>
       ) : (
@@ -195,7 +196,7 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
               {commitmentsOn(d, commitments.data ?? []).map((c) => (
                 <div key={`${c.source.sourceId}-${c.source.date}-${c.start}`} className={cx("cal-routine", c.policy !== "NoTasks" && "is-open", c.source.kind === "event" && "is-event")} aria-hidden
                   style={{ top: (Math.max(0, c.start) / 60) * HOUR, height: ((Math.min(1440, c.end) - Math.max(0, c.start)) / 60) * HOUR }}>
-                  <span>{c.title}</span>
+                  <span>{c.title}{c.source.kind === "event" ? "" : c.policy === "NoTasks" ? " · protected" : " · open"}</span>
                 </div>
               ))}
               {d === today && (
@@ -209,7 +210,12 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
                 const dragging = drag?.moved && drag.block.id === p.block.id ? drag : null;
                 const liveStart = dragging ? fromMinutes(toMinutes(p.block.start) + dragging.minuteShift) : p.block.start.slice(0, 5);
                 const liveEnd = dragging ? fromMinutes(toMinutes(p.block.start) + dragging.minuteShift + p.block.plannedMinutes) : p.block.end.slice(0, 5);
+                const breaks = [p.block.breakBeforeMinutes ? `${p.block.breakBeforeMinutes} min recovery before` : "", p.block.breakAfterMinutes ? `${p.block.breakAfterMinutes} min recovery after` : ""].filter(Boolean).join(", ");
                 return [
+                  p.block.breakBeforeMinutes > 0 && !dragging && (
+                    <span key={`${p.block.id}-break-before`} className="cal-break is-before" aria-hidden title={`${p.block.breakBeforeMinutes} min recovery`}
+                      style={{ top: Math.max(0, ((p.startMin - p.block.breakBeforeMinutes) / 60) * HOUR + 1), height: Math.max((p.block.breakBeforeMinutes / 60) * HOUR - 2, 6), left: `calc(${(p.lane / p.lanes) * 100}% + 2px)`, width: `calc(${100 / p.lanes}% - 4px)` }} />
+                  ),
                   p.block.breakAfterMinutes > 0 && !dragging && (
                     <span key={`${p.block.id}-break`} className="cal-break" aria-hidden title={`${p.block.breakAfterMinutes} min recovery`}
                       style={{ top: (p.endMin / 60) * HOUR + 1, height: Math.max((p.block.breakAfterMinutes / 60) * HOUR - 2, 6), left: `calc(${(p.lane / p.lanes) * 100}% + 2px)`, width: `calc(${100 / p.lanes}% - 4px)` }} />
@@ -229,7 +235,7 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
                     data-status={p.block.status}
                     style={{ top: (p.startMin / 60) * HOUR + 1, height, left: `calc(${(p.lane / p.lanes) * 100}% + 2px)`, width: `calc(${100 / p.lanes}% - 4px)` }}
                     onClick={() => !justDragged.current && onOpen(p.block)}
-                    aria-label={`${p.block.title}, ${formatTime(p.block.start)} to ${formatTime(p.block.end)}, ${area?.name ?? "no focus area"}, ${statusLabel[p.block.status]}. Open to edit or move.`}
+                    aria-label={`${p.block.title}, ${formatTime(p.block.start)} to ${formatTime(p.block.end)}, ${area?.name ?? "no focus area"}, ${statusLabel[p.block.status]}${breaks ? `, ${breaks}` : ""}. Open to edit or move.`}
                   >
                     <span className="cal-block-title">
                       {p.block.status !== "Planned" && <StatusIcon status={p.block.status} size={12} />}
@@ -248,6 +254,19 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
         </div>
       </div>
     </section>
+  );
+}
+
+/** What each kind of shape on the calendar means (P2-H1). Shapes differ in pattern and outline, not only colour. */
+function CalendarLegend() {
+  return (
+    <ul className="cal-legend" aria-label="Calendar key">
+      <li><span className="legend-swatch is-block" aria-hidden /> Block</li>
+      <li><span className="legend-swatch is-break" aria-hidden /> Recovery break</li>
+      <li><span className="legend-swatch is-protected" aria-hidden /> Routine, protected</li>
+      <li><span className="legend-swatch is-open" aria-hidden /> Routine, open for tasks</li>
+      <li><span className="legend-swatch is-event" aria-hidden /> Meeting from your calendar</li>
+    </ul>
   );
 }
 
@@ -285,6 +304,9 @@ function BlockTable({ blocks, loading, areaById, onOpen, onCreate }: { blocks: B
                 <button type="button" className="row-link" onClick={() => onOpen(b)}>
                   {b.title}
                 </button>
+                {b.breakBeforeMinutes + b.breakAfterMinutes > 0 && (
+                  <span className="table-note break-tag"><Coffee size={12} aria-hidden /> {[b.breakBeforeMinutes ? `${formatDuration(b.breakBeforeMinutes)} recovery before` : "", b.breakAfterMinutes ? `${formatDuration(b.breakAfterMinutes)} recovery after` : ""].filter(Boolean).join(" · ")}</span>
+                )}
                 {b.notes && <span className="table-note">{b.notes}</span>}
               </td>
               <td><AreaChip area={b.focusAreaId ? areaById.get(b.focusAreaId) : undefined} /></td>
