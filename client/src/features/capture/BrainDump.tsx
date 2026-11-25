@@ -6,7 +6,7 @@ import { Button, Dialog, ErrorNote } from "../../components/ui";
 import { errorMessage, type CaptureItem } from "../../lib/api";
 import { useAreas, useBacklog, useCaptureTasks } from "../../lib/queries";
 import { formatDuration, todayISO } from "../../lib/time";
-import { newRow, priorityOf, similarTask, type Row, type SortMode } from "../today/brainDump";
+import { newRow, priorityOf, similarTask, type Row, type SortMode } from "./rows";
 import { TaskRows } from "./TaskRows";
 
 /**

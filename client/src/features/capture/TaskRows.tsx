@@ -6,7 +6,7 @@ import { cx, IconButton, Segmented } from "../../components/ui";
 import type { Area, Priority, WorkMode } from "../../lib/api";
 import { modeLabel, PRIORITIES, WORK_MODES } from "../../lib/labels";
 import { addDays, formatDate, formatDuration, todayISO } from "../../lib/time";
-import { dueQuickPicks, sortRows, topicGroups, withWorkMode, type Row, type SortMode } from "../today/brainDump";
+import { dueQuickPicks, sortRows, topicGroups, withWorkMode, type Row, type SortMode } from "./rows";
 
 const LENGTHS = [15, 30, 45, 60, 90, 120, 180, 240];
 export const SORTS: { value: SortMode; label: string }[] = [

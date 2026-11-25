@@ -72,7 +72,7 @@ public static class RoutineEndpoints
         {
             var deleted = await db.Routines.Where(r => r.Id == id && r.UserId == user.UserId()).ExecuteDeleteAsync(ct);
             return deleted == 0 ? Results.NotFound() : Results.NoContent();
-        });
+        }).Produces(StatusCodes.Status204NoContent);
 
         // Everything that already occupies time in a date range, expanded in the account's zone.
         g.MapGet("/commitments", async (DateOnly from, DateOnly to, ClaimsPrincipal user, AppDbContext db, CancellationToken ct) =>
@@ -112,7 +112,7 @@ public static class RoutineEndpoints
             u.BreakColor = req.BreakColor;
             await db.SaveChangesAsync(ct);
             return Results.Ok(new PreferencesResponse(req.DayStart, req.DayEnd, req.WaterReminderMinutes, req.BreakColor));
-        }).ProducesValidationProblem();
+        }).Produces<PreferencesResponse>().ProducesValidationProblem();
     }
 
     private static async Task<IResult?> Apply(Routine routine, RoutineRequest req, Guid uid, AppDbContext db, CancellationToken ct)

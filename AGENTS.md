@@ -18,8 +18,8 @@ what was run and its result. "Not run" and "could not run" are acceptable answer
    `CancellationToken` passed through.
 8. Database changes: include the migration, say whether the previous app version can still run
    against it, why each index or constraint exists, and what happens to existing rows.
-9. API changes: update `docs/api/openapi.json` (the contract test tells you how), client types, error
-   states and docs.
+9. API changes: update `docs/api/openapi.json` (the contract test tells you how), run `npm run gen:api`
+   in `client/` and fix what `npm run typecheck` reports (ADR-016), then error states and docs.
 10. Performance changes come with before/after measurements. No blanket `useMemo`.
 11. Auth and security changes need human review and adversarial tests. Never silently alter linked
     identities or MFA credentials.

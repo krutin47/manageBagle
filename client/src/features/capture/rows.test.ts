@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Area, Task } from "../../lib/api";
-import { dueQuickPicks, newRow, planSuggestions, priorityFromDue, similarTask, priorityOf, rowFromTask, sortRows, topicGroups, valueScore, withWorkMode, type Row } from "./brainDump";
+import { dueQuickPicks, newRow, planSuggestions, priorityFromDue, similarTask, priorityOf, rowFromTask, sortRows, topicGroups, valueScore, withWorkMode, type Row } from "./rows";
 
 const TODAY = "2026-11-25"; // a Wednesday
 const areas: Area[] = [

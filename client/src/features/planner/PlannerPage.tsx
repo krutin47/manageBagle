@@ -145,6 +145,7 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
     window.setTimeout(() => (justDragged.current = false), 0);
     if (drag.dayShift === 0 && drag.minuteShift === 0) return;
     const date = days[days.indexOf(drag.block.date) + drag.dayShift];
+    if (!date) return; // dropped outside the visible week
     const start = fromMinutes(toMinutes(drag.block.start) + drag.minuteShift);
     move.mutate({ block: drag.block, date, start }, { onError: (err) => toast.error(errorMessage(err)) });
   };

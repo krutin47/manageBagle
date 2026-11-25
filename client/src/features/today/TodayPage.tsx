@@ -160,7 +160,7 @@ export function TodayPage() {
                     )}
                     {!day.isPending && freeRanks.slice(0, Math.max(0, 3 - rolling.current.length)).map((rank, i) => (
                       <OutcomeSlot key={`empty-${rank}`} rank={rank} position={rolling.current.length + i + 1} loading={day.isPending} date={date}
-                        onEdit={() => setEditing({ rank, result: "", focusAreaId: null, nextAction: "", status: "Planned", minutesNeeded: null })} onSchedule={() => undefined} />
+                        onEdit={() => setEditing({ rank, result: "", focusAreaId: null, nextAction: "", status: "Planned", minutesNeeded: null, backlogTaskId: null })} onSchedule={() => undefined} />
                     ))}
                   </AnimatePresence>
                 </ol>

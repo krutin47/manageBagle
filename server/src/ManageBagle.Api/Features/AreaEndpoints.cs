@@ -40,7 +40,7 @@ public static class AreaEndpoints
             db.FocusAreas.Add(area);
             await db.SaveChangesAsync();
             return Results.Created($"/api/areas/{area.Id}", AreaResponse.From(area));
-        });
+        }).Produces<AreaResponse>(StatusCodes.Status201Created).ProducesValidationProblem();
 
         g.MapPut("/{id:guid}", async (Guid id, AreaRequest req, ClaimsPrincipal user, AppDbContext db) =>
         {
@@ -53,7 +53,7 @@ public static class AreaEndpoints
             area.BreakPlacement = req.BreakPlacement;
             await db.SaveChangesAsync();
             return Results.Ok(AreaResponse.From(area));
-        });
+        }).Produces<AreaResponse>().ProducesValidationProblem();
 
         g.MapPut("/order", async (ReorderRequest req, ClaimsPrincipal user, AppDbContext db) =>
         {
@@ -65,7 +65,7 @@ public static class AreaEndpoints
             }
             await db.SaveChangesAsync();
             return Results.NoContent();
-        });
+        }).Produces(StatusCodes.Status204NoContent).ProducesValidationProblem();
 
         // Blocks, tasks and outcomes that used the area are kept and become "unassigned".
         g.MapDelete("/{id:guid}", async (Guid id, ClaimsPrincipal user, AppDbContext db) =>
@@ -75,7 +75,7 @@ public static class AreaEndpoints
             db.FocusAreas.Remove(area);
             await db.SaveChangesAsync();
             return Results.NoContent();
-        });
+        }).Produces(StatusCodes.Status204NoContent);
     }
 
     /// <summary>True when the id is null or names one of the caller's own areas.</summary>

@@ -105,8 +105,8 @@ export interface Outcome {
   nextAction: string;
   status: Status;
   minutesNeeded: number | null;
-  /** Present when the outcome came from a planned task; ticking either finishes both. */
-  backlogTaskId?: string | null;
+  /** Set when the outcome came from a planned task; ticking either finishes both. */
+  backlogTaskId: string | null;
 }
 
 export type ProviderKey = "google" | "microsoft";

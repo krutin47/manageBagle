@@ -22,6 +22,8 @@ public record TaskRequest(
 
 public record CaptureRequest([Required, MinLength(1), MaxLength(60)] Application.Planning.CaptureItem[] Items);
 
+public record ScheduledTaskResponse(TaskResponse Task, BlockResponse Block);
+
 public record ScheduleRequest(DateOnly Date, TimeOnly Start, TimeOnly End, WorkMode WorkMode);
 
 public record TaskResponse(
@@ -59,7 +61,7 @@ public static class BacklogEndpoints
             db.BacklogTasks.Add(task);
             await db.SaveChangesAsync();
             return Results.Created($"/api/backlog/{task.Id}", TaskResponse.From(task));
-        });
+        }).Produces<TaskResponse>(StatusCodes.Status201Created).ProducesValidationProblem();
 
         g.MapPut("/{id:guid}", async (Guid id, TaskRequest req, ClaimsPrincipal user, AppDbContext db, Application.Tasks.ChangeTaskStatus status, CancellationToken ct) =>
         {
@@ -82,7 +84,7 @@ public static class BacklogEndpoints
             db.BacklogTasks.Remove(task);
             await db.SaveChangesAsync();
             return Results.NoContent();
-        });
+        }).Produces(StatusCodes.Status204NoContent);
 
         // "Capture first, schedule second": turn a task into a committed block on the calendar.
         g.MapPost("/{id:guid}/schedule", async (Guid id, ScheduleRequest req, ClaimsPrincipal user, AppDbContext db) =>
@@ -104,8 +106,8 @@ public static class BacklogEndpoints
             task.WorkMode = req.WorkMode;
             db.TimeBlocks.Add(block);
             await db.SaveChangesAsync();
-            return Results.Created($"/api/blocks/{block.Id}", new { task = TaskResponse.From(task), block = BlockResponse.From(block) });
-        });
+            return Results.Created($"/api/blocks/{block.Id}", new ScheduledTaskResponse(TaskResponse.From(task), BlockResponse.From(block)));
+        }).Produces<ScheduledTaskResponse>(StatusCodes.Status201Created).ProducesValidationProblem();
     }
 
     private static void Apply(BacklogTask task, TaskRequest req)

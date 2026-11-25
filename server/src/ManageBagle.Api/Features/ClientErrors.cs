@@ -29,6 +29,6 @@ public static class ClientErrors
                 report.Kind, route ?? "", report.Reference ?? "", report.Release ?? "",
                 user.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous", report.Message);
             return Results.Accepted();
-        }).RequireRateLimiting("client-errors").WithTags("Diagnostics");
+        }).RequireRateLimiting("client-errors").WithTags("Diagnostics").Produces(StatusCodes.Status202Accepted).ProducesValidationProblem();
     }
 }

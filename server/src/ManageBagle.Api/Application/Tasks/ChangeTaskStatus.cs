@@ -1,6 +1,5 @@
 using ManageBagle.Api.Data;
 using ManageBagle.Api.Domain;
-using ManageBagle.Api.Features;
 using Microsoft.EntityFrameworkCore;
 
 namespace ManageBagle.Api.Application.Tasks;
@@ -19,7 +18,8 @@ public sealed class ChangeTaskStatus(AppDbContext db, TimeProvider clock)
     {
         if (task.Status == previous || task.Status is not (ItemStatus.Done or ItemStatus.Skipped)) return;
         var now = clock.GetUtcNow();
-        var zone = TimeZones.Find(await db.TimeZoneOf(task.UserId, ct)) ?? TimeZoneInfo.Utc;
+        var zoneId = await db.Users.Where(u => u.Id == task.UserId).Select(u => u.TimeZoneId).FirstOrDefaultAsync(ct);
+        var zone = TimeZones.Find(zoneId) ?? TimeZoneInfo.Utc;
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
 
         var open = await db.TimeBlocks

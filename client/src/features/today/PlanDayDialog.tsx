@@ -10,7 +10,7 @@ import { useBacklog, useCommitments, usePlanDay, usePreferences } from "../../li
 import { proposeSchedule } from "../../lib/schedule";
 import { formatDate, formatDuration, fromMinutes, nowMinutes, snap, todayISO, toMinutes } from "../../lib/time";
 import { dueLabel, TaskRows } from "../capture/TaskRows";
-import { newRow, planSuggestions, priorityOf, rowFromTask, valueScore, type Row, type SortMode } from "./brainDump";
+import { newRow, planSuggestions, priorityOf, rowFromTask, valueScore, type Row, type SortMode } from "../capture/rows";
 
 export { dueLabel, valueScore };
 
@@ -82,7 +82,7 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
   const suggestTop = () =>
     setRows((list) => {
       const best = [...list].sort((a, b) => valueScore(b, today) - valueScore(a, today)).slice(0, freeRanks.length);
-      return list.map((r) => ({ ...r, top: best.includes(r) ? freeRanks[best.indexOf(r)] : null }));
+      return list.map((r) => ({ ...r, top: best.includes(r) ? (freeRanks[best.indexOf(r)] ?? null) : null }));
     });
 
   const toggleTop = (key: string) =>
@@ -118,7 +118,7 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
   const goNext = () => {
     // With three tasks or fewer there is nothing to choose between: they are the top three.
     if (step === 0 && picked === 0 && rows.length <= freeRanks.length) {
-      setRows(rows.map((r, i) => ({ ...r, top: freeRanks[i] })));
+      setRows(rows.map((r, i) => ({ ...r, top: freeRanks[i] ?? null })));
     }
     setStep(step + 1);
   };

@@ -84,13 +84,13 @@ public static class DayEndpoints
             }
             await db.SaveChangesAsync(ct);
             return Results.Ok(ToResponse(outcome));
-        });
+        }).Produces<OutcomeResponse>().ProducesValidationProblem();
 
         g.MapDelete("/outcomes/{rank:int}", async (DateOnly date, int rank, ClaimsPrincipal user, AppDbContext db) =>
         {
             await db.DailyOutcomes.Where(o => o.UserId == user.UserId() && o.Date == date && o.Rank == rank).ExecuteDeleteAsync();
             return Results.NoContent();
-        });
+        }).Produces(StatusCodes.Status204NoContent);
 
         g.MapPut("/review", async (DateOnly date, ReviewRequest req, ClaimsPrincipal user, AppDbContext db) =>
         {
@@ -133,7 +133,7 @@ public static class DayEndpoints
             theme.Review = req.Review?.Trim() ?? "";
             await db.SaveChangesAsync();
             return Results.Ok(new ThemeResponse(day, theme.PrimaryFocus, theme.Outcome, theme.Review));
-        });
+        }).Produces<ThemeResponse>().ProducesValidationProblem();
     }
 
     private static readonly DayOfWeek[] WeekOrder =

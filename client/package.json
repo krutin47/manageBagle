@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "gen:api": "node scripts/api-types.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

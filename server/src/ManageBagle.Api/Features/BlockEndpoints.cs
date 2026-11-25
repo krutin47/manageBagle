@@ -112,7 +112,7 @@ public static class BlockEndpoints
             db.TimeBlocks.Remove(block);
             await db.SaveChangesAsync(ct);
             return Results.NoContent();
-        });
+        }).Produces(StatusCodes.Status204NoContent);
     }
 
     private static async Task<IResult?> Validate(BlockRequest req, Guid userId, AppDbContext db, CancellationToken ct)

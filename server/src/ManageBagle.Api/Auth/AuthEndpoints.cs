@@ -27,6 +27,15 @@ public record TokenRequest([Required, StringLength(2000)] string Token);
 
 public record AuditEventResponse(string Event, string Detail, DateTimeOffset At);
 
+// Named responses (handbook Phase 2: every endpoint declares what it returns). Same JSON as before.
+public record StatusResponse(string Status);
+public record CsrfResponse(string? Token);
+public record MfaResetResponse(string Status, DateTimeOffset? AvailableAt);
+public record MfaResetStateResponse(string State, DateTimeOffset? AvailableAt);
+public record LinkStartResponse(string Url);
+public record MfaSetupResponse(string SharedKey, string OtpauthUri);
+public record RecoveryCodesResponse(IEnumerable<string> RecoveryCodes);
+
 public record LoginRequest([Required] string Email, [Required] string Password, bool RememberMe);
 
 public record MfaLoginRequest([Required, StringLength(40)] string Code, bool UseRecoveryCode, bool RememberDevice);
@@ -73,20 +82,20 @@ public static class AuthEndpoints
         // The antiforgery token for this browser and account. The client sends it back in X-CSRF-TOKEN on
         // every state-changing request, and fetches a new one after signing in or out.
         g.MapGet("/csrf", (HttpContext http, IAntiforgery antiforgery) =>
-            Results.Ok(new { token = antiforgery.GetAndStoreTokens(http).RequestToken }));
+            Results.Ok(new CsrfResponse(antiforgery.GetAndStoreTokens(http).RequestToken))).Produces<CsrfResponse>();
 
         g.MapGet("/providers", async (IAuthenticationSchemeProvider schemes) =>
         {
             var enabled = new Dictionary<string, bool>();
             foreach (var p in ExternalProviders.All) enabled[p.Key] = await schemes.GetSchemeAsync(p.Scheme) is not null;
             return Results.Ok(enabled);
-        });
+        }).Produces<Dictionary<string, bool>>();
 
         g.MapGet("/me", async (ClaimsPrincipal principal, UserManager<AppUser> users) =>
         {
             var user = await users.GetUserAsync(principal);
             return user is null ? Results.Unauthorized() : Results.Ok(await ToResponse(users, user));
-        }).RequireAuthorization();
+        }).RequireAuthorization().Produces<UserResponse>().ProducesProblem(StatusCodes.Status401Unauthorized);
 
         limited.MapPost("/register", async (RegisterRequest req, UserManager<AppUser> users, AppDbContext db, IAppEmailSender email, AccountLinks links, IOptions<IdentityOptions> identity) =>
         {
@@ -121,8 +130,8 @@ public static class AuthEndpoints
             }
 
             // The same answer in every case: this endpoint must not reveal which addresses have accounts.
-            return Results.Accepted(value: new { status = "confirmation_sent" });
-        });
+            return Results.Accepted(value: new StatusResponse("confirmation_sent"));
+        }).Produces<StatusResponse>(StatusCodes.Status202Accepted).ProducesValidationProblem();
 
         limited.MapPost("/email/confirm", async (ConfirmEmailRequest req, UserManager<AppUser> users, SignInManager<AppUser> signIn) =>
         {
@@ -142,17 +151,17 @@ public static class AuthEndpoints
 
             // Opening the link proves the mailbox. That is enough to sign in — unless two-step
             // verification is on, which a mailbox alone must never bypass.
-            if (await users.GetTwoFactorEnabledAsync(user)) return Results.Ok(new { status = "confirmed" });
+            if (await users.GetTwoFactorEnabledAsync(user)) return Results.Ok(new StatusResponse("confirmed"));
             await signIn.SignInAsync(user, isPersistent: false);
-            return Results.Ok(new { status = "signed_in" });
-        });
+            return Results.Ok(new StatusResponse("signed_in"));
+        }).Produces<StatusResponse>().ProducesProblem(StatusCodes.Status400BadRequest);
 
         limited.MapPost("/email/resend", async (ForgotPasswordRequest req, UserManager<AppUser> users, IAppEmailSender email, AccountLinks links) =>
         {
             var user = await users.FindByEmailAsync(req.Email.Trim());
             if (user is { EmailConfirmed: false }) await links.SendConfirmationAsync(users, email, user);
             return Results.Accepted();
-        });
+        }).Produces(StatusCodes.Status202Accepted);
 
         limited.MapPost("/login", async (LoginRequest req, SignInManager<AppUser> signIn, UserManager<AppUser> users) =>
         {
@@ -172,7 +181,7 @@ public static class AuthEndpoints
             var result = await signIn.PasswordSignInAsync(req.Email.Trim(), req.Password, req.RememberMe, lockoutOnFailure: true);
             if (user is not null) await Audit.RecordAsync(app, result.Succeeded ? "sign_in" : result.RequiresTwoFactor ? "sign_in_needs_mfa" : "sign_in_failed", user.Id);
             return SignInOutcome(result);
-        });
+        }).Produces<StatusResponse>().ProducesProblem(StatusCodes.Status401Unauthorized);
 
         limited.MapPost("/login/mfa", async (MfaLoginRequest req, SignInManager<AppUser> signIn, UserManager<AppUser> users) =>
         {
@@ -196,12 +205,12 @@ public static class AuthEndpoints
                     await users.UpdateAsync(pending);
                     await Audit.RecordAsync(app, "mfa_reset_cancelled", pending.Id, "second_factor_used");
                 }
-                return Results.Ok(new { status = "ok" });
+                return Results.Ok(new StatusResponse("ok"));
             }
             await Audit.RecordAsync(app, "sign_in_mfa_failed", pending.Id);
             if (result.IsLockedOut) return SignInOutcome(result);
             return HttpExtensions.Problem(401, "invalid_code", "That code is not valid. Check your authenticator app and try again.");
-        });
+        }).Produces<StatusResponse>().ProducesProblem(StatusCodes.Status401Unauthorized);
 
         // ---- Lost every second factor --------------------------------------------------------------
         //
@@ -225,13 +234,13 @@ public static class AuthEndpoints
             await email.SendAsync(user.Email!, subject, body);
             await Audit.RecordAsync(app, "mfa_reset_requested", user.Id);
             return Results.Accepted();
-        });
+        }).Produces(StatusCodes.Status202Accepted);
 
         limited.MapPost("/mfa/recovery/confirm", async (TokenRequest req, UserManager<AppUser> users, IAppEmailSender email, AccountLinks links, IConfiguration config, TimeProvider clock) =>
         {
             var user = await MfaResetUser(users, links, req.Token, "confirm");
             if (user is null) return MfaResetLinkInvalid();
-            if (!await users.GetTwoFactorEnabledAsync(user)) return Results.Ok(new { status = "not_needed" });
+            if (!await users.GetTwoFactorEnabledAsync(user)) return Results.Ok(new MfaResetResponse("not_needed", null));
             var delay = config.GetValue("Auth:MfaResetDelayHours", 72);
             if (user.MfaResetAvailableAt is null)
             {
@@ -243,8 +252,8 @@ public static class AuthEndpoints
                 await email.SendAsync(user.Email!, subject, body);
                 await Audit.RecordAsync(app, "mfa_reset_confirmed", user.Id);
             }
-            return Results.Ok(new { status = "waiting", availableAt = user.MfaResetAvailableAt });
-        });
+            return Results.Ok(new MfaResetResponse("waiting", user.MfaResetAvailableAt));
+        }).Produces<MfaResetResponse>().ProducesProblem(StatusCodes.Status400BadRequest);
 
         limited.MapPost("/mfa/recovery/cancel", async (TokenRequest req, UserManager<AppUser> users, AccountLinks links) =>
         {
@@ -259,16 +268,16 @@ public static class AuthEndpoints
             }
             // A new stamp kills the confirm link as well, so the request cannot be restarted from the old email.
             await users.UpdateSecurityStampAsync(user);
-            return Results.Ok(new { status = "cancelled" });
-        });
+            return Results.Ok(new StatusResponse("cancelled"));
+        }).Produces<StatusResponse>().ProducesProblem(StatusCodes.Status400BadRequest);
 
         limited.MapGet("/mfa/recovery/status", async (SignInManager<AppUser> signIn, TimeProvider clock) =>
         {
             var user = await signIn.GetTwoFactorAuthenticationUserAsync();
             if (user is null) return HttpExtensions.Problem(401, "mfa_session_expired", "Your sign-in session expired. Start again.");
             var state = user.MfaResetAvailableAt is null ? "none" : user.MfaResetAvailableAt <= clock.GetUtcNow() ? "ready" : "waiting";
-            return Results.Ok(new { state, availableAt = user.MfaResetAvailableAt });
-        });
+            return Results.Ok(new MfaResetStateResponse(state, user.MfaResetAvailableAt));
+        }).Produces<MfaResetStateResponse>();
 
         limited.MapPost("/mfa/recovery/complete", async (SignInManager<AppUser> signIn, UserManager<AppUser> users, IAppEmailSender email, TimeProvider clock) =>
         {
@@ -288,8 +297,8 @@ public static class AuthEndpoints
             var (subject, body) = EmailTemplates.MfaResetCompleted(user.DisplayName);
             await email.SendAsync(user.Email!, subject, body);
             await Audit.RecordAsync(app, "mfa_reset_completed", user.Id);
-            return Results.Ok(new { status = "ok" });
-        });
+            return Results.Ok(new StatusResponse("ok"));
+        }).Produces<StatusResponse>().ProducesProblem(StatusCodes.Status400BadRequest);
 
         g.MapGet("/activity", async (ClaimsPrincipal principal, AppDbContext db, CancellationToken ct) =>
         {
@@ -298,14 +307,14 @@ public static class AuthEndpoints
                 .OrderByDescending(e => e.At).Take(30)
                 .Select(e => new AuditEventResponse(e.Event, e.Detail, e.At)).ToListAsync(ct);
             return Results.Ok(events);
-        }).RequireAuthorization();
+        }).RequireAuthorization().Produces<IEnumerable<AuditEventResponse>>();
 
         g.MapPost("/logout", async (SignInManager<AppUser> signIn, ClaimsPrincipal principal) =>
         {
             if (principal.Identity?.IsAuthenticated == true) await Audit.RecordAsync(app, "sign_out", principal.UserId());
             await signIn.SignOutAsync();
             return Results.NoContent();
-        });
+        }).Produces(StatusCodes.Status204NoContent);
 
         // ---- External providers (Google, Microsoft; an OIDC SSO provider would be one more entry) ----
         //
@@ -329,7 +338,7 @@ public static class AuthEndpoints
             }
             var props = signIn.ConfigureExternalAuthenticationProperties(known.Scheme, callback);
             return Results.Challenge(props, [known.Scheme]);
-        });
+        }).Produces(StatusCodes.Status302Found).Produces(StatusCodes.Status404NotFound);
 
         g.MapGet("/external-callback", async (string? returnUrl, string? remoteError, string? link, HttpContext http, SignInManager<AppUser> signIn,
             UserManager<AppUser> users, AppDbContext db, IAppEmailSender email, AccountLinks links) =>
@@ -398,7 +407,7 @@ public static class AuthEndpoints
             }
             result = await signIn.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: false, bypassTwoFactor: false);
             return Results.Redirect(result.Succeeded ? SafeReturnUrl(returnUrl) : "/login?error=external_failed");
-        });
+        }).Produces(StatusCodes.Status302Found);
 
         // ---- Passwords -------------------------------------------------------------------------
 
@@ -416,8 +425,8 @@ public static class AuthEndpoints
                 return HttpExtensions.Problem(409, "step_up_unavailable", "Set a password first, so we can confirm it is you before linking another account.");
             }
             if (!await Confirm(users, user, req)) return ConfirmFailed();
-            return Results.Ok(new { url = $"/api/auth/external/{known.Key}?link={Uri.EscapeDataString(links.CreateLinkTicket(user.Id, known.Key))}&returnUrl=%2Fsettings" });
-        });
+            return Results.Ok(new LinkStartResponse($"/api/auth/external/{known.Key}?link={Uri.EscapeDataString(links.CreateLinkTicket(user.Id, known.Key))}&returnUrl=%2Fsettings"));
+        }).Produces<LinkStartResponse>().ProducesProblem(StatusCodes.Status403Forbidden);
 
         authed.MapPost("/external/{provider}/unlink", async (string provider, ConfirmRequest req, ClaimsPrincipal principal, UserManager<AppUser> users, SignInManager<AppUser> signIn) =>
         {
@@ -436,7 +445,7 @@ public static class AuthEndpoints
             await signIn.RefreshSignInAsync(user);
             await Audit.RecordAsync(app, "external_login_unlinked", user.Id, known.Key);
             return Results.NoContent();
-        });
+        }).Produces(StatusCodes.Status204NoContent).ProducesProblem(StatusCodes.Status403Forbidden);
 
         authed.MapPost("/password", async (ChangePasswordRequest req, ClaimsPrincipal principal, UserManager<AppUser> users, SignInManager<AppUser> signIn) =>
         {
@@ -448,7 +457,7 @@ public static class AuthEndpoints
             await signIn.RefreshSignInAsync(user);
             await Audit.RecordAsync(app, "password_changed", user.Id);
             return Results.NoContent();
-        });
+        }).Produces(StatusCodes.Status204NoContent).ProducesValidationProblem();
 
         limited.MapPost("/password/forgot", async (ForgotPasswordRequest req, UserManager<AppUser> users, IAppEmailSender email, AccountLinks links) =>
         {
@@ -461,7 +470,7 @@ public static class AuthEndpoints
                 await email.SendAsync(user.Email!, subject, body);
             }
             return Results.Accepted();
-        });
+        }).Produces(StatusCodes.Status202Accepted);
 
         limited.MapPost("/password/reset", async (ResetPasswordRequest req, UserManager<AppUser> users) =>
         {
@@ -484,7 +493,7 @@ public static class AuthEndpoints
             await users.SetLockoutEndDateAsync(user, null);
             await Audit.RecordAsync(app, "password_reset", user.Id);
             return Results.NoContent();
-        });
+        }).Produces(StatusCodes.Status204NoContent).ProducesValidationProblem();
 
         // ---- Multi-factor ----------------------------------------------------------------------
 
@@ -506,8 +515,8 @@ public static class AuthEndpoints
             }
             var uri = $"otpauth://totp/{Uri.EscapeDataString(Issuer)}:{Uri.EscapeDataString(user.Email!)}" +
                       $"?secret={key}&issuer={Uri.EscapeDataString(Issuer)}&digits=6";
-            return Results.Ok(new { sharedKey = key, otpauthUri = uri });
-        });
+            return Results.Ok(new MfaSetupResponse(key, uri));
+        }).Produces<MfaSetupResponse>();
 
         authed.MapPost("/mfa/enable", async (CodeRequest req, ClaimsPrincipal principal, UserManager<AppUser> users, SignInManager<AppUser> signIn) =>
         {
@@ -520,8 +529,8 @@ public static class AuthEndpoints
             var codes = await users.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
             await signIn.RefreshSignInAsync(user);
             await Audit.RecordAsync(app, "mfa_enabled", user.Id);
-            return Results.Ok(new { recoveryCodes = codes });
-        });
+            return Results.Ok(new RecoveryCodesResponse(codes ?? []));
+        }).Produces<RecoveryCodesResponse>().ProducesValidationProblem();
 
         authed.MapPost("/mfa/disable", async (ConfirmRequest req, ClaimsPrincipal principal, UserManager<AppUser> users, SignInManager<AppUser> signIn) =>
         {
@@ -533,7 +542,7 @@ public static class AuthEndpoints
             await signIn.RefreshSignInAsync(user);
             await Audit.RecordAsync(app, "mfa_disabled", user.Id);
             return Results.NoContent();
-        });
+        }).Produces(StatusCodes.Status204NoContent).ProducesProblem(StatusCodes.Status403Forbidden);
 
         authed.MapPost("/mfa/recovery-codes", async (ConfirmRequest req, ClaimsPrincipal principal, UserManager<AppUser> users) =>
         {
@@ -544,8 +553,8 @@ public static class AuthEndpoints
             }
             if (!await Confirm(users, user, req)) return ConfirmFailed();
             var codes = await users.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
-            return Results.Ok(new { recoveryCodes = codes });
-        });
+            return Results.Ok(new RecoveryCodesResponse(codes ?? []));
+        }).Produces<RecoveryCodesResponse>().ProducesProblem(StatusCodes.Status403Forbidden);
 
         // ---- Profile ---------------------------------------------------------------------------
 
@@ -560,7 +569,7 @@ public static class AuthEndpoints
             }
             await users.UpdateAsync(user);
             return Results.Ok(await ToResponse(users, user));
-        }).RequireAuthorization();
+        }).RequireAuthorization().Produces<UserResponse>().ProducesValidationProblem();
 
         authed.MapPost("/account/delete", async (ConfirmRequest req, ClaimsPrincipal principal, UserManager<AppUser> users, SignInManager<AppUser> signIn) =>
         {
@@ -571,7 +580,7 @@ public static class AuthEndpoints
             await signIn.SignOutAsync();
             await users.DeleteAsync(user); // owned rows cascade
             return Results.NoContent();
-        });
+        }).Produces(StatusCodes.Status204NoContent).ProducesProblem(StatusCodes.Status403Forbidden);
     }
 
     private static async Task<bool> Confirm(UserManager<AppUser> users, AppUser user, ConfirmRequest req)
@@ -600,8 +609,8 @@ public static class AuthEndpoints
 
     private static IResult SignInOutcome(Microsoft.AspNetCore.Identity.SignInResult result)
     {
-        if (result.Succeeded) return Results.Ok(new { status = "ok" });
-        if (result.RequiresTwoFactor) return Results.Ok(new { status = "mfaRequired" });
+        if (result.Succeeded) return Results.Ok(new StatusResponse("ok"));
+        if (result.RequiresTwoFactor) return Results.Ok(new StatusResponse("mfaRequired"));
         if (result.IsLockedOut)
         {
             return HttpExtensions.Problem(423, "locked_out", "Too many attempts. Try again in a few minutes.");
