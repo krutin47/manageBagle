@@ -86,6 +86,11 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | P2-D1 | Calendar export (subscription feed and .ics) | Done | ADR-015; private regenerable link, titles and times only; browser test |
 | P2-D2 | Read busy time from an existing calendar | Done | ADR-015; SSRF-safe fetch (13 URL + 15 address tests), recurring meetings expanded, plan refuses to book over meetings; tested against a stub server — **not yet against a real Google or Outlook calendar** |
 | P2-D3 | Write into Google Calendar, two-way sync | Phase 3 | needs Google OAuth credentials |
+| P2-E1–E3 | Separate brain dump (capture), Plan my day, and a Routines page | Not started | correction of the first build |
+| P2-F1–F2 | Today: "now" and a rolling top three | Not started | |
+| P2-G1 | Board columns follow what happens on Today | Not started | |
+| P2-H1 | Calendar shows breaks before and after, routines, meetings, with a legend | Not started | breaks after, routines and meetings already shown |
+| P3-AI1–AI3 | Brain dump from a paragraph, voice or photo | Phase 3 | ADR-012 |
 
 ## Handbook requirements not yet met anywhere
 
