@@ -17,16 +17,17 @@ public record TaskRequest(
     WorkMode WorkMode = WorkMode.DeepFocus,
     bool IsOutside = false,
     Priority Impact = Priority.Medium,
-    int? Version = null);
+    int? Version = null,
+    [Range(0, 60)] int? BreakMinutes = null);
 
 public record ScheduleRequest(DateOnly Date, TimeOnly Start, TimeOnly End, WorkMode WorkMode);
 
 public record TaskResponse(
     Guid Id, string Title, Guid? FocusAreaId, int? EstimatedMinutes, Priority Priority, DateOnly? DueDate,
-    ItemStatus Status, string NextStep, WorkMode WorkMode, bool IsOutside, Priority Impact, DateOnly? ScheduledDate, DateTimeOffset CreatedAt, int Version)
+    ItemStatus Status, string NextStep, WorkMode WorkMode, bool IsOutside, Priority Impact, DateOnly? ScheduledDate, DateTimeOffset CreatedAt, int Version, int? BreakMinutes)
 {
     public static TaskResponse From(BacklogTask t) => new(
-        t.Id, t.Title, t.FocusAreaId, t.EstimatedMinutes, t.Priority, t.DueDate, t.Status, t.NextStep, t.WorkMode, t.IsOutside, t.Impact, t.ScheduledDate, t.CreatedAt, t.Version);
+        t.Id, t.Title, t.FocusAreaId, t.EstimatedMinutes, t.Priority, t.DueDate, t.Status, t.NextStep, t.WorkMode, t.IsOutside, t.Impact, t.ScheduledDate, t.CreatedAt, t.Version, t.BreakMinutes);
 }
 
 public static class BacklogEndpoints
@@ -110,5 +111,6 @@ public static class BacklogEndpoints
         task.WorkMode = req.WorkMode;
         task.IsOutside = req.IsOutside;
         task.Impact = req.Impact;
+        task.BreakMinutes = req.BreakMinutes;
     }
 }

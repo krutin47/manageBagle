@@ -17,6 +17,11 @@ public class AppUser : IdentityUser<Guid>
     public DateTimeOffset? MfaResetConfirmedAt { get; set; }
     /// <summary>When a confirmed reset may be completed. The wait gives the real owner time to cancel.</summary>
     public DateTimeOffset? MfaResetAvailableAt { get; set; }
+    /// <summary>The part of the day automatic planning may use (P2-C3). Null means the default, 08:00–21:00.</summary>
+    public TimeOnly? DayStart { get; set; }
+    public TimeOnly? DayEnd { get; set; }
+    /// <summary>Minutes between "drink water" reminders; null when switched off (P2-C5).</summary>
+    public int? WaterReminderMinutes { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
@@ -28,6 +33,31 @@ public class FocusArea
     /// <summary>Key into the client's categorical palette (see <see cref="AreaColors"/>).</summary>
     public string Color { get; set; } = "teal";
     public int SortOrder { get; set; }
+    /// <summary>Recovery break reserved next to each task in this area, in minutes (0 = none).</summary>
+    public int BreakMinutes { get; set; }
+    public Domain.BreakPlacement BreakPlacement { get; set; } = Domain.BreakPlacement.After;
+}
+
+/// <summary>A daily routine, stored as a rule and expanded on read (ADR-014).</summary>
+public class Routine
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public string Title { get; set; } = "";
+    public Domain.Weekdays Days { get; set; } = Domain.Weekdays.Workdays;
+    public TimeOnly Start { get; set; }
+    public TimeOnly End { get; set; }
+    public Domain.TaskPolicy TaskPolicy { get; set; } = Domain.TaskPolicy.NoTasks;
+    public bool IsMeal { get; set; }
+    public List<RoutineArea> Areas { get; set; } = [];
+
+    public Domain.RoutineRule ToRule() => new(Id, Title, Days, Start, End, TaskPolicy, Areas.Select(a => a.FocusAreaId).ToList(), IsMeal);
+}
+
+public class RoutineArea
+{
+    public Guid RoutineId { get; set; }
+    public Guid FocusAreaId { get; set; }
 }
 
 public static class AreaColors
@@ -101,6 +131,9 @@ public class TimeBlock : IVersioned
     /// <summary>When work on the block first started, and when it was finished (UTC instants).</summary>
     public DateTimeOffset? FirstStartedAt { get; set; }
     public DateTimeOffset? FinishedAt { get; set; }
+    /// <summary>Recovery break reserved before / after the block (P2-C4). Not counted as planned work.</summary>
+    public int BreakBeforeMinutes { get; set; }
+    public int BreakAfterMinutes { get; set; }
     /// <summary>Optional note left when the block was put off or dropped.</summary>
     public string StopNote { get; set; } = "";
 
@@ -154,6 +187,8 @@ public class BacklogTask : IVersioned
     public bool IsOutside { get; set; }
     /// <summary>How much finishing this moves things forward. Priority is urgency; impact is value.</summary>
     public Priority Impact { get; set; } = Priority.Medium;
+    /// <summary>Recovery break for this task; null follows its focus area.</summary>
+    public int? BreakMinutes { get; set; }
     public DateOnly? ScheduledDate { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

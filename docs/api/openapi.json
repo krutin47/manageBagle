@@ -1559,6 +1559,224 @@
           }
         }
       }
+    },
+    "/api/routines": {
+      "get": {
+        "tags": [
+          "Routines"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoutineResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Routines"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoutineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutineResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/routines/{id}": {
+      "put": {
+        "tags": [
+          "Routines"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoutineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutineResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Routines"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/commitments": {
+      "get": {
+        "tags": [
+          "Routines"
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CommitmentResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/preferences": {
+      "get": {
+        "tags": [
+          "Routines"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Routines"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferencesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1575,6 +1793,18 @@
           },
           "color": {
             "type": "string"
+          },
+          "breakMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          },
+          "breakPlacement": {
+            "$ref": "#/components/schemas/BreakPlacement"
           }
         }
       },
@@ -1583,7 +1813,9 @@
           "id",
           "name",
           "color",
-          "sortOrder"
+          "sortOrder",
+          "breakMinutes",
+          "breakPlacement"
         ],
         "type": "object",
         "properties": {
@@ -1604,6 +1836,17 @@
               "string"
             ],
             "format": "int32"
+          },
+          "breakMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "breakPlacement": {
+            "$ref": "#/components/schemas/BreakPlacement"
           }
         }
       },
@@ -1763,6 +2006,24 @@
               "string"
             ],
             "format": "int32"
+          },
+          "breakBeforeMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          },
+          "breakAfterMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
           }
         }
       },
@@ -1788,7 +2049,9 @@
           "timerStartedAt",
           "trackedSeconds",
           "extendedMinutes",
-          "stopNote"
+          "stopNote",
+          "breakBeforeMinutes",
+          "breakAfterMinutes"
         ],
         "type": "object",
         "properties": {
@@ -1905,8 +2168,30 @@
           },
           "stopNote": {
             "type": "string"
+          },
+          "breakBeforeMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "breakAfterMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
+      },
+      "BreakPlacement": {
+        "enum": [
+          "After",
+          "Before"
+        ]
       },
       "ChangePasswordRequest": {
         "required": [
@@ -1970,6 +2255,66 @@
         "properties": {
           "code": {
             "type": "string"
+          }
+        }
+      },
+      "CommitmentResponse": {
+        "required": [
+          "kind",
+          "sourceId",
+          "title",
+          "date",
+          "start",
+          "end",
+          "minutes",
+          "taskPolicy",
+          "areaIds",
+          "isMeal"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "start": {
+            "type": "string",
+            "format": "time"
+          },
+          "end": {
+            "type": "string",
+            "format": "time"
+          },
+          "minutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "taskPolicy": {
+            "$ref": "#/components/schemas/TaskPolicy"
+          },
+          "areaIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "isMeal": {
+            "type": "boolean"
           }
         }
       },
@@ -2390,6 +2735,33 @@
               "string"
             ],
             "format": "date"
+          },
+          "breakBeforeMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          },
+          "breakAfterMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          },
+          "breakMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -2445,6 +2817,60 @@
             "items": {
               "$ref": "#/components/schemas/OutcomeResponse"
             }
+          }
+        }
+      },
+      "PreferencesRequest": {
+        "required": [
+          "dayStart",
+          "dayEnd",
+          "waterReminderMinutes"
+        ],
+        "type": "object",
+        "properties": {
+          "dayStart": {
+            "type": "string",
+            "format": "time"
+          },
+          "dayEnd": {
+            "type": "string",
+            "format": "time"
+          },
+          "waterReminderMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "PreferencesResponse": {
+        "required": [
+          "dayStart",
+          "dayEnd",
+          "waterReminderMinutes"
+        ],
+        "type": "object",
+        "properties": {
+          "dayStart": {
+            "type": "string",
+            "format": "time"
+          },
+          "dayEnd": {
+            "type": "string",
+            "format": "time"
+          },
+          "waterReminderMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -2616,6 +3042,96 @@
           }
         }
       },
+      "RoutineRequest": {
+        "required": [
+          "title",
+          "days",
+          "start",
+          "end",
+          "taskPolicy",
+          "areaIds"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "days": {
+            "$ref": "#/components/schemas/Weekdays"
+          },
+          "start": {
+            "type": "string",
+            "format": "time"
+          },
+          "end": {
+            "type": "string",
+            "format": "time"
+          },
+          "taskPolicy": {
+            "$ref": "#/components/schemas/TaskPolicy"
+          },
+          "areaIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "isMeal": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "RoutineResponse": {
+        "required": [
+          "id",
+          "title",
+          "days",
+          "start",
+          "end",
+          "taskPolicy",
+          "areaIds",
+          "isMeal"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "days": {
+            "$ref": "#/components/schemas/Weekdays"
+          },
+          "start": {
+            "type": "string",
+            "format": "time"
+          },
+          "end": {
+            "type": "string",
+            "format": "time"
+          },
+          "taskPolicy": {
+            "$ref": "#/components/schemas/TaskPolicy"
+          },
+          "areaIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "isMeal": {
+            "type": "boolean"
+          }
+        }
+      },
       "ScheduleRequest": {
         "required": [
           "date",
@@ -2647,6 +3163,13 @@
           "Finished",
           "Later",
           "Drop"
+        ]
+      },
+      "TaskPolicy": {
+        "enum": [
+          "NoTasks",
+          "AnyTask",
+          "SelectedAreas"
         ]
       },
       "TaskRequest": {
@@ -2717,6 +3240,15 @@
               "string"
             ],
             "format": "int32"
+          },
+          "breakMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -2735,7 +3267,8 @@
           "impact",
           "scheduledDate",
           "createdAt",
-          "version"
+          "version",
+          "breakMinutes"
         ],
         "type": "object",
         "properties": {
@@ -2801,6 +3334,15 @@
           "version": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "breakMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
               "integer",
               "string"
             ],
@@ -2937,6 +3479,9 @@
           }
         }
       },
+      "Weekdays": {
+        "type": "string"
+      },
       "WeekSummaryResponse": {
         "required": [
           "start",
@@ -3066,6 +3611,9 @@
     },
     {
       "name": "Focus timer"
+    },
+    {
+      "name": "Routines"
     }
   ]
 }

@@ -240,6 +240,7 @@ app.MapBacklogEndpoints();
 app.MapDayEndpoints();
 app.MapPlanEndpoints();
 app.MapTimerEndpoints();
+app.MapRoutineEndpoints();
 app.MapSummaryEndpoints();
 app.MapClientErrorEndpoints();
 if (TestClock.Enabled(config)) app.MapTestClock();

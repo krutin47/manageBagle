@@ -38,6 +38,12 @@ namespace ManageBagle.Api.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<TimeOnly?>("DayEnd")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<TimeOnly?>("DayStart")
+                        .HasColumnType("time without time zone");
+
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(80)
@@ -93,6 +99,9 @@ namespace ManageBagle.Api.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<int?>("WaterReminderMinutes")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("NormalizedEmail")
@@ -141,6 +150,9 @@ namespace ManageBagle.Api.Data.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<int?>("BreakMinutes")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -341,6 +353,16 @@ namespace ManageBagle.Api.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("BreakMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("BreakPlacement")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasDefaultValue("After");
+
                     b.Property<string>("Color")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -400,6 +422,59 @@ namespace ManageBagle.Api.Data.Migrations
                     b.ToTable("IdempotencyRecords");
                 });
 
+            modelBuilder.Entity("ManageBagle.Api.Data.Routine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Days")
+                        .HasColumnType("integer");
+
+                    b.Property<TimeOnly>("End")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<bool>("IsMeal")
+                        .HasColumnType("boolean");
+
+                    b.Property<TimeOnly>("Start")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<string>("TaskPolicy")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Routines");
+                });
+
+            modelBuilder.Entity("ManageBagle.Api.Data.RoutineArea", b =>
+                {
+                    b.Property<Guid>("RoutineId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FocusAreaId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("RoutineId", "FocusAreaId");
+
+                    b.HasIndex("FocusAreaId");
+
+                    b.ToTable("RoutineArea");
+                });
+
             modelBuilder.Entity("ManageBagle.Api.Data.TimeBlock", b =>
                 {
                     b.Property<Guid>("Id")
@@ -411,6 +486,12 @@ namespace ManageBagle.Api.Data.Migrations
 
                     b.Property<Guid?>("BacklogTaskId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("BreakAfterMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("BreakBeforeMinutes")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -740,6 +821,30 @@ namespace ManageBagle.Api.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ManageBagle.Api.Data.Routine", b =>
+                {
+                    b.HasOne("ManageBagle.Api.Data.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ManageBagle.Api.Data.RoutineArea", b =>
+                {
+                    b.HasOne("ManageBagle.Api.Data.FocusArea", null)
+                        .WithMany()
+                        .HasForeignKey("FocusAreaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ManageBagle.Api.Data.Routine", null)
+                        .WithMany("Areas")
+                        .HasForeignKey("RoutineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("ManageBagle.Api.Data.TimeBlock", b =>
                 {
                     b.HasOne("ManageBagle.Api.Data.BacklogTask", "BacklogTask")
@@ -812,6 +917,11 @@ namespace ManageBagle.Api.Data.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("ManageBagle.Api.Data.Routine", b =>
+                {
+                    b.Navigation("Areas");
                 });
 #pragma warning restore 612, 618
         }

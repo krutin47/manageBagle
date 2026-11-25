@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ManageBagle.Api.Data;
+using ManageBagle.Api.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace ManageBagle.Api.Application.Planning;
@@ -23,7 +24,10 @@ public record PlanItem(
     TimeOnly? Start,
     TimeOnly? End,
     Priority Impact = Priority.Medium,
-    DateOnly? DueDate = null);
+    DateOnly? DueDate = null,
+    [Range(0, 60)] int BreakBeforeMinutes = 0,
+    [Range(0, 60)] int BreakAfterMinutes = 0,
+    [Range(0, 60)] int? BreakMinutes = null);
 
 public record OutcomeResponse(int Rank, string Result, Guid? FocusAreaId, string NextAction, ItemStatus Status, int? MinutesNeeded, Guid? BacklogTaskId)
 {
@@ -77,6 +81,18 @@ public sealed class PlanDay(AppDbContext db, TimeProvider clock)
         if (existing.Count != taskIds.Count) return Failure.Invalid("items", "One of the tasks no longer exists.");
 
         var zone = await db.Users.Where(u => u.Id == uid).Select(u => u.TimeZoneId).FirstOrDefaultAsync(ct);
+
+        // Routines that do not take a task are protected (P2-C3). Overnight routines from the day before count too.
+        var routines = await db.Routines.AsNoTracking().Include(r => r.Areas).Where(r => r.UserId == uid).ToListAsync(ct);
+        var occurrences = RoutineSchedule.Expand(routines.Select(r => r.ToRule()), date.AddDays(-1), date, TimeZones.Find(zone));
+        foreach (var item in items.Where(i => i.Start is not null))
+        {
+            if (RoutineClash(item, date, occurrences) is { } clash)
+            {
+                return Failure.Conflict("routine_conflict",
+                    $"“{item.Title}” would land in {clash.Title} ({clash.Start:HH\\:mm}–{clash.End:HH\\:mm}), which does not take {(clash.Policy == TaskPolicy.NoTasks ? "tasks" : "this kind of task")}.");
+            }
+        }
         var outcomes = await db.DailyOutcomes.Where(o => o.UserId == uid && o.Date == date).ToListAsync(ct);
         int created = 0, booked = 0;
 
@@ -101,6 +117,7 @@ public sealed class PlanDay(AppDbContext db, TimeProvider clock)
             task.Priority = item.Priority;
             task.Impact = item.Impact;
             task.DueDate = item.DueDate;
+            task.BreakMinutes = item.BreakMinutes;
 
             if (item.Start is { } start && item.End is { } end)
             {
@@ -109,6 +126,7 @@ public sealed class PlanDay(AppDbContext db, TimeProvider clock)
                     UserId = uid, Title = task.Title, FocusAreaId = task.FocusAreaId,
                     Priority = task.Priority, WorkMode = task.WorkMode, IsOutside = task.IsOutside, BacklogTaskId = task.Id,
                     Notes = task.NextStep.Length > 0 ? $"Next step: {task.NextStep}" : "",
+                    BreakBeforeMinutes = item.BreakBeforeMinutes, BreakAfterMinutes = item.BreakAfterMinutes,
                 };
                 if (block.Schedule(date, start, end, zone) is { } gap) return Failure.NonexistentTime(gap);
                 db.TimeBlocks.Add(block);
@@ -148,6 +166,21 @@ public sealed class PlanDay(AppDbContext db, TimeProvider clock)
         // Two plans racing for the same day collide on a unique index; the exception handler answers 409.
         await db.SaveChangesAsync(ct);
         return response;
+    }
+
+    /// <summary>The first routine occurrence the item's working time overlaps but is not allowed into.</summary>
+    private static RoutineOccurrence? RoutineClash(PlanItem item, DateOnly date, IReadOnlyList<RoutineOccurrence> occurrences)
+    {
+        var start = item.Start!.Value.Hour * 60 + item.Start.Value.Minute;
+        var end = item.End!.Value.Hour * 60 + item.End.Value.Minute;
+        if (end <= start) end += 1440;
+        foreach (var o in occurrences)
+        {
+            var (os, oe) = RoutineSchedule.Span(o);
+            var shift = (o.Date.DayNumber - date.DayNumber) * 1440; // yesterday's overnight routine: shift back a day
+            if (start < oe + shift && end > os + shift && !o.Accepts(item.FocusAreaId)) return o;
+        }
+        return null;
     }
 
     private static Failure? Validate(IReadOnlyList<PlanItem> items)

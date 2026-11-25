@@ -17,6 +17,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<Routine> Routines => Set<Routine>();
 
     /// <summary>Every edit to a versioned row moves its version on, so a stale writer is detected (HTTP 409).</summary>
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
@@ -41,6 +42,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             e.Property(x => x.Name).HasMaxLength(60);
             e.Property(x => x.Color).HasMaxLength(16);
+            e.Property(x => x.BreakPlacement).HasConversion<string>().HasMaxLength(8).HasDefaultValue(Domain.BreakPlacement.After).HasSentinel(Domain.BreakPlacement.After);
             e.HasIndex(x => new { x.UserId, x.SortOrder });
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
@@ -96,6 +98,23 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.ChangeTomorrow).HasMaxLength(1000);
             e.HasIndex(x => new { x.UserId, x.Date }).IsUnique();
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<Routine>(e =>
+        {
+            e.Property(x => x.Title).HasMaxLength(80);
+            e.Property(x => x.TaskPolicy).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.Days).HasConversion<int>();
+            e.HasIndex(x => x.UserId);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Areas).WithOne().HasForeignKey(x => x.RoutineId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<RoutineArea>(e =>
+        {
+            e.HasKey(x => new { x.RoutineId, x.FocusAreaId });
+            // Deleting a focus area removes it from routines that accepted it.
+            e.HasOne<FocusArea>().WithMany().HasForeignKey(x => x.FocusAreaId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<AuditEvent>(e =>

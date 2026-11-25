@@ -20,7 +20,9 @@ public record BlockRequest(
     [Range(0, 1440)] int? ActualMinutes,
     [StringLength(2000)] string? Notes,
     bool IsOutside = false,
-    int? Version = null);
+    int? Version = null,
+    [Range(0, 60)] int BreakBeforeMinutes = 0,
+    [Range(0, 60)] int BreakAfterMinutes = 0);
 
 /// <summary>Quick update from the timeline: status and/or logged minutes only.</summary>
 public record BlockProgressRequest(ItemStatus? Status, [Range(0, 1440)] int? ActualMinutes, bool ClearActual, int? Version = null);
@@ -29,12 +31,12 @@ public record BlockResponse(
     Guid Id, DateOnly Date, TimeOnly Start, TimeOnly End, string Title, Guid? FocusAreaId,
     Priority Priority, WorkMode WorkMode, ItemStatus Status, int? ActualMinutes, int PlannedMinutes,
     int? VarianceMinutes, string Notes, bool IsOutside, Guid? BacklogTaskId, string? TimeZone, int Version,
-    DateTimeOffset? TimerStartedAt, int TrackedSeconds, int ExtendedMinutes, string StopNote)
+    DateTimeOffset? TimerStartedAt, int TrackedSeconds, int ExtendedMinutes, string StopNote, int BreakBeforeMinutes, int BreakAfterMinutes)
 {
     public static BlockResponse From(TimeBlock b) => new(
         b.Id, b.Date, b.Start, b.End, b.Title, b.FocusAreaId, b.Priority, b.WorkMode, b.Status,
         b.ActualMinutes, b.PlannedMinutes, b.ActualMinutes - b.PlannedMinutes, b.Notes, b.IsOutside, b.BacklogTaskId, b.TimeZoneId, b.Version,
-        b.TimerStartedAt, b.TrackedSeconds, b.ExtendedMinutes, b.StopNote);
+        b.TimerStartedAt, b.TrackedSeconds, b.ExtendedMinutes, b.StopNote, b.BreakBeforeMinutes, b.BreakAfterMinutes);
 }
 
 public static class BlockEndpoints
@@ -134,6 +136,8 @@ public static class BlockEndpoints
         block.ActualMinutes = req.ActualMinutes;
         block.Notes = req.Notes?.Trim() ?? "";
         block.IsOutside = req.IsOutside;
+        block.BreakBeforeMinutes = req.BreakBeforeMinutes;
+        block.BreakAfterMinutes = req.BreakAfterMinutes;
     }
 
     /// <summary>
