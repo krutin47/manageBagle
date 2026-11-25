@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   api, UnauthorizedError,
-  type Area, type AreaColor, type Block, type BlockInput, type Day, type DayName, type Outcome, type PlanItem, type ProviderKey,
+  type Area, type AreaColor, type Block, type Commitment, type Preferences, type Routine, type RoutineInput, type BlockInput, type Day, type DayName, type Outcome, type PlanItem, type ProviderKey,
   type Review, type Status, type StopOutcome, type Task, type TaskInput, type Theme, type TimerSnapshot, type User, type WeekSummary, type WorkMode,
 } from "./api";
 import { syncServerClock } from "../features/timer/clock";
@@ -30,6 +30,12 @@ export const keys = {
   themes: ["themes"] as const,
   backlog: ["backlog"] as const,
   timer: ["timer"] as const,
+  routines: ["routines"] as const,
+  commitments: {
+    all: ["commitments"] as const,
+    week: (monday: string) => ["commitments", monday] as const,
+  },
+  preferences: ["preferences"] as const,
 };
 
 /** How long each kind of data may be shown before it is quietly refreshed. Mutations invalidate sooner. */
@@ -85,7 +91,7 @@ export function useAreaMutations() {
   return {
     create: useMutation({ mutationFn: (body: { name: string; color: AreaColor }) => api<Area>("/areas", { method: "POST", body }), onSuccess: done }),
     update: useMutation({
-      mutationFn: ({ id, ...body }: { id: string; name: string; color: AreaColor }) => api<Area>(`/areas/${id}`, { method: "PUT", body }),
+      mutationFn: ({ id, ...body }: { id: string; name: string; color: AreaColor; breakMinutes: number; breakPlacement: Area["breakPlacement"] }) => api<Area>(`/areas/${id}`, { method: "PUT", body }),
       onSuccess: done,
     }),
     remove: useMutation({
@@ -380,4 +386,46 @@ export function useTimerMutations() {
       onSettled: closing,
     }),
   };
+}
+
+// ---- Routines, commitments, preferences (P2-C) ----------------------------------------------
+
+export function useRoutines() {
+  return useQuery({ queryKey: keys.routines, queryFn: ({ signal }) => api<Routine[]>("/routines", { signal }), staleTime: STALE.reference });
+}
+
+/** Routine occurrences for the week containing the date, expanded by the server in the account's zone. */
+export function useCommitments(anyDateInWeek: string) {
+  const start = weekStart(anyDateInWeek);
+  return useQuery({
+    // A day early, so an overnight routine that began the evening before is included.
+    queryKey: keys.commitments.week(start),
+    queryFn: ({ signal }) => api<Commitment[]>(`/commitments?from=${addDays(start, -1)}&to=${addDays(start, 6)}`, { signal }),
+    staleTime: STALE.reference,
+  });
+}
+
+export function useRoutineMutations() {
+  const qc = useQueryClient();
+  const done = () => {
+    qc.invalidateQueries({ queryKey: keys.routines });
+    qc.invalidateQueries({ queryKey: keys.commitments.all });
+  };
+  return {
+    create: useMutation({ mutationFn: (body: RoutineInput) => api<Routine>("/routines", { method: "POST", body }), onSuccess: done }),
+    update: useMutation({ mutationFn: ({ id, ...body }: Routine) => api<Routine>(`/routines/${id}`, { method: "PUT", body }), onSuccess: done }),
+    remove: useMutation({ mutationFn: (id: string) => api(`/routines/${id}`, { method: "DELETE" }), onSuccess: done }),
+  };
+}
+
+export function usePreferences() {
+  return useQuery({ queryKey: keys.preferences, queryFn: ({ signal }) => api<Preferences>("/preferences", { signal }), staleTime: STALE.account });
+}
+
+export function useSavePreferences() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Preferences) => api<Preferences>("/preferences", { method: "PUT", body }),
+    onSuccess: (saved) => qc.setQueryData(keys.preferences, saved),
+  });
 }

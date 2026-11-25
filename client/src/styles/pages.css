@@ -496,3 +496,37 @@
 }
 .review-facts-wide { grid-column: 1 / -1; }
 .fact-note { display: block; color: var(--ink-2); font-size: 13.5px; margin-top: 2px; quotes: "“" "”"; }
+
+/* ---- Routines, your day, breaks (P2-C) ---- */
+.routine-list { display: grid; }
+.routine-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.routine-list li:first-child { border-top: 0; }
+.routine-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--sunken); color: var(--ink-2); }
+.routine-meta { display: block; font-size: 13px; color: var(--ink-2); }
+.day-toggles { display: flex; gap: 6px; flex-wrap: wrap; }
+.day-toggle { min-width: 46px; height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); font-size: 13px; font-weight: 550; color: var(--ink-2); transition: all var(--t-fast); }
+.day-toggle:hover { border-color: var(--line-strong); }
+.day-toggle.is-on { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+.area-pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.opt-chip.is-tag.is-off { background: transparent; color: var(--ink-2); border-color: var(--line); font-weight: 500; }
+.your-day { max-width: 640px; }
+.area-row { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+.area-break { height: 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink-2); font-size: 13px; padding: 0 8px; }
+.fit-row.is-routine { opacity: 0.85; }
+.fit-row.is-routine .agenda-bar { background: repeating-linear-gradient(135deg, var(--line-strong) 0 3px, transparent 3px 6px); }
+.fit-row.is-routine .fit-title { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
+.fit-break { color: var(--good); }
+@media (max-width: 860px) { .area-row { grid-template-columns: auto minmax(0, 1fr) auto; } .area-break { grid-column: 2; grid-row: 2; justify-self: start; } }
+.routine-row { display: grid; grid-template-columns: 48px 4px minmax(0, 1fr); gap: 12px; align-items: center; padding: 6px 10px 6px 12px; color: var(--ink-2); }
+.routine-row .agenda-bar { background: repeating-linear-gradient(135deg, var(--line-strong) 0 3px, transparent 3px 6px); min-height: 26px; }
+.routine-row .agenda-time strong { font-weight: 500; }
+.routine-row-title { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 550; }
+.routine-row-title small { font-weight: 400; color: var(--ink-3); font-size: 12.5px; }
+.break-tag { display: inline-flex; align-items: center; gap: 3px; color: var(--good); white-space: nowrap; }
+.cal-routine { position: absolute; left: 0; right: 0; pointer-events: none; z-index: 0;
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--line-strong) 22%, transparent) 0 6px, transparent 6px 12px); border-left: 2px solid var(--line-strong); }
+.cal-routine.is-open { background: color-mix(in srgb, var(--line) 35%, transparent); border-left-style: dashed; }
+.cal-routine span { position: absolute; right: 6px; top: 3px; font-size: 11px; font-weight: 600; color: var(--ink-3); }
+.cal-break { position: absolute; z-index: 1; border-radius: 0 0 6px 6px; pointer-events: none;
+  background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--good) 30%, transparent) 0 4px, transparent 4px 8px); }
+@media (max-width: 860px) { .routine-row { grid-template-columns: 44px 4px minmax(0, 1fr); } }

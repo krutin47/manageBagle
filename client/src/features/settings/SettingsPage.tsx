@@ -9,6 +9,7 @@ import { Button, ConfirmDialog, cx, Dialog, ErrorNote, Field, IconButton, Input,
 import { api, ApiError, errorMessage, type Area, type AreaColor, type User } from "../../lib/api";
 import { useDocumentTitle, useTheme } from "../../lib/hooks";
 import { AREA_COLORS, colorLabel } from "../../lib/labels";
+import { RoutinesCard, YourDayCard } from "./RoutinesCard";
 import { keys, useAreaMutations, useAreas, useProviders, useUser } from "../../lib/queries";
 import { browserTimeZone } from "../../lib/time";
 
@@ -20,6 +21,8 @@ export function SettingsPage() {
       <PageHeader eyebrow="Your personal system" title="Settings" />
       <div className="settings">
         <ProfileCard user={user} />
+        <YourDayCard />
+        <RoutinesCard />
         <AreasCard />
         <SecurityCard user={user} />
         <ActivityCard />
@@ -154,7 +157,7 @@ function AreaRow({ area, onDelete }: { area: Area; onDelete: () => void }) {
   const [name, setName] = useState(area.name);
   const [picking, setPicking] = useState(false);
   const save = (next: { name?: string; color?: AreaColor }) => {
-    const body = { id: area.id, name: (next.name ?? area.name).trim(), color: next.color ?? area.color };
+    const body = { id: area.id, name: (next.name ?? area.name).trim(), color: next.color ?? area.color, breakMinutes: area.breakMinutes, breakPlacement: area.breakPlacement };
     if (!body.name) return setName(area.name);
     if (body.name === area.name && body.color === area.color) return;
     update.mutate(body, { onError: (e) => { setName(area.name); toast.error(errorMessage(e)); } });
@@ -163,6 +166,17 @@ function AreaRow({ area, onDelete }: { area: Area; onDelete: () => void }) {
     <div className="area-row" data-area={area.color}>
       <button type="button" className="swatch" data-area={area.color} aria-label={`Colour: ${colorLabel[area.color]}. Change colour of ${area.name}`} aria-expanded={picking} onClick={() => setPicking(!picking)} />
       <input className="cell-input" aria-label={`Name of ${area.name}`} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} onBlur={() => save({ name })} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} />
+      <select className="area-break" aria-label={`Recovery break for ${area.name}`} value={`${area.breakMinutes}|${area.breakPlacement}`}
+        onChange={(e) => {
+          const [m, placement] = e.target.value.split("|");
+          update.mutate({ id: area.id, name: area.name, color: area.color, breakMinutes: Number(m), breakPlacement: placement as Area["breakPlacement"] }, { onError: (err) => toast.error(errorMessage(err)) });
+        }}>
+        <option value={`0|${area.breakPlacement}`}>No break</option>
+        {[5, 10, 15, 20, 30].flatMap((m) => [
+          <option key={`${m}a`} value={`${m}|After`}>{m} min break after</option>,
+          <option key={`${m}b`} value={`${m}|Before`}>{m} min break before</option>,
+        ])}
+      </select>
       <IconButton size="sm" label={`Delete ${area.name}`} onClick={onDelete}><Trash2 size={15} /></IconButton>
       {picking && (
         <motion.div className="area-row-picker" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>

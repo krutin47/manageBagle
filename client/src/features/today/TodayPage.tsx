@@ -1,4 +1,4 @@
-import { CalendarClock, CalendarPlus, Check, Clock, ListPlus, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarClock, CalendarPlus, Check, Clock, Coffee, ListPlus, MapPin, Pencil, Plus, Repeat, Trash2, Utensils } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { DropdownMenu } from "radix-ui";
 import { useMemo, useState, type FormEvent } from "react";
@@ -8,7 +8,8 @@ import { AreaChip, AreaSelect, Button, cx, DateNav, Dialog, EmptyState, ErrorNot
 import { errorMessage, type Area, type Block, type DayName, type Outcome, type Status, type Task } from "../../lib/api";
 import { useDocumentTitle, useNowMinutes } from "../../lib/hooks";
 import { modeLabel, STATUSES, statusLabel } from "../../lib/labels";
-import { useAreas, useBacklog, useBlockMutations, useDay, useDayMutations, useThemes, useUser, useWeekBlocks } from "../../lib/queries";
+import { commitmentsOn } from "../../lib/commitments";
+import { useAreas, useBacklog, useCommitments, useBlockMutations, useDay, useDayMutations, useThemes, useUser, useWeekBlocks } from "../../lib/queries";
 import { addDays, nowMinutes, formatDate, formatDuration, formatHours, fromMinutes, isValidISODate, parseISODate, snap, todayISO, toMinutes } from "../../lib/time";
 import { BlockDialog, type BlockDraft } from "../planner/BlockDialog";
 import { Variance } from "../planner/PlannerPage";
@@ -43,6 +44,10 @@ export function TodayPage() {
   const blocks = useMemo(() => (blocksQuery.data ?? []).filter((b) => b.date === date), [blocksQuery.data, date]);
   const outcomes = useMemo(() => day.data?.outcomes ?? [], [day.data]);
   const theme = themes.data?.find((t) => t.day === DAY_NAMES[parseISODate(date).getDay()]);
+  const commitments = useCommitments(date);
+  const routineBands = useMemo(() => commitmentsOn(date, commitments.data ?? []).map((c) => ({
+    title: c.title, start: c.start, end: c.end, isMeal: c.source.isMeal, policy: c.policy, key: `${c.source.sourceId}-${c.source.date}`,
+  })), [date, commitments.data]);
 
   // A top-three outcome and its booked block are the same piece of work; show them as one.
   const rankByTask = useMemo(() => new Map(outcomes.filter((o) => o.backlogTaskId).map((o) => [o.backlogTaskId!, o.rank])), [outcomes]);
@@ -160,7 +165,7 @@ export function TodayPage() {
               ) : blocks.length === 0 ? (
                 <EmptyState icon={<CalendarPlus size={22} />} title="Nothing has a time yet" body="An outcome without a slot is a wish. Give your top three real time on the clock." action={<Button variant="primary" onClick={() => setDumping([])}>Brain dump</Button>} />
               ) : (
-                <Agenda blocks={blocks} areaById={areaById} rankByTask={rankByTask} showNow={isToday} onOpen={setDraft} />
+                <Agenda blocks={blocks} routines={routineBands} areaById={areaById} rankByTask={rankByTask} showNow={isToday} onOpen={setDraft} />
               )}
             </div>
           </section>
@@ -308,13 +313,19 @@ function OutcomeForm({ date, outcome, areas, onClose }: { date: string; outcome:
 
 // ---- Agenda ----------------------------------------------------------------------------------
 
-function Agenda({ blocks, areaById, rankByTask, showNow, onOpen }: { blocks: Block[]; areaById: Map<string, Area>; rankByTask: Map<string, number>; showNow: boolean; onOpen: (b: Block) => void }) {
+type RoutineBand = { title: string; start: number; end: number; isMeal: boolean; policy: string; key: string };
+
+function Agenda({ blocks, routines, areaById, rankByTask, showNow, onOpen }: { blocks: Block[]; routines: RoutineBand[]; areaById: Map<string, Area>; rankByTask: Map<string, number>; showNow: boolean; onOpen: (b: Block) => void }) {
   const now = useNowMinutes();
   const nowIndex = showNow ? blocks.findIndex((b) => toMinutes(b.start) + b.plannedMinutes > now) : -1;
+  // Routines sit between the blocks at their own time; they are context, not something to tick off.
+  // A routine starting at the same time as a block comes first: it is the frame the block sits in.
+  const routinesBefore = (i: number) => routines.filter((r) => r.start > (i === 0 ? -Infinity : toMinutes(blocks[i - 1]!.start)) && r.start <= toMinutes(blocks[i]!.start));
+  const trailing = routines.filter((r) => blocks.length === 0 || r.start > toMinutes(blocks.at(-1)!.start));
   return (
     <ul className="agenda">
       <AnimatePresence initial={false}>
-        {blocks.map((b, i) => (
+        {blocks.flatMap((b, i) => [...routinesBefore(i).map((r) => <RoutineRow key={r.key} band={r} />), (
           <motion.li key={b.id} layout="position" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.22 }}>
             {i === nowIndex && (
               <div className="agenda-now" aria-label={`Now, ${fromMinutes(now)}`}>
@@ -323,9 +334,22 @@ function Agenda({ blocks, areaById, rankByTask, showNow, onOpen }: { blocks: Blo
             )}
             <AgendaRow block={b} rank={b.backlogTaskId ? rankByTask.get(b.backlogTaskId) : undefined} area={b.focusAreaId ? areaById.get(b.focusAreaId) : undefined} onOpen={() => onOpen(b)} />
           </motion.li>
-        ))}
+        )])}
+        {trailing.map((r) => <RoutineRow key={r.key} band={r} />)}
       </AnimatePresence>
     </ul>
+  );
+}
+
+function RoutineRow({ band }: { band: RoutineBand }) {
+  return (
+    <motion.li layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="routine-row" aria-label={`Routine: ${band.title}, ${fromMinutes(Math.max(0, band.start))} to ${fromMinutes(band.end)}`}>
+      <span className="agenda-time"><strong>{fromMinutes(Math.max(0, band.start))}</strong><span>{fromMinutes(band.end)}</span></span>
+      <span className="agenda-bar" aria-hidden />
+      <span className="routine-row-title">{band.isMeal ? <Utensils size={14} aria-hidden /> : <Repeat size={14} aria-hidden />}{band.title}
+        <small>{band.policy === "NoTasks" ? "protected" : band.policy === "AnyTask" ? "open for tasks" : "for selected areas"}</small>
+      </span>
+    </motion.li>
   );
 }
 
@@ -356,6 +380,7 @@ function AgendaRow({ block, rank, area, onOpen }: { block: Block; rank?: number;
         <span className="agenda-meta">
           {area?.name ?? "No area"} · {modeLabel[block.workMode]} · {formatDuration(block.plannedMinutes)}
           {block.isOutside && <> · <span className="outside-tag"><MapPin size={12} aria-hidden /> outside</span></>}
+          {block.breakBeforeMinutes + block.breakAfterMinutes > 0 && <> · <span className="break-tag"><Coffee size={12} aria-hidden /> {formatDuration(block.breakBeforeMinutes + block.breakAfterMinutes)} recovery {block.breakBeforeMinutes ? "before" : "after"}</span></>}
           {block.varianceMinutes !== null && <> · <Variance minutes={block.varianceMinutes} /></>}
         </span>
       </div>

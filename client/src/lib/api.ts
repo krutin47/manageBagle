@@ -1,6 +1,8 @@
 export type Priority = "High" | "Medium" | "Low";
 export type WorkMode = "DeepFocus" | "ShallowWork" | "Meeting" | "Personal";
 export type Status = "Planned" | "InProgress" | "Done" | "Skipped";
+export type TaskPolicy = "NoTasks" | "AnyTask" | "SelectedAreas";
+export type BreakPlacement = "After" | "Before";
 export type AreaColor = "teal" | "blue" | "violet" | "rose" | "orange" | "amber" | "green" | "slate";
 export type DayName = "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
 
@@ -17,7 +19,15 @@ export interface User {
   recoveryCodesLeft: number;
 }
 
-export interface Area { id: string; name: string; color: AreaColor; sortOrder: number }
+export interface Area {
+  id: string;
+  name: string;
+  color: AreaColor;
+  sortOrder: number;
+  /** Recovery break reserved next to each task in this area (P2-C4). */
+  breakMinutes: number;
+  breakPlacement: BreakPlacement;
+}
 
 export interface Block {
   id: string;
@@ -47,6 +57,9 @@ export interface Block {
   extendedMinutes: number;
   /** Optional note left when the block was put off or dropped. */
   stopNote: string;
+  /** Recovery break reserved before / after the block; not planned work. */
+  breakBeforeMinutes: number;
+  breakAfterMinutes: number;
 }
 
 export type StopOutcome = "Finished" | "Later" | "Drop";
@@ -58,7 +71,7 @@ export interface TimerSnapshot {
   pausedBlockId: string | null;
 }
 
-export type BlockInput = Omit<Block, "id" | "plannedMinutes" | "varianceMinutes" | "backlogTaskId" | "timeZone" | "version" | "timerStartedAt" | "trackedSeconds" | "extendedMinutes" | "stopNote">;
+export type BlockInput = Omit<Block, "id" | "plannedMinutes" | "varianceMinutes" | "backlogTaskId" | "timeZone" | "version" | "timerStartedAt" | "trackedSeconds" | "extendedMinutes" | "stopNote" | "breakBeforeMinutes" | "breakAfterMinutes"> & { breakBeforeMinutes?: number; breakAfterMinutes?: number };
 
 export interface Task {
   id: string;
@@ -76,9 +89,11 @@ export interface Task {
   scheduledDate: string | null;
   createdAt: string;
   version: number;
+  /** Recovery break for this task; null follows its focus area. */
+  breakMinutes: number | null;
 }
 
-export type TaskInput = Omit<Task, "id" | "scheduledDate" | "createdAt" | "version">;
+export type TaskInput = Omit<Task, "id" | "scheduledDate" | "createdAt" | "version" | "breakMinutes"> & { breakMinutes?: number | null };
 
 export interface Outcome {
   rank: number;
@@ -106,6 +121,45 @@ export interface PlanItem {
   topRank: number | null;
   start: string | null;
   end: string | null;
+  breakBeforeMinutes: number;
+  breakAfterMinutes: number;
+  breakMinutes: number | null;
+}
+
+export type WeekdayFlag = "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
+
+export interface Routine {
+  id: string;
+  title: string;
+  /** Comma-separated weekday flags as the API sends them, e.g. "Monday, Wednesday" or "Workdays". */
+  days: string;
+  start: string;
+  end: string;
+  taskPolicy: TaskPolicy;
+  areaIds: string[];
+  isMeal: boolean;
+}
+
+export type RoutineInput = Omit<Routine, "id">;
+
+/** Time already spoken for on a date (a routine occurrence). `end` may be on the next date. */
+export interface Commitment {
+  kind: "routine";
+  sourceId: string;
+  title: string;
+  date: string;
+  start: string;
+  end: string;
+  minutes: number;
+  taskPolicy: TaskPolicy;
+  areaIds: string[];
+  isMeal: boolean;
+}
+
+export interface Preferences {
+  dayStart: string;
+  dayEnd: string;
+  waterReminderMinutes: number | null;
 }
 
 export interface Review { biggestWin: string; interruptions: string; changeTomorrow: string }

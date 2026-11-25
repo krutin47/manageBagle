@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, CalendarDays, Check, Clock, CornerDownLeft, Gauge, Inbox, MapPin, Plus, Sparkles, Wand2, X, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, Check, Clock, Coffee, CornerDownLeft, Gauge, Inbox, Lock, MapPin, Plus, Sparkles, Wand2, X, Zap } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useToast } from "../../components/toast";
@@ -9,7 +9,8 @@ import { dueQuickPicks, priorityOf, rowFromTask, sortRows, topicGroups, valueSco
 
 export { valueScore };
 import { modeLabel, PRIORITIES, WORK_MODES } from "../../lib/labels";
-import { useBacklog, usePlanDay } from "../../lib/queries";
+import { busyFromBlocks, commitmentsOn } from "../../lib/commitments";
+import { useBacklog, useCommitments, usePlanDay, usePreferences } from "../../lib/queries";
 import { proposeSchedule } from "../../lib/schedule";
 import { addDays, formatDate, formatDuration, fromMinutes, nowMinutes, snap, todayISO, toMinutes } from "../../lib/time";
 
@@ -79,7 +80,7 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
     if (!title) return;
     const last = rows.at(-1);
     // A new line inherits topic and kind of work from the one above: people dump related things in runs.
-    const fresh: Row = { key: `n${nextKey.current++}`, taskId: null, title, minutes: 30, minutesChosen: false, focusAreaId: last?.focusAreaId ?? null, workMode: "ShallowWork", isOutside: false, impact: "Medium", dueDate: null, priorityOverride: null, top: null };
+    const fresh: Row = { key: `n${nextKey.current++}`, taskId: null, title, minutes: 30, minutesChosen: false, focusAreaId: last?.focusAreaId ?? null, workMode: "ShallowWork", isOutside: false, impact: "Medium", dueDate: null, priorityOverride: null, breakMinutes: null, top: null };
     setRows([...rows, withWorkMode(fresh, last?.workMode ?? "ShallowWork")]);
     setText("");
     input.current?.focus();
@@ -111,8 +112,22 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
       return free === undefined ? list : list.map((r) => (r.key === key ? { ...r, top: free } : r));
     });
 
-  const busy = useMemo(() => blocks.map((b): [number, number] => [toMinutes(b.start), Math.min(toMinutes(b.start) + b.plannedMinutes, 1440)]), [blocks]);
-  const proposal = useMemo(() => proposeSchedule(rows.map((r) => ({ ...r, topic: r.focusAreaId })), busy, toMinutes(from || "09:00"), batch), [rows, busy, from, batch]);
+  // What the day already holds: blocks (with their breaks), routines, and the day window (P2-C3).
+  const commitmentsQuery = useCommitments(date);
+  const preferences = usePreferences();
+  const fixed = useMemo(() => commitmentsOn(date, commitmentsQuery.data ?? []), [date, commitmentsQuery.data]);
+  const breakOf = (r: Row) => {
+    const area = areaOf(r.focusAreaId);
+    return { breakMinutes: r.breakMinutes ?? area?.breakMinutes ?? 0, breakPlacement: area?.breakPlacement ?? "After" };
+  };
+  const proposal = proposeSchedule(rows.map((r) => ({ ...r, topic: r.focusAreaId, ...breakOf(r) })), {
+    from: toMinutes(from || "09:00"),
+    busy: busyFromBlocks(blocks),
+    commitments: fixed,
+    dayStart: toMinutes(preferences.data?.dayStart ?? "00:00"),
+    dayEnd: toMinutes(preferences.data?.dayEnd ?? "23:55"),
+    batch,
+  });
   const ordered = useMemo(() => [...rows].sort((a, b) => (proposal.slots.get(a.key)?.start ?? 9999) - (proposal.slots.get(b.key)?.start ?? 9999)), [rows, proposal]);
 
   const total = rows.reduce((s, r) => s + r.minutes, 0);
@@ -134,6 +149,7 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
       return {
         taskId: r.taskId, title: r.title, estimatedMinutes: r.minutes, focusAreaId: r.focusAreaId, workMode: r.workMode, isOutside: r.isOutside,
         priority: priorityOf(r, today), impact: r.impact, dueDate: r.dueDate, topRank: r.top, start: slot ? fromMinutes(slot.start) : null, end: slot ? fromMinutes(slot.end) : null,
+        breakBeforeMinutes: slot?.breakBefore ?? 0, breakAfterMinutes: slot?.breakAfter ?? 0, breakMinutes: r.breakMinutes,
       };
     });
     try {
@@ -215,6 +231,12 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
                                   <OptionChip label="Outcome impact" icon={<Gauge size={13} aria-hidden />} strong={r.impact === "High"} value={r.impact}
                                     options={PRIORITIES.map((v) => ({ value: v, label: `${v} impact` }))}
                                     onChange={(v) => patch(r.key, { impact: v as Priority })} />
+                                  <OptionChip label="Recovery break" icon={<Coffee size={13} aria-hidden />} value={r.breakMinutes === null ? "area" : String(r.breakMinutes)}
+                                    options={[
+                                      { value: "area", label: area && area.breakMinutes > 0 ? `${formatDuration(area.breakMinutes)} break (area)` : "No break" },
+                                      ...[0, 5, 10, 15, 20, 30].map((m) => ({ value: String(m), label: m === 0 ? "No break" : `${formatDuration(m)} break` })),
+                                    ].filter((o, i, all) => all.findIndex((x) => x.label === o.label) === i)}
+                                    onChange={(v) => patch(r.key, { breakMinutes: v === "area" ? null : Number(v) })} />
                                   <DateChip label="Due date" icon={<CalendarDays size={13} aria-hidden />} value={r.dueDate} warn={late}
                                     display={r.dueDate ? dueLabel(r.dueDate, today) : "No due date"} quickPicks={dueQuickPicks(today)}
                                     onChange={(v) => patch(r.key, { dueDate: v, priorityOverride: null })} />
@@ -297,16 +319,25 @@ function PlanFlow({ date, areas, blocks, takenRanks, seed, onClose }: Omit<Props
                   </div>
                 </div>
                 <ul className="plan-fit">
+                  {fixed.filter((c) => c.policy === "NoTasks" && c.end > toMinutes(from || "00:00")).map((c) => (
+                    <li key={`r-${c.source.sourceId}-${c.start}`} className="fit-row is-routine" style={{ order: c.start }}>
+                      <span className="fit-time"><strong>{fromMinutes(Math.max(0, c.start))}</strong><span>{fromMinutes(c.end)}</span></span>
+                      <span className="agenda-bar" aria-hidden />
+                      <span className="fit-main"><span className="fit-title"><Lock size={13} aria-hidden /> {c.title}</span><span className="fit-meta">Routine · protected</span></span>
+                    </li>
+                  ))}
                   {ordered.map((r) => {
                     const slot = proposal.slots.get(r.key);
                     return (
-                      <motion.li key={r.key} layout="position" className={cx("fit-row", !slot && "is-out")} data-area={areas.find((a) => a.id === r.focusAreaId)?.color ?? "none"}>
+                      <motion.li key={r.key} layout="position" style={{ order: slot?.start ?? 99999 }} className={cx("fit-row", !slot && "is-out")} data-area={areas.find((a) => a.id === r.focusAreaId)?.color ?? "none"}>
                         <span className="fit-time">{slot ? <><strong>{fromMinutes(slot.start)}</strong><span>{fromMinutes(slot.end)}</span></> : <span>—</span>}</span>
                         <span className="agenda-bar" aria-hidden />
                         <span className="fit-main">
                           <span className="fit-title">{r.top !== null && <b className="rank-badge">{r.top}</b>}{r.title}</span>
                           <span className="fit-meta">
-                            {slot ? <>{areas.find((a) => a.id === r.focusAreaId)?.name ?? "No focus area"} · {formatDuration(r.minutes)} · {modeLabel[r.workMode]}{slot.buffer > 0 && <span className="fit-buffer"> · +{formatDuration(slot.buffer)} buffer for outside work</span>}</> : "No room left today — it will wait in your backlog"}
+                            {slot ? <>{areas.find((a) => a.id === r.focusAreaId)?.name ?? "No focus area"} · {formatDuration(r.minutes)} · {modeLabel[r.workMode]}{slot.buffer > 0 && <span className="fit-buffer"> · +{formatDuration(slot.buffer)} buffer for outside work</span>}
+                              {slot.within && <span> · in {slot.within}</span>}
+                              {slot.breakBefore + slot.breakAfter > 0 && <span className="fit-break"> · {formatDuration(slot.breakBefore + slot.breakAfter)} recovery {slot.breakBefore ? "before" : "after"}</span>}</> : "No room left today — it will wait in your backlog"}
                           </span>
                         </span>
                       </motion.li>

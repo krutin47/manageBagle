@@ -17,6 +17,8 @@ export interface Row {
   dueDate: string | null;
   /** A priority set by hand earlier (backlog task). Null means "follow the due date". */
   priorityOverride: Priority | null;
+  /** Recovery break for this task; null follows its focus area (P2-C4). */
+  breakMinutes: number | null;
   top: number | null;
 }
 
@@ -58,7 +60,7 @@ export function rowFromTask(t: Task): Row {
     minutes: t.estimatedMinutes ?? (t.workMode === "DeepFocus" ? DEEP_FOCUS_MINUTES : 30),
     minutesChosen: t.estimatedMinutes !== null,
     focusAreaId: t.focusAreaId, workMode: t.workMode, isOutside: t.isOutside, impact: t.impact, dueDate: t.dueDate,
-    priorityOverride: t.priority, top: null,
+    priorityOverride: t.priority, breakMinutes: t.breakMinutes, top: null,
   };
 }
 

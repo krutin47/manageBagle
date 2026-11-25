@@ -7,7 +7,8 @@ import { errorMessage, type Area, type Block } from "../../lib/api";
 import { useToast } from "../../components/toast";
 import { useDocumentTitle, useMediaQuery, useNowMinutes } from "../../lib/hooks";
 import { modeLabel, statusLabel } from "../../lib/labels";
-import { useAreas, useBlockMutations, useWeekBlocks } from "../../lib/queries";
+import { commitmentsOn } from "../../lib/commitments";
+import { useAreas, useBlockMutations, useCommitments, useWeekBlocks } from "../../lib/queries";
 import { formatDate, formatDuration, formatTime, formatVariance, formatWeekRange, fromMinutes, isValidISODate, nowMinutes, snap, todayISO, toMinutes, weekDays, weekStart } from "../../lib/time";
 import { BlockDialog, type BlockDraft } from "./BlockDialog";
 import { placeBlocks } from "./layout";
@@ -107,6 +108,7 @@ interface Drag {
 }
 
 function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridProps) {
+  const commitments = useCommitments(days[0]!);
   const toast = useToast();
   const { move } = useBlockMutations();
   const scroller = useRef<HTMLDivElement>(null);
@@ -190,6 +192,12 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
           </div>
           {days.map((d) => (
             <div key={d} className={cx("cal-col", d === today && "is-today")} onClick={createAt(d)} >
+              {commitmentsOn(d, commitments.data ?? []).map((c) => (
+                <div key={`${c.source.sourceId}-${c.source.date}`} className={cx("cal-routine", c.policy !== "NoTasks" && "is-open")} aria-hidden
+                  style={{ top: (Math.max(0, c.start) / 60) * HOUR, height: ((Math.min(1440, c.end) - Math.max(0, c.start)) / 60) * HOUR }}>
+                  <span>{c.title}</span>
+                </div>
+              ))}
               {d === today && (
                 <div className="now-line" style={{ top: (now / 60) * HOUR }} aria-hidden>
                   <span />
@@ -201,7 +209,11 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
                 const dragging = drag?.moved && drag.block.id === p.block.id ? drag : null;
                 const liveStart = dragging ? fromMinutes(toMinutes(p.block.start) + dragging.minuteShift) : p.block.start.slice(0, 5);
                 const liveEnd = dragging ? fromMinutes(toMinutes(p.block.start) + dragging.minuteShift + p.block.plannedMinutes) : p.block.end.slice(0, 5);
-                return (
+                return [
+                  p.block.breakAfterMinutes > 0 && !dragging && (
+                    <span key={`${p.block.id}-break`} className="cal-break" aria-hidden title={`${p.block.breakAfterMinutes} min recovery`}
+                      style={{ top: (p.endMin / 60) * HOUR + 1, height: Math.max((p.block.breakAfterMinutes / 60) * HOUR - 2, 6), left: `calc(${(p.lane / p.lanes) * 100}% + 2px)`, width: `calc(${100 / p.lanes}% - 4px)` }} />
+                  ),
                   <motion.button
                     key={p.block.id}
                     type="button"
@@ -228,8 +240,8 @@ function WeekGrid({ days, blocks, loading, areaById, onCreate, onOpen }: GridPro
                       {p.block.isOutside && <MapPin size={11} aria-label="outside work" />}
                       {p.overnight && <MoonStar size={11} aria-label="continues past midnight" />}
                     </span>
-                  </motion.button>
-                );
+                  </motion.button>,
+                ];
               })}
             </div>
           ))}

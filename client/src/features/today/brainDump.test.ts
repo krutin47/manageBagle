@@ -4,13 +4,13 @@ import { dueQuickPicks, priorityFromDue, priorityOf, rowFromTask, sortRows, topi
 
 const TODAY = "2026-11-25"; // a Wednesday
 const areas: Area[] = [
-  { id: "build", name: "Build", color: "teal", sortOrder: 0 },
-  { id: "home", name: "Home", color: "slate", sortOrder: 1 },
+  { id: "build", name: "Build", color: "teal", sortOrder: 0, breakMinutes: 0, breakPlacement: "After" },
+  { id: "home", name: "Home", color: "slate", sortOrder: 1, breakMinutes: 0, breakPlacement: "After" },
 ];
 let n = 0;
 const row = (p: Partial<Row> = {}): Row => ({
   key: `k${n++}`, taskId: null, title: "t", minutes: 30, minutesChosen: false, focusAreaId: null, workMode: "ShallowWork",
-  isOutside: false, impact: "Medium", dueDate: null, priorityOverride: null, top: null, ...p,
+  isOutside: false, impact: "Medium", dueDate: null, priorityOverride: null, breakMinutes: null, top: null, ...p,
 });
 const titles = (rows: Row[]) => rows.map((r) => r.title);
 
@@ -41,7 +41,7 @@ describe("deep focus default (P2-A2)", () => {
   it("never overrides a length the person chose", () => expect(withWorkMode(row({ minutes: 45, minutesChosen: true }), "DeepFocus").minutes).toBe(45));
   it("leaves the length alone for other kinds of work", () => expect(withWorkMode(row({ minutes: 30 }), "Meeting").minutes).toBe(30));
   it("treats a backlog estimate as chosen", () => {
-    const fromBacklog = rowFromTask({ id: "x", title: "x", focusAreaId: null, estimatedMinutes: 50, priority: "Low", dueDate: null, status: "Planned", nextStep: "", workMode: "ShallowWork", isOutside: false, impact: "Medium", scheduledDate: null, createdAt: "", version: 1 });
+    const fromBacklog = rowFromTask({ id: "x", title: "x", focusAreaId: null, estimatedMinutes: 50, priority: "Low", dueDate: null, status: "Planned", nextStep: "", workMode: "ShallowWork", isOutside: false, impact: "Medium", scheduledDate: null, createdAt: "", version: 1, breakMinutes: null });
     expect(withWorkMode(fromBacklog, "DeepFocus").minutes).toBe(50);
   });
 });
