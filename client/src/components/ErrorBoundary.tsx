@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { newReference, reportClientError } from "../lib/errorReporting";
 import { Button } from "./ui";
 
 interface Props {
@@ -23,12 +24,13 @@ export class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null, reference: "" };
 
   static getDerivedStateFromError(error: Error): Partial<State> {
-    return { error, reference: Math.random().toString(36).slice(2, 10) };
+    return { error, reference: newReference() };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    // The reference ties what the person sees to this log line. No user content is included.
-    console.error(`[render-error ${this.state.reference}] in ${this.props.area}: ${error.name}`, info.componentStack);
+    // The reference shown to the person is the one in the server log.
+    reportClientError("render", error, this.state.reference);
+    if (import.meta.env.DEV) console.error(error, info.componentStack);
   }
 
   componentDidUpdate(previous: Props) {

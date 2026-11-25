@@ -426,3 +426,13 @@
 .boundary { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-3); }
 .boundary-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .auth-resend { margin-top: 16px; }
+
+/* ---- Recovery, activity ---- */
+.lost-factor { display: grid; gap: 10px; margin-top: 24px; padding-top: 20px; border-top: 1px dashed var(--line-strong); }
+.lost-factor h2 { font-size: 16px; }
+.lost-factor p { color: var(--ink-2); font-size: 14px; }
+.activity { display: grid; }
+.activity li { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.activity li:first-child { border-top: 0; }
+.activity time { color: var(--ink-3); white-space: nowrap; font-size: 13px; }
+.activity li.is-warning span { color: var(--warn); font-weight: 550; }

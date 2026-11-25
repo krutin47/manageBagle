@@ -271,8 +271,97 @@ export function VerifyPage() {
           {useRecoveryCode ? "Use my authenticator app instead" : "Lost your phone? Use a recovery code"}
         </button>
       </form>
+      {useRecoveryCode && <LostEverySecondFactor next={next} />}
     </AuthLayout>
   );
+}
+
+type ResetState = { state: "none" | "waiting" | "ready"; availableAt: string | null };
+
+/** The way back in when the authenticator and every recovery code are gone (audited, with a waiting period). */
+function LostEverySecondFactor({ next }: { next: string }) {
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const status = useQuery({ queryKey: ["mfa-reset-status"], queryFn: ({ signal }) => api<ResetState>("/auth/mfa/recovery/status", { signal }), retry: false });
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const request = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api("/auth/mfa/recovery/request", { method: "POST" });
+      setSent(true);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const complete = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api("/auth/mfa/recovery/complete", { method: "POST" });
+      await qc.invalidateQueries({ queryKey: keys.me });
+      navigate(next, { replace: true });
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  };
+
+  if (!status.data) return null;
+  const when = status.data.availableAt ? new Date(status.data.availableAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "";
+  return (
+    <section className="lost-factor" aria-labelledby="lost-factor-title">
+      <h2 id="lost-factor-title">Lost your recovery codes too?</h2>
+      {error && <ErrorNote>{error}</ErrorNote>}
+      {status.data.state === "ready" ? (
+        <>
+          <p>The waiting period is over. You can turn off two-step verification and sign in with your password. We will email you to confirm.</p>
+          <Button variant="primary" block loading={busy} onClick={complete}>Turn off two-step verification and sign in</Button>
+        </>
+      ) : status.data.state === "waiting" ? (
+        <p>Your request is confirmed. You can finish it here after <strong>{when}</strong>. If you find your authenticator before then, just use it — that cancels the request.</p>
+      ) : sent ? (
+        <div className="notice" role="status"><MailCheck size={20} aria-hidden /><p>Check your email. Confirm the request there, then wait 3 days before finishing it here. The wait protects you if someone else learned your password.</p></div>
+      ) : (
+        <>
+          <p>We can turn off two-step verification for you. To keep your account safe this takes a confirmation by email and a 3-day wait, which anyone can see coming and the real owner can cancel.</p>
+          <Button block loading={busy} onClick={request}>Start account recovery</Button>
+        </>
+      )}
+    </section>
+  );
+}
+
+/** Landing page for the confirm / cancel links in the account-recovery emails. */
+export function MfaRecoveryLinkPage() {
+  const [params] = useSearchParams();
+  const action = params.get("action") === "cancel" ? "cancel" : "confirm";
+  const token = params.get("token");
+  const result = useQuery({
+    queryKey: ["mfa-recovery-link", action, token],
+    queryFn: () => api<{ status: string; availableAt?: string }>(`/auth/mfa/recovery/${action}`, { method: "POST", body: { token } }),
+    enabled: !!token,
+    retry: false,
+    staleTime: Infinity,
+    gcTime: 0,
+  });
+  const when = result.data?.availableAt ? new Date(result.data.availableAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "";
+  const title = !token || result.isError ? "This link did not work"
+    : result.isPending ? "One moment…"
+    : action === "cancel" ? "Recovery cancelled"
+    : result.data.status === "not_needed" ? "Nothing to do" : "Recovery confirmed";
+  const lead = !token || result.isError ? "It may have expired, or been replaced by a newer request."
+    : result.isPending ? ""
+    : action === "cancel" ? "Two-step verification stays on. If you did not ask for this, change your password now."
+    : result.data.status === "not_needed" ? "Two-step verification is already off for this account."
+    : `Sign in with your password after ${when} to finish. Using your authenticator or a recovery code before then cancels it.`;
+  return <AuthLayout title={title} lead={lead} footer={<Link to="/login"><ArrowLeft size={14} aria-hidden /> Sign in</Link>}>{null}</AuthLayout>;
 }
 
 export function RegisterPage() {

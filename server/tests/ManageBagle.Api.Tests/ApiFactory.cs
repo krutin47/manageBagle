@@ -31,16 +31,21 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public CapturedEmail Email { get; } = new();
 
+    /// <summary>Settings a derived factory needs on top of the defaults.</summary>
+    protected virtual IEnumerable<(string Key, string Value)> ExtraSettings => [];
+
     private string ConnectionString =>
         (Environment.GetEnvironmentVariable("MB_TEST_POSTGRES") ?? "Host=localhost;Port=5432;Username=managebagle;Password=managebagle")
         + $";Database={_database}";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        foreach (var (key, value) in ExtraSettings) builder.UseSetting(key, value);
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:Default", ConnectionString);
         builder.UseSetting("Database:MigrateOnStartup", "true");
         builder.UseSetting("RateLimits:AuthPerMinute", "10000");
+        builder.UseSetting("Auth:SessionRevalidateSeconds", "0"); // so "other sessions end" is observable at once
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton<IAppEmailSender>(Email);
@@ -123,6 +128,10 @@ public sealed partial class CapturedEmail : IAppEmailSender
         var match = ConfirmLink().Match(body);
         return new ConfirmEmail(Guid.Parse(match.Groups[1].Value), match.Groups[2].Value);
     }
+
+    /// <summary>The token in the newest link of the given kind, e.g. ("Turn off two-step", "confirm").</summary>
+    public string MfaResetToken(string address, string subjectStartsWith, string action) =>
+        Regex.Match(To(address).Last(m => m.Subject.StartsWith(subjectStartsWith)).Body, $@"/mfa-recovery\?action={action}&token=([\w-]+)").Groups[1].Value;
 
     public string ResetTokenFor(string address) => ResetLink().Match(To(address).Last(m => m.Subject.StartsWith("Reset")).Body).Groups[1].Value;
 

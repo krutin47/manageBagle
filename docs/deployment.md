@@ -21,6 +21,8 @@ All settings are environment variables (double underscore = nesting).
 | `Security__AllowedOrigins__0` | no | extra origins allowed to send writes (normally none) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | no | turns on trace and metric export to a collector |
 | `Auth__IdleSessionDays`, `Auth__AbsoluteSessionDays` | no | default 14 and 30 |
+| `Auth__SessionRevalidateSeconds` | no | default 60: how soon a password change ends other sessions |
+| `Auth__MfaResetDelayHours` | no | default 72: wait before a lost-second-factor recovery can finish |
 | `RateLimits__AuthPerMinute` | no | default `20` |
 
 Use a **separate database and separate Google OAuth client** for UAT and production.

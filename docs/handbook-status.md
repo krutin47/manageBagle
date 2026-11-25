@@ -14,7 +14,7 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | Item | State | Evidence |
 |---|---|---|
 | Client lint, type-check, tests, build | Done | run locally, all pass |
-| Server build (warnings as errors) and tests against real PostgreSQL | Done | 71 tests pass |
+| Server build (warnings as errors) and tests against real PostgreSQL | Done | 76 tests pass |
 | Migrations against a disposable database | Done | every test run creates a database from migrations; release sequence run by hand |
 | Build the Docker image and run it | **Not done** | no Docker daemon where this was built; CI job `image` does it on the first pull request |
 | Trace five user journeys with timings and SQL counts | **Not done** | no measurements taken yet |
@@ -25,14 +25,14 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | # | Item | State | Notes |
 |---|---|---|---|
 | 1 | Email confirmation at registration | Done | accounts cannot sign in until confirmed; registration and resend do not reveal whether an address exists |
-| 1 | Safe recovery | Partial | reset links are one-time and expire in 2 h. **No admin process for someone locked out of MFA without recovery codes.** |
+| 1 | Safe recovery | Done | reset links are one-time and expire in 2 h. Lost every second factor: self-service recovery confirmed by email, then a 72-hour wait the owner can cancel; every step audited (`/mfa-recovery`) |
 | 1 | Remove destructive auto-linking | Done | ADR-007; existing accounts marked confirmed by migration so nobody is locked out |
 | 2 | Antiforgery tokens | Done | ADR-006 |
 | 2 | Trusted ingress headers | Done in code · **Needs you** | only loopback is trusted by default. Set `ForwardedHeaders__KnownProxies` / `KnownNetworks` to your platform's ingress when you deploy |
 | 2 | Tests for CSRF, spoofed headers, cross-account writes | Done | `SecurityTests`, `TransportTests`, `PlanningTests` |
 | 3 | Problem Details and trace IDs | Done | ADR-005 |
 | 3 | Sanitised structured logs | Done | JSON outside development; route templates, not URLs; no bodies |
-| 3 | Central error monitoring | Partial | traces and metrics export over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. **No backend chosen or connected; no alerts; browser errors are not reported anywhere.** |
+| 3 | Central error monitoring | Partial | traces and metrics export over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; browser errors are reported to the server log with the reference the person sees. **No backend chosen or connected, no alerts.** |
 | 4 | User time-zone setting | Done | ADR-008 |
 | 4 | DST and overnight policy | Done | tested on both transitions |
 | 4 | Migrate without changing existing dates | Done | old rows keep their wall-clock length and get no zone |
@@ -40,8 +40,10 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 | 5 | Atomic plan and simultaneous edits tested | Done | 8 concurrent writers: exactly one wins |
 | 6 | Migrations as an explicit release step | Done | `--migrate`; readiness fails until applied |
 | 6 | Backups and a restore drill | Partial | `scripts/backup.sh`, `scripts/restore-drill.sh`; drill passed **against a local database only**. No production backups exist because no production exists. |
-| 7 | Playwright end-to-end flows | Done | 10 tests, run locally |
+| 7 | Playwright end-to-end flows | Done | 11 tests, run locally |
 | 7 | Verify the full Docker / UAT deployment | **Not done** | no image has been built, no environment exists |
+
+**Also done in Phase 1:** a queryable audit trail shown to the owner (Settings → Account activity); other sessions now end within 60 s of a password change or reset (`Auth__SessionRevalidateSeconds`), instead of Identity's 30-minute default.
 
 **Exit criteria**
 
@@ -92,6 +94,5 @@ gap is stated · **Not done** = nothing built · **Needs you** = cannot be done 
 - No `/api/v1` prefix (deferred to the first breaking change, per §7.1).
 - No recurring blocks, so the civil-time recurrence rule is untested (§10).
 - Actual start/finish instants are not recorded, only minutes (§10).
-- Audit events are log entries, not a queryable table (§11.2).
 - No data inventory, retention policy or export path (§17.3).
 - No load test, no SLO measurement (§1, Phase 3).

@@ -11,6 +11,32 @@ namespace ManageBagle.Api.Auth;
 public sealed class AccountLinks(IConfiguration config, IHttpContextAccessor http, IDataProtectionProvider protection)
 {
     private readonly ITimeLimitedDataProtector _tickets = protection.CreateProtector("external-login-link").ToTimeLimitedDataProtector();
+    private readonly ITimeLimitedDataProtector _mfaReset = protection.CreateProtector("mfa-reset").ToTimeLimitedDataProtector();
+
+    /// <summary>
+    /// Link tokens for the lost-second-factor flow. Bound to the account, the purpose ("confirm" or
+    /// "cancel") and the security stamp, so a password change or a completed reset kills every older link.
+    /// </summary>
+    public string CreateMfaResetToken(AppUser user, string purpose, TimeSpan lifetime) =>
+        AccountLinks.Encode(_mfaReset.Protect($"{user.Id}|{purpose}|{user.SecurityStamp}", lifetime));
+
+    public bool TryReadMfaResetToken(string token, string purpose, out Guid userId, out string stamp)
+    {
+        userId = Guid.Empty;
+        stamp = "";
+        if (!TryDecode(token, out var raw)) return false;
+        try
+        {
+            var parts = _mfaReset.Unprotect(raw).Split('|');
+            if (parts.Length != 3 || parts[1] != purpose || !Guid.TryParse(parts[0], out userId)) return false;
+            stamp = parts[2];
+            return true;
+        }
+        catch (System.Security.Cryptography.CryptographicException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>Absolute URL on the public site. Prefers the configured address over whatever host the request claimed.</summary>
     public string Url(string path)
@@ -63,12 +89,24 @@ public sealed class AccountLinks(IConfiguration config, IHttpContextAccessor htt
 }
 
 /// <summary>
-/// Security-relevant account events, written as structured log entries (event name, account id, optional
-/// detail such as the provider). Never includes credentials, codes, tokens or email bodies.
+/// Security-relevant account events. Each is written as a structured log line and as a row the owner
+/// can see under Settings → Account activity. Written in its own unit of work, so recording an event
+/// never commits or rolls back the request's other changes. Never includes credentials, codes, tokens
+/// or email bodies.
 /// </summary>
 public static class Audit
 {
-    public static void Log(IEndpointRouteBuilder app, string eventName, Guid userId, string? detail = null) =>
+    public static async Task RecordAsync(IEndpointRouteBuilder app, string eventName, Guid userId, string? detail = null)
+    {
         app.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("ManageBagle.Audit")
             .LogInformation("audit {AuditEvent} user {UserId} {Detail}", eventName, userId, detail ?? "");
+        using var scope = app.ServiceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.AuditEvents.Add(new AuditEvent
+        {
+            UserId = userId, Event = eventName, Detail = detail ?? "",
+            At = scope.ServiceProvider.GetRequiredService<TimeProvider>().GetUtcNow(),
+        });
+        await db.SaveChangesAsync();
+    }
 }

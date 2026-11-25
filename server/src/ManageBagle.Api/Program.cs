@@ -76,6 +76,10 @@ builder.Services
     .AddDefaultTokenProviders();
 
 builder.Services.Configure<DataProtectionTokenProviderOptions>(o => o.TokenLifespan = TimeSpan.FromHours(2));
+// How soon a password change, reset or removed sign-in method ends the account's other sessions.
+// Identity's default is 30 minutes; each check costs one small query per signed-in request.
+builder.Services.Configure<SecurityStampValidatorOptions>(o =>
+    o.ValidationInterval = TimeSpan.FromSeconds(config.GetValue("Auth:SessionRevalidateSeconds", 60)));
 
 var secureCookies = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
 
@@ -174,6 +178,9 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("auth", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = authLimit, Window = TimeSpan.FromMinutes(1) }));
+    o.AddPolicy("client-errors", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) }));
 });
 
 builder.Services.Configure<ForwardedHeadersOptions>(o => SecurityMiddleware.ConfigureForwardedHeaders(o, config));
@@ -230,6 +237,7 @@ app.MapBacklogEndpoints();
 app.MapDayEndpoints();
 app.MapPlanEndpoints();
 app.MapSummaryEndpoints();
+app.MapClientErrorEndpoints();
 
 app.MapFallback("/api/{**path}", () => HttpExtensions.Problem(StatusCodes.Status404NotFound, ErrorCodes.NotFound, "There is nothing at this address."));
 app.MapFallbackToFile("index.html");

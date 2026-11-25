@@ -13,6 +13,10 @@ public class AppUser : IdentityUser<Guid>
     public string DisplayName { get; set; } = "";
     /// <summary>IANA zone the person plans in. Null until first set (accounts created before the setting existed).</summary>
     public string? TimeZoneId { get; set; }
+    /// <summary>When the owner confirmed by email that they lost every second factor; null when no reset is pending.</summary>
+    public DateTimeOffset? MfaResetConfirmedAt { get; set; }
+    /// <summary>When a confirmed reset may be completed. The wait gives the real owner time to cancel.</summary>
+    public DateTimeOffset? MfaResetAvailableAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
@@ -35,6 +39,18 @@ public static class AreaColors
 public interface IVersioned
 {
     int Version { get; set; }
+}
+
+/// <summary>A security-relevant account event, kept so the owner can see it and support can investigate.</summary>
+public class AuditEvent
+{
+    public long Id { get; set; }
+    public Guid UserId { get; set; }
+    /// <summary>Stable snake_case name, e.g. "sign_in", "mfa_disabled".</summary>
+    public string Event { get; set; } = "";
+    /// <summary>Short non-secret detail such as a provider name. Never credentials, codes or tokens.</summary>
+    public string Detail { get; set; } = "";
+    public DateTimeOffset At { get; set; }
 }
 
 public class IdempotencyRecord

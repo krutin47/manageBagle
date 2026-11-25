@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.MicrosoftAccount;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using ManageBagle.Api.Domain;
 
@@ -21,6 +22,10 @@ public record RegisterRequest(
     [StringLength(64)] string? TimeZone = null);
 
 public record ConfirmEmailRequest(Guid UserId, [Required] string Token);
+
+public record TokenRequest([Required, StringLength(2000)] string Token);
+
+public record AuditEventResponse(string Event, string Detail, DateTimeOffset At);
 
 public record LoginRequest([Required] string Email, [Required] string Password, bool RememberMe);
 
@@ -103,7 +108,7 @@ public static class AuthEndpoints
                 DefaultData.AddFor(db, user.Id);
                 await db.SaveChangesAsync();
                 await links.SendConfirmationAsync(users, email, user);
-                Audit.Log(app, "account_created", user.Id);
+                await Audit.RecordAsync(app, "account_created", user.Id);
             }
             else if (!existing.EmailConfirmed)
             {
@@ -128,7 +133,7 @@ public static class AuthEndpoints
             {
                 var result = await users.ConfirmEmailAsync(user, token);
                 if (!result.Succeeded) return invalid;
-                Audit.Log(app, "email_confirmed", user.Id);
+                await Audit.RecordAsync(app, "email_confirmed", user.Id);
             }
             else if (!await users.VerifyUserTokenAsync(user, users.Options.Tokens.EmailConfirmationTokenProvider, UserManager<AppUser>.ConfirmEmailTokenPurpose, token))
             {
@@ -165,13 +170,14 @@ public static class AuthEndpoints
             }
 
             var result = await signIn.PasswordSignInAsync(req.Email.Trim(), req.Password, req.RememberMe, lockoutOnFailure: true);
-            if (user is not null) Audit.Log(app, result.Succeeded ? "sign_in" : result.RequiresTwoFactor ? "sign_in_needs_mfa" : "sign_in_failed", user.Id);
+            if (user is not null) await Audit.RecordAsync(app, result.Succeeded ? "sign_in" : result.RequiresTwoFactor ? "sign_in_needs_mfa" : "sign_in_failed", user.Id);
             return SignInOutcome(result);
         });
 
-        limited.MapPost("/login/mfa", async (MfaLoginRequest req, SignInManager<AppUser> signIn) =>
+        limited.MapPost("/login/mfa", async (MfaLoginRequest req, SignInManager<AppUser> signIn, UserManager<AppUser> users) =>
         {
-            if (await signIn.GetTwoFactorAuthenticationUserAsync() is null)
+            var pending = await signIn.GetTwoFactorAuthenticationUserAsync();
+            if (pending is null)
             {
                 return HttpExtensions.Problem(401, "mfa_session_expired", "Your sign-in session expired. Start again.");
             }
@@ -179,13 +185,124 @@ public static class AuthEndpoints
             var result = req.UseRecoveryCode
                 ? await signIn.TwoFactorRecoveryCodeSignInAsync(req.Code.Replace(" ", "").ToUpperInvariant())
                 : await signIn.TwoFactorAuthenticatorSignInAsync(req.Code.Replace(" ", "").Replace("-", ""), isPersistent: false, rememberClient: req.RememberDevice);
-            if (result.Succeeded) return Results.Ok(new { status = "ok" });
+            if (result.Succeeded)
+            {
+                await Audit.RecordAsync(app, req.UseRecoveryCode ? "sign_in_recovery_code" : "sign_in_mfa", pending.Id);
+                // Whoever holds a second factor is the owner: any pending "lost my second factor" reset is void.
+                if (pending.MfaResetConfirmedAt is not null || pending.MfaResetAvailableAt is not null)
+                {
+                    pending.MfaResetConfirmedAt = null;
+                    pending.MfaResetAvailableAt = null;
+                    await users.UpdateAsync(pending);
+                    await Audit.RecordAsync(app, "mfa_reset_cancelled", pending.Id, "second_factor_used");
+                }
+                return Results.Ok(new { status = "ok" });
+            }
+            await Audit.RecordAsync(app, "sign_in_mfa_failed", pending.Id);
             if (result.IsLockedOut) return SignInOutcome(result);
             return HttpExtensions.Problem(401, "invalid_code", "That code is not valid. Check your authenticator app and try again.");
         });
 
-        g.MapPost("/logout", async (SignInManager<AppUser> signIn) =>
+        // ---- Lost every second factor --------------------------------------------------------------
+        //
+        // The audited way back in for someone who knows their password but has lost both their
+        // authenticator and their recovery codes. No database edits, no support desk:
+        //   1. after the password step, they ask; an email goes to the account's address;
+        //   2. the link in it confirms they control the mailbox, and starts a waiting period;
+        //   3. during the wait, signing in with a second factor or the cancel link stops it;
+        //   4. after the wait, signing in with the password finishes it: two-step verification is off,
+        //      every other session ends, and the owner is emailed.
+
+        limited.MapPost("/mfa/recovery/request", async (SignInManager<AppUser> signIn, IAppEmailSender email, AccountLinks links, IConfiguration config) =>
         {
+            var user = await signIn.GetTwoFactorAuthenticationUserAsync();
+            if (user is null) return HttpExtensions.Problem(401, "mfa_session_expired", "Your sign-in session expired. Start again.");
+            var delay = config.GetValue("Auth:MfaResetDelayHours", 72);
+            var (subject, body) = EmailTemplates.MfaResetRequested(user.DisplayName,
+                links.Url($"/mfa-recovery?action=confirm&token={links.CreateMfaResetToken(user, "confirm", TimeSpan.FromHours(2))}"),
+                links.Url($"/mfa-recovery?action=cancel&token={links.CreateMfaResetToken(user, "cancel", TimeSpan.FromHours(delay + 72))}"),
+                delay);
+            await email.SendAsync(user.Email!, subject, body);
+            await Audit.RecordAsync(app, "mfa_reset_requested", user.Id);
+            return Results.Accepted();
+        });
+
+        limited.MapPost("/mfa/recovery/confirm", async (TokenRequest req, UserManager<AppUser> users, IAppEmailSender email, AccountLinks links, IConfiguration config, TimeProvider clock) =>
+        {
+            var user = await MfaResetUser(users, links, req.Token, "confirm");
+            if (user is null) return MfaResetLinkInvalid();
+            if (!await users.GetTwoFactorEnabledAsync(user)) return Results.Ok(new { status = "not_needed" });
+            var delay = config.GetValue("Auth:MfaResetDelayHours", 72);
+            if (user.MfaResetAvailableAt is null)
+            {
+                user.MfaResetConfirmedAt = clock.GetUtcNow();
+                user.MfaResetAvailableAt = clock.GetUtcNow().AddHours(delay);
+                await users.UpdateAsync(user);
+                var (subject, body) = EmailTemplates.MfaResetConfirmed(user.DisplayName, user.MfaResetAvailableAt.Value,
+                    links.Url($"/mfa-recovery?action=cancel&token={links.CreateMfaResetToken(user, "cancel", TimeSpan.FromHours(delay + 72))}"));
+                await email.SendAsync(user.Email!, subject, body);
+                await Audit.RecordAsync(app, "mfa_reset_confirmed", user.Id);
+            }
+            return Results.Ok(new { status = "waiting", availableAt = user.MfaResetAvailableAt });
+        });
+
+        limited.MapPost("/mfa/recovery/cancel", async (TokenRequest req, UserManager<AppUser> users, AccountLinks links) =>
+        {
+            var user = await MfaResetUser(users, links, req.Token, "cancel");
+            if (user is null) return MfaResetLinkInvalid();
+            if (user.MfaResetConfirmedAt is not null || user.MfaResetAvailableAt is not null)
+            {
+                user.MfaResetConfirmedAt = null;
+                user.MfaResetAvailableAt = null;
+                await users.UpdateAsync(user);
+                await Audit.RecordAsync(app, "mfa_reset_cancelled", user.Id, "cancel_link");
+            }
+            // A new stamp kills the confirm link as well, so the request cannot be restarted from the old email.
+            await users.UpdateSecurityStampAsync(user);
+            return Results.Ok(new { status = "cancelled" });
+        });
+
+        limited.MapGet("/mfa/recovery/status", async (SignInManager<AppUser> signIn, TimeProvider clock) =>
+        {
+            var user = await signIn.GetTwoFactorAuthenticationUserAsync();
+            if (user is null) return HttpExtensions.Problem(401, "mfa_session_expired", "Your sign-in session expired. Start again.");
+            var state = user.MfaResetAvailableAt is null ? "none" : user.MfaResetAvailableAt <= clock.GetUtcNow() ? "ready" : "waiting";
+            return Results.Ok(new { state, availableAt = user.MfaResetAvailableAt });
+        });
+
+        limited.MapPost("/mfa/recovery/complete", async (SignInManager<AppUser> signIn, UserManager<AppUser> users, IAppEmailSender email, TimeProvider clock) =>
+        {
+            var user = await signIn.GetTwoFactorAuthenticationUserAsync();
+            if (user is null) return HttpExtensions.Problem(401, "mfa_session_expired", "Your sign-in session expired. Start again.");
+            if (user.MfaResetAvailableAt is null || user.MfaResetAvailableAt > clock.GetUtcNow())
+            {
+                return HttpExtensions.Problem(409, "mfa_reset_not_ready", "Two-step verification cannot be turned off yet.");
+            }
+            user.MfaResetConfirmedAt = null;
+            user.MfaResetAvailableAt = null;
+            await users.UpdateAsync(user);
+            await users.SetTwoFactorEnabledAsync(user, false);
+            await users.ResetAuthenticatorKeyAsync(user);
+            await users.UpdateSecurityStampAsync(user); // every other session ends
+            await signIn.SignInAsync(user, isPersistent: false);
+            var (subject, body) = EmailTemplates.MfaResetCompleted(user.DisplayName);
+            await email.SendAsync(user.Email!, subject, body);
+            await Audit.RecordAsync(app, "mfa_reset_completed", user.Id);
+            return Results.Ok(new { status = "ok" });
+        });
+
+        g.MapGet("/activity", async (ClaimsPrincipal principal, AppDbContext db, CancellationToken ct) =>
+        {
+            var uid = principal.UserId();
+            var events = await db.AuditEvents.AsNoTracking().Where(e => e.UserId == uid)
+                .OrderByDescending(e => e.At).Take(30)
+                .Select(e => new AuditEventResponse(e.Event, e.Detail, e.At)).ToListAsync(ct);
+            return Results.Ok(events);
+        }).RequireAuthorization();
+
+        g.MapPost("/logout", async (SignInManager<AppUser> signIn, ClaimsPrincipal principal) =>
+        {
+            if (principal.Identity?.IsAuthenticated == true) await Audit.RecordAsync(app, "sign_out", principal.UserId());
             await signIn.SignOutAsync();
             return Results.NoContent();
         });
@@ -230,7 +347,8 @@ public static class AuthEndpoints
                 if (await users.FindByLoginAsync(info.LoginProvider, info.ProviderKey) is not null) return Results.Redirect("/settings?error=link_in_use");
                 var added = await users.AddLoginAsync(current, info);
                 if (!added.Succeeded) return Results.Redirect("/settings?error=link_failed");
-                Audit.Log(app, "external_login_linked", current.Id, known.Key);
+                await signIn.RefreshSignInAsync(current);
+                await Audit.RecordAsync(app, "external_login_linked", current.Id, known.Key);
                 return Results.Redirect($"/settings?linked={known.Key}");
             }
 
@@ -270,7 +388,7 @@ public static class AuthEndpoints
             DefaultData.AddFor(db, user.Id);
             await db.SaveChangesAsync();
             if (!(await users.AddLoginAsync(user, info)).Succeeded) return Results.Redirect("/login?error=external_failed");
-            Audit.Log(app, "account_created", user.Id, known.Key);
+            await Audit.RecordAsync(app, "account_created", user.Id, known.Key);
 
             if (!emailProven)
             {
@@ -316,7 +434,7 @@ public static class AuthEndpoints
             if (!await Confirm(users, user, req)) return ConfirmFailed();
             await users.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey);
             await signIn.RefreshSignInAsync(user);
-            Audit.Log(app, "external_login_unlinked", user.Id, known.Key);
+            await Audit.RecordAsync(app, "external_login_unlinked", user.Id, known.Key);
             return Results.NoContent();
         });
 
@@ -328,7 +446,7 @@ public static class AuthEndpoints
                 : await users.AddPasswordAsync(user, req.NewPassword);
             if (!result.Succeeded) return IdentityProblem(result);
             await signIn.RefreshSignInAsync(user);
-            Audit.Log(app, "password_changed", user.Id);
+            await Audit.RecordAsync(app, "password_changed", user.Id);
             return Results.NoContent();
         });
 
@@ -364,13 +482,13 @@ public static class AuthEndpoints
                 await users.UpdateAsync(user);
             }
             await users.SetLockoutEndDateAsync(user, null);
-            Audit.Log(app, "password_reset", user.Id);
+            await Audit.RecordAsync(app, "password_reset", user.Id);
             return Results.NoContent();
         });
 
         // ---- Multi-factor ----------------------------------------------------------------------
 
-        authed.MapGet("/mfa/setup", async (ClaimsPrincipal principal, UserManager<AppUser> users) =>
+        authed.MapGet("/mfa/setup", async (ClaimsPrincipal principal, UserManager<AppUser> users, SignInManager<AppUser> signIn) =>
         {
             var user = (await users.GetUserAsync(principal))!;
             if (await users.GetTwoFactorEnabledAsync(user))
@@ -382,6 +500,9 @@ public static class AuthEndpoints
             {
                 await users.ResetAuthenticatorKeyAsync(user);
                 key = await users.GetAuthenticatorKeyAsync(user);
+                // A new key changes the security stamp; re-issue this browser's cookie so the person
+                // is not signed out while scanning the code. Other sessions still end.
+                await signIn.RefreshSignInAsync(user);
             }
             var uri = $"otpauth://totp/{Uri.EscapeDataString(Issuer)}:{Uri.EscapeDataString(user.Email!)}" +
                       $"?secret={key}&issuer={Uri.EscapeDataString(Issuer)}&digits=6";
@@ -398,7 +519,7 @@ public static class AuthEndpoints
             await users.SetTwoFactorEnabledAsync(user, true);
             var codes = await users.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
             await signIn.RefreshSignInAsync(user);
-            Audit.Log(app, "mfa_enabled", user.Id);
+            await Audit.RecordAsync(app, "mfa_enabled", user.Id);
             return Results.Ok(new { recoveryCodes = codes });
         });
 
@@ -410,7 +531,7 @@ public static class AuthEndpoints
             await users.ResetAuthenticatorKeyAsync(user);
             await signIn.ForgetTwoFactorClientAsync();
             await signIn.RefreshSignInAsync(user);
-            Audit.Log(app, "mfa_disabled", user.Id);
+            await Audit.RecordAsync(app, "mfa_disabled", user.Id);
             return Results.NoContent();
         });
 
@@ -463,6 +584,16 @@ public static class AuthEndpoints
         }
         return false;
     }
+
+    private static async Task<AppUser?> MfaResetUser(UserManager<AppUser> users, AccountLinks links, string token, string purpose)
+    {
+        if (!links.TryReadMfaResetToken(token, purpose, out var userId, out var stamp)) return null;
+        var user = await users.FindByIdAsync(userId.ToString());
+        return user is not null && user.SecurityStamp == stamp ? user : null;
+    }
+
+    private static IResult MfaResetLinkInvalid() =>
+        HttpExtensions.Problem(400, "invalid_token", "This link is invalid or has expired.");
 
     private static IResult ConfirmFailed() =>
         HttpExtensions.Problem(403, "confirmation_failed", "We could not confirm it is you. Check your password or code.");

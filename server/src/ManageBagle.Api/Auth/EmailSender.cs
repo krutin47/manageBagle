@@ -75,6 +75,18 @@ public static class EmailTemplates
         "You already have a manageBagle account",
         $"Hi {name},\n\nSomeone tried to create a manageBagle account with this email address, but you already have one.\n\nSign in here: {signInLink}\n\nIf you have forgotten your password, use \"Forgot password?\" on that page. If this was not you, no action is needed.");
 
+    public static (string Subject, string Body) MfaResetRequested(string name, string confirmLink, string cancelLink, int delayHours) => (
+        "Turn off two-step verification on manageBagle?",
+        $"Hi {name},\n\nSomeone who knows your password says they have lost both their authenticator app and their recovery codes, and asked to turn off two-step verification.\n\nIf that was you, confirm here. Two-step verification will then be turned off {delayHours} hours later, so you have time to stop it if this was not you:\n{confirmLink}\n\nIf it was NOT you, cancel now and change your password:\n{cancelLink}\n\nThe confirm link works for 2 hours.");
+
+    public static (string Subject, string Body) MfaResetConfirmed(string name, DateTimeOffset availableAt, string cancelLink) => (
+        "Two-step verification will be turned off",
+        $"Hi {name},\n\nTwo-step verification on your manageBagle account can be turned off from {availableAt:yyyy-MM-dd HH:mm} UTC. After that, sign in with your password to finish.\n\nIf this was not you, cancel now:\n{cancelLink}\n\nSigning in with your authenticator app or a recovery code also cancels it.");
+
+    public static (string Subject, string Body) MfaResetCompleted(string name) => (
+        "Two-step verification was turned off",
+        $"Hi {name},\n\nTwo-step verification has been turned off on your manageBagle account, as requested. We recommend turning it on again in Settings with your new device.\n\nIf this was not you, reset your password immediately.");
+
     public static (string Subject, string Body) ResetPassword(string name, string link) => (
         "Reset your manageBagle password",
         $"Hi {name},\n\nUse this link to choose a new password. It works once and expires in 2 hours.\n\n{link}\n\nIf you did not ask for this, you can ignore this email.");

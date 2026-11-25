@@ -68,12 +68,35 @@ email is written to the log in Development and an error is logged elsewhere.
   Development, and `Cache-Control: no-store` on API responses.
 - **Data isolation** – every query is filtered by the signed-in user's id, and ids sent by the client
   are checked for ownership.
-- **Audit trail** – account events (sign-in, password change, MFA on/off, account linked/unlinked) are
-  written as structured log entries under the `ManageBagle.Audit` category, without credentials.
+
+## Lost every second factor
+
+Someone who knows their password but has lost both their authenticator and every recovery code can
+recover without anyone editing the database:
+
+1. After the password step, *Lost your phone? → Start account recovery*. An email goes to the account.
+2. Its link confirms they control the mailbox and starts a **72-hour wait** (`Auth__MfaResetDelayHours`).
+   A second email says when, with a cancel link.
+3. During the wait, signing in with the authenticator or a recovery code, or the cancel link, stops it.
+4. After the wait, signing in with the password finishes it: two-step verification is turned off, all
+   other sessions end, and the owner is emailed.
+
+Every step is recorded in the account's activity.
+
+## Account activity
+
+Sign-ins (including failures), sign-outs, password changes and resets, two-step verification changes,
+recovery steps and connected accounts are stored as audit events. The owner sees the latest 30 under
+*Settings → Account activity*; each event is also a `ManageBagle.Audit` log line. No credentials, codes
+or tokens are recorded.
+
+## Sessions
+
+A password change, reset, recovery or disconnected sign-in method ends the account's other sessions
+within 60 seconds (`Auth__SessionRevalidateSeconds`).
 
 ## Known limits
 
-- There is no admin process for someone locked out of MFA without recovery codes; today that needs
-  a database change, which the handbook says must be replaced by an audited procedure.
-- Audit events live in logs, not in a table the app can query.
-- Sessions on other devices cannot be listed or revoked individually; changing the password ends them.
+- Sessions on other devices cannot be listed or revoked individually.
+- Recovery relies on the account's mailbox; someone who controls both the password and the mailbox can
+  complete it, but the owner sees it coming for 72 hours by email and in their activity.

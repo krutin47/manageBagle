@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Copy, Download, KeyRound, Link2, Plus, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
@@ -22,6 +22,7 @@ export function SettingsPage() {
         <ProfileCard user={user} />
         <AreasCard />
         <SecurityCard user={user} />
+        <ActivityCard />
         <AppearanceCard />
         <DangerCard user={user} />
       </div>
@@ -480,6 +481,59 @@ function AppearanceCard() {
         </div>
         <Segmented label="Theme" value={theme} onChange={setTheme} options={[{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} />
       </header>
+    </section>
+  );
+}
+
+const EVENT_LABELS: Record<string, string> = {
+  account_created: "Account created",
+  email_confirmed: "Email confirmed",
+  sign_in: "Signed in with password",
+  sign_in_mfa: "Signed in with authenticator",
+  sign_in_recovery_code: "Signed in with a recovery code",
+  sign_in_needs_mfa: "Password accepted, waiting for second step",
+  sign_in_failed: "Failed sign-in attempt",
+  sign_in_mfa_failed: "Wrong authenticator code",
+  sign_out: "Signed out",
+  password_changed: "Password changed",
+  password_reset: "Password reset by email",
+  mfa_enabled: "Two-step verification turned on",
+  mfa_disabled: "Two-step verification turned off",
+  mfa_reset_requested: "Recovery requested: lost second factor",
+  mfa_reset_confirmed: "Recovery confirmed by email",
+  mfa_reset_cancelled: "Recovery cancelled",
+  mfa_reset_completed: "Two-step verification turned off by recovery",
+  external_login_linked: "Account connected",
+  external_login_unlinked: "Account disconnected",
+};
+const WARNING_EVENTS = new Set(["sign_in_failed", "sign_in_mfa_failed", "mfa_reset_requested", "mfa_reset_confirmed", "mfa_reset_completed", "mfa_disabled"]);
+
+/** The account's recent security events, so the owner can spot something they did not do. */
+function ActivityCard() {
+  const activity = useQuery({
+    queryKey: ["account-activity"],
+    queryFn: ({ signal }) => api<{ event: string; detail: string; at: string }[]>("/auth/activity", { signal }),
+    staleTime: 60_000,
+  });
+  return (
+    <section className="card" aria-labelledby="activity">
+      <header className="card-head">
+        <div>
+          <h2 id="activity">Account activity</h2>
+          <p>Recent sign-ins and security changes. If you see something you did not do, change your password.</p>
+        </div>
+      </header>
+      {activity.isError ? <ErrorNote onRetry={() => activity.refetch()}>We could not load your account activity.</ErrorNote>
+        : activity.isPending ? <Skeleton height={120} radius={10} /> : (
+          <ul className="activity">
+            {activity.data.map((e, i) => (
+              <li key={i} className={cx(WARNING_EVENTS.has(e.event) && "is-warning")}>
+                <span>{EVENT_LABELS[e.event] ?? e.event.replace(/_/g, " ")}{e.detail && !e.detail.includes("_") ? ` · ${e.detail[0]!.toUpperCase()}${e.detail.slice(1)}` : ""}</span>
+                <time dateTime={e.at}>{new Date(e.at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</time>
+              </li>
+            ))}
+          </ul>
+        )}
     </section>
   );
 }

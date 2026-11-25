@@ -42,6 +42,8 @@ export default defineConfig({
         ConnectionStrings__Default: database,
         Smtp__PickupDirectory: MAIL_DIR,
         RateLimits__AuthPerMinute: "10000",
+        // The real wait is 72 hours; the browser test exercises the flow, the API tests the wait.
+        Auth__MfaResetDelayHours: "0",
       },
     },
     {

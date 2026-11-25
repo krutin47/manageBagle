@@ -3,7 +3,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ErrorNote, Logo } from "./components/ui";
-import { ConfirmEmailPage, ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyPage } from "./features/auth/AuthPages";
+import { ConfirmEmailPage, MfaRecoveryLinkPage, ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyPage } from "./features/auth/AuthPages";
 import { BacklogPage } from "./features/backlog/BacklogPage";
 import { GuidePage } from "./features/guide/GuidePage";
 import { PlannerPage } from "./features/planner/PlannerPage";
@@ -83,6 +83,7 @@ export function App() {
       </Route>
       {/* Reachable signed in or out: the link may be opened in a browser that already has a session. */}
       <Route path="/confirm-email" element={<ConfirmEmailPage />} />
+      <Route path="/mfa-recovery" element={<MfaRecoveryLinkPage />} />
       <Route element={<RequireAuth />}>
         <Route index element={<TodayPage />} />
         <Route path="/week" element={<WeekPage />} />

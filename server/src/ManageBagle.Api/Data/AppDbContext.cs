@@ -16,6 +16,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<DayTheme> DayThemes => Set<DayTheme>();
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     /// <summary>Every edit to a versioned row moves its version on, so a stale writer is detected (HTTP 409).</summary>
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
@@ -90,6 +91,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.Interruptions).HasMaxLength(1000);
             e.Property(x => x.ChangeTomorrow).HasMaxLength(1000);
             e.HasIndex(x => new { x.UserId, x.Date }).IsUnique();
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<AuditEvent>(e =>
+        {
+            e.Property(x => x.Event).HasMaxLength(40);
+            e.Property(x => x.Detail).HasMaxLength(100);
+            e.HasIndex(x => new { x.UserId, x.At });
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 

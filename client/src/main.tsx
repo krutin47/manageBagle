@@ -15,6 +15,9 @@ import { BrowserRouter } from "react-router";
 import { App } from "./App";
 import { ToastProvider } from "./components/toast";
 import { ApiError } from "./lib/api";
+import { installGlobalErrorReporting } from "./lib/errorReporting";
+
+installGlobalErrorReporting();
 
 const queryClient = new QueryClient({
   defaultOptions: {
