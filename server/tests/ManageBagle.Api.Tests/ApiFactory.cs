@@ -40,13 +40,13 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        foreach (var (key, value) in ExtraSettings) builder.UseSetting(key, value);
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:Default", ConnectionString);
         builder.UseSetting("Database:MigrateOnStartup", "true");
         builder.UseSetting("RateLimits:AuthPerMinute", "10000");
         builder.UseSetting("Auth:SessionRevalidateSeconds", "0"); // so "other sessions end" is observable at once
         builder.UseSetting("RateLimits:CalendarFetchPerMinute", "1000");
+        foreach (var (key, value) in ExtraSettings) builder.UseSetting(key, value); // last, so a derived factory can override the defaults above
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton<IAppEmailSender>(Email);

@@ -12,12 +12,18 @@ export function Reminders() {
   const prefs = usePreferences();
   const today = todayISO();
   const commitments = useCommitments(today);
-  const plan = useMemo(() => prefs.data && {
-    dayStart: toMinutes(prefs.data.dayStart),
-    dayEnd: toMinutes(prefs.data.dayEnd),
-    waterEvery: prefs.data.waterReminderMinutes,
-    meals: commitmentsOn(today, commitments.data ?? []).filter((c) => c.source.isMeal && c.start >= 0).map((c) => ({ title: c.title, start: c.start })),
-  }, [prefs.data, commitments.data, today]);
+  const plan = useMemo(
+    () =>
+      prefs.data && {
+        dayStart: toMinutes(prefs.data.dayStart),
+        dayEnd: toMinutes(prefs.data.dayEnd),
+        waterEvery: prefs.data.waterReminderMinutes,
+        meals: commitmentsOn(today, commitments.data ?? [])
+          .filter((c) => c.source.isMeal && c.start >= 0)
+          .map((c) => ({ title: c.title, start: c.start })),
+      },
+    [prefs.data, commitments.data, today],
+  );
 
   // Start from "now": anything due before the page opened is not shown late.
   const last = useRef({ date: today, minute: nowMinutes() });

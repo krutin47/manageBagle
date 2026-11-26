@@ -5,7 +5,8 @@
 
 import { argv } from "node:process";
 
-const HEADER = "// Generated from docs/api/openapi.json by scripts/api-types.mjs — do not edit. Run `npm run gen:api`.\n";
+const HEADER =
+  "// Generated from docs/api/openapi.json by scripts/api-types.mjs — do not edit. Run `npm run gen:api`.\n";
 
 function typeOf(schema) {
   if (!schema) return "unknown";
@@ -19,31 +20,43 @@ function typeOf(schema) {
   for (const t of types) {
     if (t === "null") parts.add("null");
     else if (t === "integer" || t === "number") parts.add("number");
-    else if (t === "string") { if (!numeric) parts.add("string"); }
-    else if (t === "boolean") parts.add("boolean");
+    else if (t === "string") {
+      if (!numeric) parts.add("string");
+    } else if (t === "boolean") parts.add("boolean");
     else if (t === "array") parts.add(`${wrap(typeOf(schema.items))}[]`);
     else if (t === "object") parts.add(objectType(schema, "  "));
   }
   if (parts.size === 0 && schema.properties) parts.add(objectType(schema, "  "));
   const list = [...parts];
-  return list.length ? [...list.filter((p) => p !== "null"), ...list.filter((p) => p === "null")].join(" | ") : "unknown";
+  return list.length
+    ? [...list.filter((p) => p !== "null"), ...list.filter((p) => p === "null")].join(" | ")
+    : "unknown";
 }
 
 const wrap = (t) => (t.includes(" | ") ? `(${t})` : t);
 
 function objectType(schema, indent) {
-  if (!schema.properties) return schema.additionalProperties ? `Record<string, ${typeOf(schema.additionalProperties)}>` : "Record<string, unknown>";
+  if (!schema.properties)
+    return schema.additionalProperties
+      ? `Record<string, ${typeOf(schema.additionalProperties)}>`
+      : "Record<string, unknown>";
   const required = new Set(schema.required ?? []);
-  const lines = Object.entries(schema.properties).map(([name, prop]) => `${indent}${name}${required.has(name) ? "" : "?"}: ${typeOf(prop)};`);
+  const lines = Object.entries(schema.properties).map(
+    ([name, prop]) => `${indent}${name}${required.has(name) ? "" : "?"}: ${typeOf(prop)};`,
+  );
   return `{\n${lines.join("\n")}\n${indent.slice(2)}}`;
 }
 
 export function generate(contract) {
   const schemas = contract.components?.schemas ?? {};
-  const out = Object.keys(schemas).sort().map((name) => {
-    const schema = schemas[name];
-    return schema.properties ? `export interface ${name} ${objectType(schema, "  ")}` : `export type ${name} = ${typeOf(schema)};`;
-  });
+  const out = Object.keys(schemas)
+    .sort()
+    .map((name) => {
+      const schema = schemas[name];
+      return schema.properties
+        ? `export interface ${name} ${objectType(schema, "  ")}`
+        : `export type ${name} = ${typeOf(schema)};`;
+    });
   return `${HEADER}\n${out.join("\n\n")}\n`;
 }
 

@@ -232,7 +232,7 @@ legend. The list view shows a block's breaks too.
 
 ## Later — AI-assisted brain dump (Phase 3, per ADR-012)
 
-Recorded now so the capture design leaves room for it. Nothing here is built.
+AI1 and AI2 are built (ADR-020): "Write freely" → "Turn into tasks", and a microphone that uses the browser's speech recognition. AI3 is not built.
 
 - **P3-AI1 Paragraph to tasks:** write one paragraph; it is split into tasks with suggested length,
   focus area, kind of work and due date, which the person confirms or corrects.

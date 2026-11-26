@@ -249,8 +249,9 @@ Capturing, planning and pre-planning are three separate jobs (requirements P2-E)
 - Block editor: date, start, end, quick lengths, focus area, priority, kind of work, outside flag,
   status, actual minutes, notes; overnight blocks supported.
 - One-day view with a day strip on phones.
-- Recovery breaks before and after blocks, routines (protected or open) and meetings, with a key;
-  the list view shows each block's breaks.
+- Recovery breaks before and after blocks, routines (protected or open) and meetings, in your chosen
+  colours, with a key; the list view shows each block's breaks.
+- A block placed over protected time or a meeting is allowed but flagged (editor, Today, Planner).
 
 ### Week
 - Totals: planned, logged, deep-focus hours, blocks done %.
@@ -264,6 +265,7 @@ Capturing, planning and pre-planning are three separate jobs (requirements P2-E)
 - List view with filters (open, scheduled, closed, all) and delete with undo.
 - Task editor with all fields; **Schedule** turns a task into a block.
 - Remaining estimated hours; overdue and high-impact markers.
+- Shows open tasks and 30 days of finished and dropped ones; "Show all history" for the rest.
 
 ### Review
 - Optional end-of-day page: how the day went (top three, what ran over) and three questions.
@@ -271,6 +273,7 @@ Capturing, planning and pre-planning are three separate jobs (requirements P2-E)
 ### Settings and guide
 - Focus areas: add, rename, recolour, delete (their blocks and tasks are kept).
 - Sign-in and security management; light and dark theme.
+- **Your data**: download everything the account holds as one JSON file (secrets left out).
 - Guide: the daily loop and recommended block sizes.
 
 ### Platform
@@ -281,32 +284,26 @@ Capturing, planning and pre-planning are three separate jobs (requirements P2-E)
 
 ## 5. What is pending
 
-The detailed, phase-by-phase list is **[handbook-status.md](handbook-status.md)**. In short:
+The detailed, phase-by-phase list is **[handbook-status.md](handbook-status.md)**. Everything that can
+be done in code is done; what is left needs a decision or an account only the owner can provide.
 
-### Needs your action (cannot be done from code)
+### Needs your decision or action
 | Item | Why |
 |---|---|
-| **Protect `main` and `uat`** | Needs repository-admin rights. Run `scripts/protect-branches.sh` or set it in GitHub settings. |
-| **Open a pull request** into `dev` | Not opened yet. It will be the first real run of CI, including the image build. |
-| **Choose a host**, then set `ForwardedHeaders__KnownNetworks` to its ingress | Until then nothing is deployed and the proxy trust list is only loopback. |
-| **Google and Microsoft credentials** | Buttons stay hidden until set. Neither flow has been exercised against the real provider (the linking rules are tested with a stand-in provider). |
-| **SMTP settings** | Required in UAT and production: accounts now need a confirmation email. |
-| **An error-monitoring backend** | Telemetry export is wired but points nowhere. |
+| **Hosting for UAT and production** (and access for deploys) | Nothing is deployed. Unblocks: trusted proxy settings, host rate limits, a real restore drill, rolling-deploy draining, signed images. |
+| **Email provider** (SMTP settings) | New accounts must confirm their email. |
+| **Google and Microsoft credentials** | Sign-in buttons stay hidden until set; also needed for writing into Google Calendar. |
+| **Protect `main` and `uat`** | Needs repository-admin rights: `scripts/protect-branches.sh` or GitHub settings. |
+| **Error monitoring backend** | Telemetry export is wired but points nowhere. |
+| **Container registry** | To publish and sign release images. |
+| **Expected peak users** | To agree response-time objectives ([performance.md](performance.md)). |
+| **Retention periods** | Proposed in [data-inventory.md](data-inventory.md): activity 13 months, backups 35 days, logs 30 days. |
+| **AI model choice** | Built on Claude Opus 5.5 within the US$10 cap; Claude Haiku 5.5 would allow about 40 times more uses. Your call (`AI_MODEL`, see azure-setup.md). |
+| **Prettier** | Adopting it reformats every file in one change. |
+
+### Blocked by tooling
+- Accessibility lint (`eslint-plugin-jsx-a11y`) does not support ESLint 10 yet (checked 2026-11-25).
 
 ### Not verified yet
-- The **Docker image** and the **CI workflow** have never run.
-- No **hosted environment** exists, so nothing about a real deployment, a real redeploy, or a
-  production backup has been demonstrated.
-- No performance measurements. No testing on real phones or with a screen reader.
-
-### Phase 2 product features
-Built: brain-dump refinements, the focus timer, routines with recovery breaks and reminders, and calendar
-export/import ([requirements/phase-2-product.md](requirements/phase-2-product.md)). Still open: writing into
-Google Calendar and two-way sync (Phase 3), and notifications while the app is closed.
-
-### Still open from the handbook
-- Phase 2's main item: use-case classes (PlanDay first) and moving database access out of endpoints.
-- Generated TypeScript API types; import-boundary lint rules; Prettier and accessibility lint.
-- An admin process for MFA lockout; a queryable audit table.
-- Overlap rules for fixed commitments; pagination; recurring blocks.
-- Phase 3 entirely (load testing, two-replica validation, AI features).
+- Anything on a deployed environment; real phones and screen readers; real Google/Microsoft
+  sign-in and real Google/Outlook calendar feeds (tested against stand-ins).

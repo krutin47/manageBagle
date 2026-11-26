@@ -1,5 +1,25 @@
 // Generated from docs/api/openapi.json by scripts/api-types.mjs — do not edit. Run `npm run gen:api`.
 
+export interface AccountExport {
+  exportedAt: string;
+  profile: ExportProfile;
+  preferences: ExportPreferences;
+  focusAreas: AreaResponse[];
+  dayThemes: ThemeResponse[];
+  routines: RoutineResponse[];
+  tasks: TaskResponse[];
+  blocks: BlockResponse[];
+  topThree: ExportOutcome[];
+  reviews: ExportReview[];
+  connectedCalendars: ExportCalendar[];
+  activity: AuditEventResponse[];
+}
+
+export interface AiStatus {
+  enabled: boolean;
+  remainingToday: number;
+}
+
 export interface AreaRequest {
   name: string;
   color: string;
@@ -77,6 +97,8 @@ export interface BlockResponse {
   stopNote: string;
   breakBeforeMinutes: number;
   breakAfterMinutes: number;
+  firstStartedAt: string | null;
+  finishedAt: string | null;
 }
 
 export type BreakPlacement = "After" | "Before";
@@ -177,6 +199,41 @@ export interface DaySummary {
   blocks: number;
   blocksDone: number;
   doneRate: number | null;
+}
+
+export interface ExportCalendar {
+  name: string;
+  host: string;
+  lastFetchedAt: string | null;
+  eventCount: number;
+}
+
+export interface ExportOutcome {
+  date: string;
+  outcome: OutcomeResponse;
+}
+
+export interface ExportPreferences {
+  dayStart: string | null;
+  dayEnd: string | null;
+  waterReminderMinutes: number | null;
+  breakColor: string | null;
+}
+
+export interface ExportProfile {
+  email: string;
+  displayName: string;
+  timeZone: string | null;
+  createdAt: string;
+  twoStepVerification: boolean;
+  signInProviders: string[];
+}
+
+export interface ExportReview {
+  date: string;
+  biggestWin: string;
+  interruptions: string;
+  changeTomorrow: string;
 }
 
 export interface ForgotPasswordRequest {
@@ -301,6 +358,29 @@ export interface ProfileRequest {
   timeZone?: string | null;
 }
 
+export interface PushKeyResponse {
+  publicKey: string;
+}
+
+export interface PushSubscribeRequest {
+  endpoint: string;
+  keys: PushSubscriptionKeys;
+}
+
+export interface PushSubscriptionKeys {
+  p256dh: string;
+  auth: string;
+}
+
+export interface PushTestResponse {
+  sent: number;
+  devices: number;
+}
+
+export interface PushUnsubscribeRequest {
+  endpoint: string;
+}
+
 export interface RecoveryCodesResponse {
   recoveryCodes: string[];
 }
@@ -375,6 +455,15 @@ export interface StatusResponse {
 
 export type StopOutcome = "Finished" | "Later" | "Drop";
 
+export interface SuggestTasksRequest {
+  text: string;
+}
+
+export interface SuggestTasksResponse {
+  tasks: TaskSuggestion[];
+  remainingToday: number;
+}
+
 export type TaskPolicy = "NoTasks" | "AnyTask" | "SelectedAreas";
 
 export interface TaskRequest {
@@ -408,6 +497,16 @@ export interface TaskResponse {
   createdAt: string;
   version: number;
   breakMinutes: number | null;
+}
+
+export interface TaskSuggestion {
+  title: string;
+  estimatedMinutes: number | null;
+  workMode: WorkMode;
+  focusAreaId: string | null;
+  impact: Priority;
+  dueDate: string | null;
+  isOutside: boolean;
 }
 
 export interface ThemeRequest {

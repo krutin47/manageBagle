@@ -12,7 +12,13 @@ public static class ResultHttp
     {
         if (failure.Kind != FailureKind.Validation)
         {
-            var status = failure.Kind == FailureKind.NotFound ? StatusCodes.Status404NotFound : StatusCodes.Status409Conflict;
+            var status = failure.Kind switch
+            {
+                FailureKind.NotFound => StatusCodes.Status404NotFound,
+                FailureKind.Limited => StatusCodes.Status429TooManyRequests,
+                FailureKind.Unavailable => StatusCodes.Status503ServiceUnavailable,
+                _ => StatusCodes.Status409Conflict,
+            };
             var problem = new Dictionary<string, object?>(failure.Extra ?? new Dictionary<string, object?>()) { ["code"] = failure.Code };
             return Results.Problem(detail: failure.Message, statusCode: status, extensions: problem);
         }

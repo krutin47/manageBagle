@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const MAIL_DIR = path.join(here, ".mail");
 
-const database = process.env.MB_E2E_POSTGRES ?? "Host=localhost;Port=5432;Database=managebagle_e2e;Username=managebagle;Password=managebagle";
+const database =
+  process.env.MB_E2E_POSTGRES ??
+  "Host=localhost;Port=5432;Database=managebagle_e2e;Username=managebagle;Password=managebagle";
 
 /**
  * Runs the real API (against PostgreSQL) and the real client, and drives them in a browser.
@@ -27,11 +29,20 @@ export default defineConfig({
     launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
   },
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } }, testIgnore: /focus-timer/ },
+    {
+      name: "desktop",
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
+      testIgnore: /focus-timer/,
+    },
     { name: "phone", use: { ...devices["Pixel 7"] }, grep: /@phone/, testIgnore: /focus-timer/ },
     // These tests move the server's clock, which would upset time-based checks (authenticator codes,
     // link expiry) in tests running alongside them. They run on their own, after everything else.
-    { name: "clock", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } }, testMatch: /focus-timer/, dependencies: ["desktop", "phone"] },
+    {
+      name: "clock",
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
+      testMatch: /focus-timer/,
+      dependencies: ["desktop", "phone"],
+    },
   ],
   webServer: [
     {
@@ -49,6 +60,7 @@ export default defineConfig({
         Auth__MfaResetDelayHours: "0",
         // Lets tests move the server's clock together with the browser's (never available in Production).
         Testing__ClockControl: "true",
+        Testing__ScriptedAi: "true", // the "Write freely" flow without calling a real model (ADR-020)
       },
     },
     {

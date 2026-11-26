@@ -11,13 +11,26 @@ import type * as Api from "./api";
 import type * as Contract from "./api.generated";
 
 /** Forget literal narrowing (enums, colours) so only the shape is compared. */
-type Widen<T> = T extends string ? string : T extends number ? number : T extends boolean ? boolean
-  : T extends readonly (infer U)[] ? Widen<U>[] : T extends object ? { [K in keyof T]: Widen<T[K]> } : T;
+type Widen<T> = T extends string
+  ? string
+  : T extends number
+    ? number
+    : T extends boolean
+      ? boolean
+      : T extends readonly (infer U)[]
+        ? Widen<U>[]
+        : T extends object
+          ? { [K in keyof T]: Widen<T[K]> }
+          : T;
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 type Assert<T extends true> = T;
 type Matches<Client, Server> = Same<Widen<Client>, Widen<Server>>;
 /** A request may fill in fields the server would default, but may not send fields the server does not know. */
-type Sends<Client, Server> = [Widen<Client>] extends [Widen<Server>] ? ([Exclude<keyof Client, keyof Server>] extends [never] ? true : false) : false;
+type Sends<Client, Server> = [Widen<Client>] extends [Widen<Server>]
+  ? [Exclude<keyof Client, keyof Server>] extends [never]
+    ? true
+    : false
+  : false;
 
 // Responses: what the client reads.
 export type Checks = [
@@ -35,6 +48,8 @@ export type Checks = [
   Assert<Matches<Api.Day, Contract.DayResponse>>,
   Assert<Matches<Api.Theme, Contract.ThemeResponse>>,
   Assert<Matches<Api.WeekSummary, Contract.WeekSummaryResponse>>,
+  Assert<Matches<Api.AiStatus, Contract.AiStatus>>,
+  Assert<Matches<Api.TaskSuggestion, Contract.TaskSuggestion>>,
   // Requests: what the client sends.
   Assert<Sends<Api.PlanItem, Contract.PlanItem>>,
   Assert<Sends<Api.CaptureItem, Contract.CaptureItem>>,

@@ -12,7 +12,11 @@ const seen = new Set<string>();
 
 export const newReference = () => Math.random().toString(36).slice(2, 10);
 
-export function reportClientError(kind: "render" | "script" | "promise", error: unknown, reference = newReference()): string {
+export function reportClientError(
+  kind: "render" | "script" | "promise",
+  error: unknown,
+  reference = newReference(),
+): string {
   const message = (error instanceof Error ? `${error.name}: ${error.message}` : String(error)).slice(0, 300);
   if (sent >= MAX_REPORTS || seen.has(message)) return reference;
   seen.add(message);

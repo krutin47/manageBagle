@@ -11,13 +11,19 @@ export const PASSWORD = "correct horse battery";
 export async function latestEmail(to: string, subjectStartsWith: string): Promise<string> {
   let found: string | undefined;
   await expect
-    .poll(() => {
-      if (!fs.existsSync(MAIL_DIR)) return false;
-      found = fs.readdirSync(MAIL_DIR).sort().reverse()
-        .map((file) => fs.readFileSync(path.join(MAIL_DIR, file), "utf8"))
-        .find((text) => text.startsWith(`To: ${to}\nSubject: ${subjectStartsWith}`));
-      return !!found;
-    }, { message: `an email "${subjectStartsWith}…" for ${to}`, timeout: 10_000 })
+    .poll(
+      () => {
+        if (!fs.existsSync(MAIL_DIR)) return false;
+        found = fs
+          .readdirSync(MAIL_DIR)
+          .sort()
+          .reverse()
+          .map((file) => fs.readFileSync(path.join(MAIL_DIR, file), "utf8"))
+          .find((text) => text.startsWith(`To: ${to}\nSubject: ${subjectStartsWith}`));
+        return !!found;
+      },
+      { message: `an email "${subjectStartsWith}…" for ${to}`, timeout: 10_000 },
+    )
     .toBe(true);
   return found!;
 }
@@ -60,7 +66,8 @@ export async function dayFromToday(page: Page, offset: number): Promise<string> 
 export function totp(base32Secret: string, at = Date.now()): string {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
   let bits = "";
-  for (const c of base32Secret.replace(/[\s=]/g, "").toUpperCase()) bits += alphabet.indexOf(c).toString(2).padStart(5, "0");
+  for (const c of base32Secret.replace(/[\s=]/g, "").toUpperCase())
+    bits += alphabet.indexOf(c).toString(2).padStart(5, "0");
   const key = Buffer.from(bits.match(/.{8}/g)!.map((b) => parseInt(b, 2)));
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));

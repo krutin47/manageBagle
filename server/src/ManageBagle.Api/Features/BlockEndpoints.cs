@@ -31,12 +31,14 @@ public record BlockResponse(
     Guid Id, DateOnly Date, TimeOnly Start, TimeOnly End, string Title, Guid? FocusAreaId,
     Priority Priority, WorkMode WorkMode, ItemStatus Status, int? ActualMinutes, int PlannedMinutes,
     int? VarianceMinutes, string Notes, bool IsOutside, Guid? BacklogTaskId, string? TimeZone, int Version,
-    DateTimeOffset? TimerStartedAt, int TrackedSeconds, int ExtendedMinutes, string StopNote, int BreakBeforeMinutes, int BreakAfterMinutes)
+    DateTimeOffset? TimerStartedAt, int TrackedSeconds, int ExtendedMinutes, string StopNote, int BreakBeforeMinutes, int BreakAfterMinutes,
+    DateTimeOffset? FirstStartedAt, DateTimeOffset? FinishedAt)
 {
     public static BlockResponse From(TimeBlock b) => new(
         b.Id, b.Date, b.Start, b.End, b.Title, b.FocusAreaId, b.Priority, b.WorkMode, b.Status,
         b.ActualMinutes, b.PlannedMinutes, b.ActualMinutes - b.PlannedMinutes, b.Notes, b.IsOutside, b.BacklogTaskId, b.TimeZoneId, b.Version,
-        b.TimerStartedAt, b.TrackedSeconds, b.ExtendedMinutes, b.StopNote, b.BreakBeforeMinutes, b.BreakAfterMinutes);
+        b.TimerStartedAt, b.TrackedSeconds, b.ExtendedMinutes, b.StopNote, b.BreakBeforeMinutes, b.BreakAfterMinutes,
+        b.FirstStartedAt, b.FinishedAt);
 }
 
 public static class BlockEndpoints

@@ -19,10 +19,12 @@ test("a calendar block dragged to another time stays there after a reload", asyn
   await page.mouse.down();
   await page.mouse.move(box.x + 20, box.y + 40, { steps: 5 });
   await page.mouse.move(box.x + 20, box.y + 10 + 112, { steps: 10 }); // two hours down
+  const saved = page.waitForResponse((r) => r.request().method() === "PUT" && r.url().includes("/api/blocks/"));
   await page.mouse.up();
 
   await expect(page.getByRole("dialog")).toHaveCount(0); // a drag is not a click
   await expect(block).toHaveAccessibleName(/11:00.*12:00/);
+  expect((await saved).ok()).toBe(true); // reload only once the move is saved, or the reload cancels it
   await page.reload();
   await expect(page.getByRole("button", { name: /^Deep work session/ })).toHaveAccessibleName(/11:00.*12:00/);
 });
@@ -34,15 +36,21 @@ test("a backlog card can be moved between columns with the keyboard alone", asyn
   await page.keyboard.press("Enter");
 
   const card = page.locator(".board-card-wrap", { hasText: "Renew passport" });
+  await expect(card).toBeVisible();
   await card.focus();
   await page.keyboard.press("Space");
   await expect(card).toHaveAttribute("aria-pressed", "true"); // picked up
+  // The drag library starts listening for arrow keys on the next task after the pick-up; a test
+  // presses faster than a person can, so give it that moment.
+  await page.waitForTimeout(150);
   await page.keyboard.press("ArrowRight"); // one press, one column
   await expect(page.getByRole("status").filter({ hasText: "Over In progress." })).toBeAttached();
+  const saved = page.waitForResponse((r) => r.request().method() === "PUT" && r.url().includes("/api/backlog/"));
   await page.keyboard.press("Space");
 
   const inProgress = page.getByRole("region", { name: /^In progress/ });
   await expect(inProgress.getByText("Renew passport")).toBeVisible();
+  expect((await saved).ok()).toBe(true);
   await page.reload();
   await expect(page.getByRole("region", { name: /^In progress/ }).getByText("Renew passport")).toBeVisible();
 });

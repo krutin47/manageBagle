@@ -38,11 +38,16 @@ export function priorityFromDue(due: string | null, today: string): Priority {
   return "Low";
 }
 
-export const priorityOf = (row: Pick<Row, "dueDate"> & { priorityOverride?: Priority | null }, today: string): Priority =>
-  row.priorityOverride ?? priorityFromDue(row.dueDate, today);
+export const priorityOf = (
+  row: Pick<Row, "dueDate"> & { priorityOverride?: Priority | null },
+  today: string,
+): Priority => row.priorityOverride ?? priorityFromDue(row.dueDate, today);
 
 /** Higher is more worth doing today. Impact (value) counts most; urgency comes from the due date. */
-export function valueScore(row: Pick<Row, "impact" | "dueDate"> & { priorityOverride?: Priority | null }, today: string): number {
+export function valueScore(
+  row: Pick<Row, "impact" | "dueDate"> & { priorityOverride?: Priority | null },
+  today: string,
+): number {
   const urgency = 2 - LEVEL[priorityOf(row, today)];
   const overdue = row.dueDate !== null && row.dueDate < today ? 1 : 0;
   return (2 - LEVEL[row.impact]) * 5 + urgency * 2 + overdue;
@@ -56,11 +61,19 @@ export function withWorkMode(row: Row, workMode: WorkMode): Row {
 
 export function rowFromTask(t: Task): Row {
   return {
-    key: t.id, taskId: t.id, title: t.title,
+    key: t.id,
+    taskId: t.id,
+    title: t.title,
     minutes: t.estimatedMinutes ?? (t.workMode === "DeepFocus" ? DEEP_FOCUS_MINUTES : 30),
     minutesChosen: t.estimatedMinutes !== null,
-    focusAreaId: t.focusAreaId, workMode: t.workMode, isOutside: t.isOutside, impact: t.impact, dueDate: t.dueDate,
-    priorityOverride: t.priority, breakMinutes: t.breakMinutes, top: null,
+    focusAreaId: t.focusAreaId,
+    workMode: t.workMode,
+    isOutside: t.isOutside,
+    impact: t.impact,
+    dueDate: t.dueDate,
+    priorityOverride: t.priority,
+    breakMinutes: t.breakMinutes,
+    top: null,
   };
 }
 
@@ -72,12 +85,16 @@ const NO_DATE = "9999-12-31";
  */
 export function sortRows(rows: Row[], mode: SortMode, areas: Area[]): Row[] {
   const written = new Map(rows.map((r, i) => [r.key, i]));
-  const areaIndex = (id: string | null) => (id === null ? Number.MAX_SAFE_INTEGER : areas.findIndex((a) => a.id === id));
+  const areaIndex = (id: string | null) =>
+    id === null ? Number.MAX_SAFE_INTEGER : areas.findIndex((a) => a.id === id);
   const byWritten = (a: Row, b: Row) => written.get(a.key)! - written.get(b.key)!;
   const due = (r: Row) => r.dueDate ?? NO_DATE;
   const compare: Record<SortMode, (a: Row, b: Row) => number> = {
     written: byWritten,
-    topic: (a, b) => areaIndex(a.focusAreaId) - areaIndex(b.focusAreaId) || WORK_MODES.indexOf(a.workMode) - WORK_MODES.indexOf(b.workMode) || byWritten(a, b),
+    topic: (a, b) =>
+      areaIndex(a.focusAreaId) - areaIndex(b.focusAreaId) ||
+      WORK_MODES.indexOf(a.workMode) - WORK_MODES.indexOf(b.workMode) ||
+      byWritten(a, b),
     impact: (a, b) => LEVEL[a.impact] - LEVEL[b.impact] || due(a).localeCompare(due(b)) || byWritten(a, b),
     due: (a, b) => due(a).localeCompare(due(b)) || LEVEL[a.impact] - LEVEL[b.impact] || byWritten(a, b),
   };
@@ -111,13 +128,28 @@ export function dueQuickPicks(today: string): { label: string; date: string }[] 
 /** A freshly typed line. It inherits focus area and kind of work from the line above: people dump related things in runs. */
 export function newRow(key: string, title: string, last: Row | undefined): Row {
   const fresh: Row = {
-    key, taskId: null, title, minutes: 30, minutesChosen: false, focusAreaId: last?.focusAreaId ?? null, workMode: "ShallowWork",
-    isOutside: false, impact: "Medium", dueDate: null, priorityOverride: null, breakMinutes: null, top: null,
+    key,
+    taskId: null,
+    title,
+    minutes: 30,
+    minutesChosen: false,
+    focusAreaId: last?.focusAreaId ?? null,
+    workMode: "ShallowWork",
+    isOutside: false,
+    impact: "Medium",
+    dueDate: null,
+    priorityOverride: null,
+    breakMinutes: null,
+    top: null,
   };
   return withWorkMode(fresh, last?.workMode ?? "ShallowWork");
 }
 
-const normalise = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+const normalise = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
 
 /** An open backlog task that a captured line probably repeats, so the brain dump can say so instead of duplicating it. */
 export function similarTask(title: string, tasks: Task[]): Task | undefined {
@@ -130,7 +162,11 @@ export function similarTask(title: string, tasks: Task[]): Task | undefined {
   });
 }
 
-export interface SuggestionGroup { id: "due" | "impact" | "rest"; label: string; tasks: Task[] }
+export interface SuggestionGroup {
+  id: "due" | "impact" | "rest";
+  label: string;
+  tasks: Task[];
+}
 
 /**
  * What Plan my day offers from the backlog (P2-E2): open tasks with no time booked, in three groups —
@@ -140,8 +176,11 @@ export interface SuggestionGroup { id: "due" | "impact" | "rest"; label: string;
 export function planSuggestions(tasks: Task[], today: string): SuggestionGroup[] {
   const open = tasks.filter((t) => TaskOpen(t) && !t.scheduledDate);
   const horizon = addDays(today, 7);
-  const byValue = (a: Task, b: Task) => valueScore(b, today) - valueScore(a, today) || a.createdAt.localeCompare(b.createdAt);
-  const due = open.filter((t) => t.dueDate !== null && t.dueDate <= horizon).sort((a, b) => a.dueDate!.localeCompare(b.dueDate!) || byValue(a, b));
+  const byValue = (a: Task, b: Task) =>
+    valueScore(b, today) - valueScore(a, today) || a.createdAt.localeCompare(b.createdAt);
+  const due = open
+    .filter((t) => t.dueDate !== null && t.dueDate <= horizon)
+    .sort((a, b) => a.dueDate!.localeCompare(b.dueDate!) || byValue(a, b));
   const impact = open.filter((t) => !due.includes(t) && t.impact === "High").sort(byValue);
   const rest = open.filter((t) => !due.includes(t) && !impact.includes(t)).sort(byValue);
   return [

@@ -9,7 +9,10 @@ async function planOneBlock(page: import("@playwright/test").Page, title: string
   await page.getByLabel("Add a new task to this plan").fill(title);
   await page.getByLabel("Add a new task to this plan").press("Enter");
   if (minutes !== "30m") {
-    await page.getByRole("group", { name: `Options for ${title}` }).getByRole("button", { name: /^Length/ }).click();
+    await page
+      .getByRole("group", { name: `Options for ${title}` })
+      .getByRole("button", { name: /^Length/ })
+      .click();
     await page.getByRole("menuitemradio", { name: minutes }).click();
   }
   await page.getByRole("button", { name: /Next: top three/ }).click();
@@ -23,7 +26,9 @@ test("press play, pause, and the time worked is recorded and survives a reload",
   await planOneBlock(page, "Write the report");
   // One play button on Today: on the Now card.
   const now = page.getByRole("region", { name: "Now" });
-  await expect(page.getByRole("region", { name: "Schedule" }).getByRole("button", { name: /Start timer/ })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Schedule" }).getByRole("button", { name: /Start timer/ })).toHaveCount(
+    0,
+  );
   await now.getByRole("button", { name: "Start timer for Write the report" }).click();
   const bar = page.getByRole("region", { name: "Focus timer" });
   await expect(bar).toContainText("Write the report");
@@ -34,8 +39,12 @@ test("press play, pause, and the time worked is recorded and survives a reload",
   await expect(bar).toHaveCount(0);
 
   await page.reload();
-  await expect(page.getByRole("region", { name: "Now" }).getByRole("button", { name: "Resume timer for Write the report" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Schedule" }).getByLabel("Actual minutes for Write the report")).toHaveValue("12");
+  await expect(
+    page.getByRole("region", { name: "Now" }).getByRole("button", { name: "Resume timer for Write the report" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Schedule" }).getByLabel("Actual minutes for Write the report"),
+  ).toHaveValue("12");
 });
 
 test("only one block runs at a time; starting another asks first", async ({ page }) => {
@@ -49,7 +58,10 @@ test("only one block runs at a time; starting another asks first", async ({ page
   await now.getByRole("button", { name: "Start timer for First thing" }).click();
   await expect(page.getByRole("region", { name: "Focus timer" })).toContainText("First thing");
   // Something else can still be started, from its row's menu.
-  await schedule.locator(".agenda-row", { hasText: "Second thing" }).getByRole("button", { name: /Change status/ }).click();
+  await schedule
+    .locator(".agenda-row", { hasText: "Second thing" })
+    .getByRole("button", { name: /Change status/ })
+    .click();
   await page.getByRole("menuitem", { name: "Start timer now" }).click();
   const ask = page.getByRole("dialog", { name: "Switch what you are working on?" });
   await expect(ask).toContainText("“First thing” is running");
@@ -65,7 +77,10 @@ test("time's up asks whether more time is needed, and stopping can drop the task
   await signUp(page);
   await page.goto("/");
   await planOneBlock(page, "Tidy the garage", "15m");
-  await page.getByRole("region", { name: "Now" }).getByRole("button", { name: "Start timer for Tidy the garage" }).click();
+  await page
+    .getByRole("region", { name: "Now" })
+    .getByRole("button", { name: "Start timer for Tidy the garage" })
+    .click();
 
   await advanceTime(page, 15.1);
   const timeUp = page.getByRole("dialog", { name: "Time's up" });
@@ -79,7 +94,9 @@ test("time's up asks whether more time is needed, and stopping can drop the task
   await stop.getByLabel("Why are you dropping it?").fill("Selling the house instead");
   await stop.getByRole("button", { name: "Drop it" }).click();
   await expect(page.getByRole("region", { name: "Focus timer" })).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Schedule" }).getByRole("button", { name: /Status: Skipped/ })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Schedule" }).getByRole("button", { name: /Status: Skipped/ }),
+  ).toBeVisible();
 
   await page.goto("/review");
   await expect(page.getByText("Selling the house instead")).toBeVisible();

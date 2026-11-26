@@ -51,27 +51,36 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   const [timeUp, setTimeUp] = useState<Block | null>(null);
   const prompted = useRef(new Set<string>());
 
-  const begin = useCallback((block: Block, pauseRunning = false) => {
-    void askForNotificationsOnce();
-    start.mutate({ blockId: block.id, pauseRunning }, {
-      onSuccess: () => setSwitchTo(null),
-      onError: (e) => {
-        if (e instanceof ConflictError && e.code === "timer_already_running") {
-          setSwitchTo({ block, runningTitle: running?.title ?? "Another block" });
-        } else {
-          toast.error(errorMessage(e));
-        }
-      },
-    });
-  }, [start, running, toast]);
+  const begin = useCallback(
+    (block: Block, pauseRunning = false) => {
+      void askForNotificationsOnce();
+      start.mutate(
+        { blockId: block.id, pauseRunning },
+        {
+          onSuccess: () => setSwitchTo(null),
+          onError: (e) => {
+            if (e instanceof ConflictError && e.code === "timer_already_running") {
+              setSwitchTo({ block, runningTitle: running?.title ?? "Another block" });
+            } else {
+              toast.error(errorMessage(e));
+            }
+          },
+        },
+      );
+    },
+    [start, running, toast],
+  );
 
-  const api = useMemo<TimerApi>(() => ({
-    running,
-    start: (b) => begin(b),
-    pause: (b) => pause.mutate(b.id, { onError: (e) => toast.error(errorMessage(e)) }),
-    askToStop: (block, preset = "Finished") => setStopping({ block, preset }),
-    busy: start.isPending || pause.isPending || stop.isPending,
-  }), [running, begin, pause, toast, start.isPending, stop.isPending]);
+  const api = useMemo<TimerApi>(
+    () => ({
+      running,
+      start: (b) => begin(b),
+      pause: (b) => pause.mutate(b.id, { onError: (e) => toast.error(errorMessage(e)) }),
+      askToStop: (block, preset = "Finished") => setStopping({ block, preset }),
+      busy: start.isPending || pause.isPending || stop.isPending,
+    }),
+    [running, begin, pause, toast, start.isPending, stop.isPending],
+  );
 
   // Time's up (P2-B4): ask once per threshold; an extension moves the threshold.
   const now = useTick(!!running);
@@ -87,10 +96,13 @@ export function TimerProvider({ children }: { children: ReactNode }) {
 
   const grant = (minutes: number) => {
     if (!timeUp) return;
-    extend.mutate({ blockId: timeUp.id, minutes }, {
-      onSuccess: () => toast.success(`${formatDuration(minutes)} added to ${timeUp.title}`),
-      onError: (e) => toast.error(errorMessage(e)),
-    });
+    extend.mutate(
+      { blockId: timeUp.id, minutes },
+      {
+        onSuccess: () => toast.success(`${formatDuration(minutes)} added to ${timeUp.title}`),
+        onError: (e) => toast.error(errorMessage(e)),
+      },
+    );
     setTimeUp(null);
   };
 
@@ -99,8 +111,15 @@ export function TimerProvider({ children }: { children: ReactNode }) {
       {children}
       <NowPlaying block={running} now={now} onPause={api.pause} onStop={(b) => api.askToStop(b)} />
 
-      <Dialog open={!!switchTo} onClose={() => setSwitchTo(null)} width="sm" title="Switch what you are working on?"
-        description={switchTo ? `“${switchTo.runningTitle}” is running. Only one block can be timed at a time.` : undefined}>
+      <Dialog
+        open={!!switchTo}
+        onClose={() => setSwitchTo(null)}
+        width="sm"
+        title="Switch what you are working on?"
+        description={
+          switchTo ? `“${switchTo.runningTitle}” is running. Only one block can be timed at a time.` : undefined
+        }
+      >
         <footer className="dialog-foot">
           <Button onClick={() => setSwitchTo(null)}>Keep it running</Button>
           <Button variant="primary" loading={start.isPending} onClick={() => switchTo && begin(switchTo.block, true)}>
@@ -109,41 +128,103 @@ export function TimerProvider({ children }: { children: ReactNode }) {
         </footer>
       </Dialog>
 
-      <Dialog open={!!timeUp} onClose={() => setTimeUp(null)} width="sm" title="Time's up"
-        description={timeUp ? `You planned ${formatDuration(timeUp.plannedMinutes + timeUp.extendedMinutes)} for “${timeUp.title}”. Need more time?` : undefined}>
+      <Dialog
+        open={!!timeUp}
+        onClose={() => setTimeUp(null)}
+        width="sm"
+        title="Time's up"
+        description={
+          timeUp
+            ? `You planned ${formatDuration(timeUp.plannedMinutes + timeUp.extendedMinutes)} for “${timeUp.title}”. Need more time?`
+            : undefined
+        }
+      >
         <div className="dialog-body time-up-choices">
-          {[15, 30].map((m) => <Button key={m} size="lg" icon={<Clock3 size={18} aria-hidden />} onClick={() => grant(m)}>+{m} min</Button>)}
-          <Button size="lg" variant="primary" icon={<CheckCircle2 size={18} aria-hidden />} onClick={() => {
-            if (!timeUp) return;
-            stop.mutate({ blockId: timeUp.id, outcome: "Finished" }, { onSuccess: () => toast.success("Nice work. Time recorded."), onError: (e) => toast.error(errorMessage(e)) });
-            setTimeUp(null);
-          }}>I'm done</Button>
+          {[15, 30].map((m) => (
+            <Button key={m} size="lg" icon={<Clock3 size={18} aria-hidden />} onClick={() => grant(m)}>
+              +{m} min
+            </Button>
+          ))}
+          <Button
+            size="lg"
+            variant="primary"
+            icon={<CheckCircle2 size={18} aria-hidden />}
+            onClick={() => {
+              if (!timeUp) return;
+              stop.mutate(
+                { blockId: timeUp.id, outcome: "Finished" },
+                {
+                  onSuccess: () => toast.success("Nice work. Time recorded."),
+                  onError: (e) => toast.error(errorMessage(e)),
+                },
+              );
+              setTimeUp(null);
+            }}
+          >
+            I'm done
+          </Button>
         </div>
       </Dialog>
 
-      <StopDialog block={stopping?.block ?? null} preset={stopping?.preset ?? "Finished"} onClose={() => setStopping(null)} onStop={async (outcome, note) => {
-        await stop.mutateAsync({ blockId: stopping!.block.id, outcome, note });
-        toast.success(outcome === "Finished" ? "Done. Time recorded." : outcome === "Later" ? "Moved back to your backlog for another time." : "Dropped.");
-        setStopping(null);
-      }} />
+      <StopDialog
+        block={stopping?.block ?? null}
+        preset={stopping?.preset ?? "Finished"}
+        onClose={() => setStopping(null)}
+        onStop={async (outcome, note) => {
+          await stop.mutateAsync({ blockId: stopping!.block.id, outcome, note });
+          toast.success(
+            outcome === "Finished"
+              ? "Done. Time recorded."
+              : outcome === "Later"
+                ? "Moved back to your backlog for another time."
+                : "Dropped.",
+          );
+          setStopping(null);
+        }}
+      />
     </TimerContext.Provider>
   );
 }
 
 /** Always visible while a timer runs, on every page. */
-function NowPlaying({ block, now, onPause, onStop }: { block: Block | null; now: number; onPause: (b: Block) => void; onStop: (b: Block) => void }) {
+function NowPlaying({
+  block,
+  now,
+  onPause,
+  onStop,
+}: {
+  block: Block | null;
+  now: number;
+  onPause: (b: Block) => void;
+  onStop: (b: Block) => void;
+}) {
   return (
     <AnimatePresence>
       {block && (
-        <motion.div className="now-playing" role="region" aria-label="Focus timer" initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 420, damping: 34 }}>
+        <motion.div
+          className="now-playing"
+          role="region"
+          aria-label="Focus timer"
+          initial={{ y: 24, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 24, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 420, damping: 34 }}
+        >
           <span className="now-playing-dot" aria-hidden />
           <span className="now-playing-title">{block.title}</span>
-          <span className={cx("now-playing-clock", elapsedSeconds(block, now) >= dueSeconds(block) && "is-over")} aria-live="off">
-            {formatClock(elapsedSeconds(block, now))}<small> / {formatDuration(block.plannedMinutes + block.extendedMinutes)}</small>
+          <span
+            className={cx("now-playing-clock", elapsedSeconds(block, now) >= dueSeconds(block) && "is-over")}
+            aria-live="off"
+          >
+            {formatClock(elapsedSeconds(block, now))}
+            <small> / {formatDuration(block.plannedMinutes + block.extendedMinutes)}</small>
           </span>
-          <IconButton size="sm" label={`Pause ${block.title}`} onClick={() => onPause(block)}><Pause size={16} /></IconButton>
-          <IconButton size="sm" label={`Stop ${block.title}`} onClick={() => onStop(block)}><Square size={14} /></IconButton>
+          <IconButton size="sm" label={`Pause ${block.title}`} onClick={() => onPause(block)}>
+            <Pause size={16} />
+          </IconButton>
+          <IconButton size="sm" label={`Stop ${block.title}`} onClick={() => onStop(block)}>
+            <Square size={14} />
+          </IconButton>
         </motion.div>
       )}
     </AnimatePresence>
@@ -151,21 +232,64 @@ function NowPlaying({ block, now, onPause, onStop }: { block: Block | null; now:
 }
 
 const STOP_CHOICES: { value: StopOutcome; title: string; body: string; icon: ReactNode }[] = [
-  { value: "Finished", title: "I finished it", body: "Mark it done and keep the time worked.", icon: <CheckCircle2 size={18} aria-hidden /> },
-  { value: "Later", title: "Not finished — another time", body: "Keep the time worked and put the task back in your backlog.", icon: <Clock3 size={18} aria-hidden /> },
-  { value: "Drop", title: "Drop it", body: "It is not happening. You can say why.", icon: <Trash2 size={18} aria-hidden /> },
+  {
+    value: "Finished",
+    title: "I finished it",
+    body: "Mark it done and keep the time worked.",
+    icon: <CheckCircle2 size={18} aria-hidden />,
+  },
+  {
+    value: "Later",
+    title: "Not finished — another time",
+    body: "Keep the time worked and put the task back in your backlog.",
+    icon: <Clock3 size={18} aria-hidden />,
+  },
+  {
+    value: "Drop",
+    title: "Drop it",
+    body: "It is not happening. You can say why.",
+    icon: <Trash2 size={18} aria-hidden />,
+  },
 ];
 
-function StopDialog({ block, preset, onClose, onStop }: { block: Block | null; preset: StopOutcome; onClose: () => void; onStop: (outcome: StopOutcome, note?: string) => Promise<void> }) {
+function StopDialog({
+  block,
+  preset,
+  onClose,
+  onStop,
+}: {
+  block: Block | null;
+  preset: StopOutcome;
+  onClose: () => void;
+  onStop: (outcome: StopOutcome, note?: string) => Promise<void>;
+}) {
   const timing = !!block?.timerStartedAt;
   return (
-    <Dialog open={!!block} onClose={onClose} width="sm" title={timing ? "Stop the timer" : "Close this block"} description={block ? `How did “${block.title}” go?` : undefined}>
-      {block && <StopForm key={`${block.id}-${preset}`} preset={preset} timing={timing} onClose={onClose} onStop={onStop} />}
+    <Dialog
+      open={!!block}
+      onClose={onClose}
+      width="sm"
+      title={timing ? "Stop the timer" : "Close this block"}
+      description={block ? `How did “${block.title}” go?` : undefined}
+    >
+      {block && (
+        <StopForm key={`${block.id}-${preset}`} preset={preset} timing={timing} onClose={onClose} onStop={onStop} />
+      )}
     </Dialog>
   );
 }
 
-function StopForm({ preset, timing, onClose, onStop }: { preset: StopOutcome; timing: boolean; onClose: () => void; onStop: (outcome: StopOutcome, note?: string) => Promise<void> }) {
+function StopForm({
+  preset,
+  timing,
+  onClose,
+  onStop,
+}: {
+  preset: StopOutcome;
+  timing: boolean;
+  onClose: () => void;
+  onStop: (outcome: StopOutcome, note?: string) => Promise<void>;
+}) {
   const [outcome, setOutcome] = useState<StopOutcome>(preset);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -187,15 +311,38 @@ function StopForm({ preset, timing, onClose, onStop }: { preset: StopOutcome; ti
         <div className="stop-choices" role="radiogroup" aria-label="How did it go?">
           {STOP_CHOICES.map((c) => (
             <label key={c.value} className={cx("stop-choice", outcome === c.value && "is-on")} data-choice={c.value}>
-              <input type="radio" name="stop" value={c.value} checked={outcome === c.value} onChange={() => setOutcome(c.value)} />
+              <input
+                type="radio"
+                name="stop"
+                value={c.value}
+                checked={outcome === c.value}
+                onChange={() => setOutcome(c.value)}
+              />
               {c.icon}
-              <span><strong>{c.title}</strong><small>{c.body}</small></span>
+              <span>
+                <strong>{c.title}</strong>
+                <small>{c.body}</small>
+              </span>
             </label>
           ))}
         </div>
         {outcome !== "Finished" && (
-          <Field label={outcome === "Drop" ? "Why are you dropping it?" : "Anything to remember for next time?"} optional>
-            {(p) => <Textarea {...p} rows={2} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} placeholder={outcome === "Drop" ? "e.g. No longer needed after Monday's call" : "e.g. Waiting on feedback from Sam"} />}
+          <Field
+            label={outcome === "Drop" ? "Why are you dropping it?" : "Anything to remember for next time?"}
+            optional
+          >
+            {(p) => (
+              <Textarea
+                {...p}
+                rows={2}
+                maxLength={500}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={
+                  outcome === "Drop" ? "e.g. No longer needed after Monday's call" : "e.g. Waiting on feedback from Sam"
+                }
+              />
+            )}
           </Field>
         )}
       </div>
@@ -222,13 +369,27 @@ export function TimerButton({ block }: { block: Block }) {
       {(isRunning || block.trackedSeconds > 0) && (
         <span className={cx("timer-elapsed", elapsed >= dueSeconds(block) && "is-over")}>{formatClock(elapsed)}</span>
       )}
-      <button type="button" className={cx("timer-btn", isRunning && "is-running")} disabled={timer.busy}
-        aria-label={isRunning ? `Pause ${block.title}` : `${block.trackedSeconds > 0 ? "Resume" : "Start"} timer for ${block.title}`}
-        onClick={() => (isRunning ? timer.pause(timer.running!) : timer.start(block))}>
+      <button
+        type="button"
+        className={cx("timer-btn", isRunning && "is-running")}
+        disabled={timer.busy}
+        aria-label={
+          isRunning
+            ? `Pause ${block.title}`
+            : `${block.trackedSeconds > 0 ? "Resume" : "Start"} timer for ${block.title}`
+        }
+        onClick={() => (isRunning ? timer.pause(timer.running!) : timer.start(block))}
+      >
         {isRunning ? <Pause size={15} aria-hidden /> : <Play size={15} aria-hidden />}
       </button>
       {(isRunning || block.trackedSeconds > 0) && (
-        <IconButton size="sm" label={`Stop ${block.title}`} onClick={() => timer.askToStop(isRunning ? timer.running! : block)}><Square size={13} /></IconButton>
+        <IconButton
+          size="sm"
+          label={`Stop ${block.title}`}
+          onClick={() => timer.askToStop(isRunning ? timer.running! : block)}
+        >
+          <Square size={13} />
+        </IconButton>
       )}
     </span>
   );
@@ -243,7 +404,8 @@ export function RunningTag({ block }: { block: Block }) {
   return (
     <span className="running-tag">
       <span className="now-playing-dot" aria-hidden />
-      <span className="sr-only">Timer running, </span>{formatClock(elapsedSeconds(timer.running!, now))}
+      <span className="sr-only">Timer running, </span>
+      {formatClock(elapsedSeconds(timer.running!, now))}
     </span>
   );
 }

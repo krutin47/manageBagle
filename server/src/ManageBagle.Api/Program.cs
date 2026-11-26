@@ -165,6 +165,25 @@ builder.Services.AddScoped<AccountLinks>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Planning.PlanDay>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Planning.CaptureTasks>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Tasks.ChangeTaskStatus>();
+// AI brain dump (ADR-020): off unless Ai:AnthropicApiKey is set; spend capped per month and per person per day.
+builder.Services.AddSingleton(new ManageBagle.Api.Application.Ai.AiOptions(
+    config["Ai:Model"] ?? "claude-opus-5-5", config.GetValue("Ai:MonthlyBudgetUsd", 10m), config.GetValue("Ai:DailyLimitPerUser", 20)));
+if (ManageBagle.Api.Infrastructure.Ai.ScriptedSuggestionModel.Enabled(config))
+{
+    if (builder.Environment.IsProduction()) throw new InvalidOperationException("Testing:ScriptedAi must never be enabled in Production.");
+    builder.Services.AddSingleton<ManageBagle.Api.Application.Ai.ITaskSuggestionModel, ManageBagle.Api.Infrastructure.Ai.ScriptedSuggestionModel>();
+}
+else
+{
+    builder.Services.AddSingleton<ManageBagle.Api.Application.Ai.ITaskSuggestionModel, ManageBagle.Api.Infrastructure.Ai.ClaudeTaskSuggestionModel>();
+}
+builder.Services.AddScoped<ManageBagle.Api.Application.Ai.SuggestTasks>();
+// Notifications while the app is closed (ADR-019).
+builder.Services.AddScoped<ManageBagle.Api.Infrastructure.Push.PushService>();
+builder.Services.AddScoped<ManageBagle.Api.Infrastructure.Push.PushReminders>();
+builder.Services.AddHttpClient(ManageBagle.Api.Infrastructure.Push.PushService.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(10))
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+if (config.GetValue("Push:SchedulerEnabled", true)) builder.Services.AddHostedService<ManageBagle.Api.Infrastructure.Push.PushReminderService>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Timing.FocusTimer>();
 builder.Services.AddScoped<ManageBagle.Api.Application.Calendars.CalendarSync>();
 builder.Services.AddHttpClient(SafeFetch.ClientName, c =>
@@ -182,6 +201,7 @@ builder.Services.AddCsrfProtection(secureCookies: !builder.Environment.IsDevelop
 if (TestClock.Enabled(config)) builder.Services.AddTestClock(builder.Environment);
 else builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddOpenApi();
+builder.Services.AddHostedService<ManageBagle.Api.Infrastructure.RetentionService>();
 
 builder.Services.AddRateLimiter(o =>
 {
@@ -219,6 +239,8 @@ builder.Services.AddRateLimiter(o =>
 
 builder.Services.Configure<ForwardedHeadersOptions>(o => SecurityMiddleware.ConfigureForwardedHeaders(o, config));
 
+builder.AddErrorReporting();
+
 var app = builder.Build();
 
 // Release step: `dotnet ManageBagle.Api.dll --migrate` applies reviewed migrations, then exits.
@@ -253,6 +275,7 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 app.UseAuthentication();
+app.UseErrorReportingScope();
 // After authentication, so limits can be per account where that is what they are about.
 app.UseRateLimiter();
 app.UseRequestLogging();
@@ -276,6 +299,9 @@ app.MapRoutineEndpoints();
 app.MapCalendarEndpoints();
 app.MapSummaryEndpoints();
 app.MapClientErrorEndpoints();
+app.MapAccountExportEndpoints();
+app.MapPushEndpoints();
+app.MapAiEndpoints();
 if (TestClock.Enabled(config)) app.MapTestClock();
 
 app.MapFallback("/api/{**path}", () => HttpExtensions.Problem(StatusCodes.Status404NotFound, ErrorCodes.NotFound, "There is nothing at this address."));

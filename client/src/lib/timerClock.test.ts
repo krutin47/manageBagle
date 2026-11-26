@@ -17,7 +17,8 @@ describe("timer clock", () => {
     expect(elapsedSeconds({ trackedSeconds: 0, timerStartedAt: "2026-11-26T09:29:00Z" }, deviceNow)).toBe(60);
   });
 
-  it("is due at the planned length plus any extension", () => expect(dueSeconds({ plannedMinutes: 60, extendedMinutes: 15 })).toBe(4500));
+  it("is due at the planned length plus any extension", () =>
+    expect(dueSeconds({ plannedMinutes: 60, extendedMinutes: 15 })).toBe(4500));
 
   it.each([
     [0, "0:00"],

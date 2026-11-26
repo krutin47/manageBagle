@@ -71,7 +71,10 @@ const accepts = (c: Commitment, area: string | null | undefined) =>
  * recovery break, within the day window. Whatever does not fit is returned as unplaced and stays in
  * the backlog.
  */
-export function proposeSchedule(items: PlanDraft[], options: FitOptions): { slots: Map<string, Slot>; unplaced: string[] } {
+export function proposeSchedule(
+  items: PlanDraft[],
+  options: FitOptions,
+): { slots: Map<string, Slot>; unplaced: string[] } {
   const { from, busy = [], commitments = [], dayStart = 0, dayEnd = DAY_END, batch = false } = options;
   const taken = busy.map(([s, e]) => [s, e] as [number, number]);
   const slots = new Map<string, Slot>();
@@ -107,7 +110,9 @@ export function proposeSchedule(items: PlanDraft[], options: FitOptions): { slot
           s = ceil5(routineClash.end);
           continue;
         }
-        const taskClash = taken.filter(([ts, te]) => ts < s + length + after && te > s - before).sort((a, b) => b[1] - a[1])[0];
+        const taskClash = taken
+          .filter(([ts, te]) => ts < s + length + after && te > s - before)
+          .sort((a, b) => b[1] - a[1])[0];
         if (taskClash) {
           s = ceil5(taskClash[1] + before);
           continue;
@@ -120,7 +125,9 @@ export function proposeSchedule(items: PlanDraft[], options: FitOptions): { slot
     // Prefer a routine made for this kind of work.
     let start: number | null = null;
     let within: string | undefined;
-    for (const home of commitments.filter((c) => c.policy === "SelectedAreas" && accepts(c, d.topic)).sort((a, b) => a.start - b.start)) {
+    for (const home of commitments
+      .filter((c) => c.policy === "SelectedAreas" && accepts(c, d.topic))
+      .sort((a, b) => a.start - b.start)) {
       const s = firstFit(Math.max(earliest, home.start), Math.min(home.end, Math.max(dayEnd, home.end)));
       if (s !== null) {
         start = s;

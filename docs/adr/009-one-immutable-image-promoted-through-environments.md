@@ -1,6 +1,6 @@
 # ADR-009: One immutable image promoted through environments
 
-- **Status:** Accepted — not yet implemented
+- **Status:** Accepted — implemented in `.github/workflows/release.yml` (not yet run: needs Azure)
 - **Date:** 2026-11-14
 - **Source:** Production Architecture Handbook, decision register
 

@@ -14,13 +14,19 @@ export function syncServerClock(serverNowIso: string, receivedAtMs = Date.now())
 export const serverNow = (deviceNowMs = Date.now()) => deviceNowMs + serverOffsetMs;
 
 /** Seconds worked on a block so far: banked runs plus the current one. */
-export function elapsedSeconds(block: Pick<Block, "trackedSeconds" | "timerStartedAt">, deviceNowMs = Date.now()): number {
-  const running = block.timerStartedAt ? Math.max(0, Math.floor((serverNow(deviceNowMs) - Date.parse(block.timerStartedAt)) / 1000)) : 0;
+export function elapsedSeconds(
+  block: Pick<Block, "trackedSeconds" | "timerStartedAt">,
+  deviceNowMs = Date.now(),
+): number {
+  const running = block.timerStartedAt
+    ? Math.max(0, Math.floor((serverNow(deviceNowMs) - Date.parse(block.timerStartedAt)) / 1000))
+    : 0;
   return block.trackedSeconds + running;
 }
 
 /** When "time's up" is due, in seconds of work. */
-export const dueSeconds = (block: Pick<Block, "plannedMinutes" | "extendedMinutes">) => (block.plannedMinutes + block.extendedMinutes) * 60;
+export const dueSeconds = (block: Pick<Block, "plannedMinutes" | "extendedMinutes">) =>
+  (block.plannedMinutes + block.extendedMinutes) * 60;
 
 /** 75 → "1:15", 3725 → "1:02:05". */
 export function formatClock(seconds: number): string {

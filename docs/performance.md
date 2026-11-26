@@ -89,13 +89,48 @@ With the defaults: up to 3 instances on a database with `max_connections = 100`.
 Not yet checked: graceful draining of in-flight requests during a rolling deploy behind a real
 load balancer.
 
-## Proposed objectives (to agree)
+## Agreed objectives (2026-11-25)
 
-| Objective | Proposal | Status on this machine |
+Expected load in the first year: **about 100 people at the busiest moment** (product owner). The
+load test's 50 simulated users each act far faster than a person, so 100 real people is well inside
+what was measured.
+
+| Objective | Target | Measured on this machine (50 simulated users) | How it is watched |
+|---|---|---|---|
+| Today and Planner open, p95 | under 300 ms | 57 ms / 50 ms | load test before releases (`scripts/load/run.mjs`) |
+| Writes (tick a block, capture), p95 | under 300 ms | 83 ms / 52 ms | load test |
+| Error rate | under 0.1 % of requests | 0 % | Sentry alerts on new and recurring errors (ADR-018) |
+| Availability (production) | 99.5 % a month (about 3.6 hours down) | not measured: not deployed | the deploy smoke test; an uptime check needs a monitoring choice (below) |
+
+Not yet in place: an uptime check that pages someone. Options once production exists: Sentry's
+uptime monitors (free plan: one monitor) or an Azure Monitor availability test.
+
+## SQL commands per journey (handbook Phase 0)
+
+Measured by `QueryBudgetTests`, which counts every command the API sends while a journey makes the
+same requests as the screen. Each count is a budget: exceeding it fails the build, so an N+1 query
+or a duplicated lookup is caught. Production settings (session re-checked once a minute).
+
+| Journey | Requests | SQL commands | Budget |
+|---|---|---|---|
+| Plan a day (6 tasks) | 1 | 8 | 9 |
+| Open Today | 7 | 11 | 12 |
+| Open Planner | 3 | 5 | 6 |
+| Tick a block | 1 | 5 | 6 |
+| Brain dump (3 tasks) | 1 | 2 | 3 |
+| Open Week | 1 | 1 | 2 |
+
+No journey's cost grows with the number of tasks or blocks.
+
+## First download (handbook §5.4)
+
+Only Today is in the first download; every other page, including sign-in, loads when opened.
+
+| | Before | After |
 |---|---|---|
-| Today and Planner open, p95 | under 300 ms at expected load | 57 ms at 50 simulated users; 517 ms at 200 |
-| Writes (tick, capture), p95 | under 300 ms at expected load | 83 ms at 50 simulated users |
-| Error rate | under 0.1 % | 0 % at 50 and 200 |
+| JavaScript before the first screen | 755 KB (236 KB gzip) | 661 KB (211 KB gzip) |
+| Backlog (drag and drop) | in the first download | 58 KB, on opening the Backlog |
 
-"Expected load" needs a number from you: how many people do you expect to be using it at the busiest
-moment in the first year?
+What remains is React, the router, data fetching, animation and the menu and dialog primitives that
+Today itself uses. Going much lower means replacing one of those libraries, which is not worth it
+until slow first loads are seen in real use.

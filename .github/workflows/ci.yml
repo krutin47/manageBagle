@@ -31,6 +31,8 @@ jobs:
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
+      - name: Formatting (Prettier, ADR-021)
+        run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
       - name: Unit tests (includes the WCAG contrast checks)
@@ -159,3 +161,10 @@ jobs:
         with:
           name: sbom
           path: sbom-out/sbom*.json
+
+  infra:
+    name: Azure template compiles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: az bicep build --file infra/main.bicep --stdout > /dev/null

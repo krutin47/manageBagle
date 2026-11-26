@@ -15,7 +15,9 @@ export function useMediaQuery(query: string): boolean {
 type Theme = "light" | "dark";
 
 export function useTheme(): [Theme, (t: Theme) => void] {
-  const [theme, setTheme] = useState<Theme>(() => (document.documentElement.dataset.theme === "dark" ? "dark" : "light"));
+  const [theme, setTheme] = useState<Theme>(() =>
+    document.documentElement.dataset.theme === "dark" ? "dark" : "light",
+  );
   const apply = (next: Theme) => {
     // A short cross-fade for the theme switch only, so ordinary hovers stay crisp.
     document.documentElement.classList.add("theme-switching");

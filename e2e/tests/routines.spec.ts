@@ -30,26 +30,39 @@ test("routines and recovery breaks shape the plan, and show on Today", async ({ 
   await addRoutine("Work hours", "09:00", "12:30", "Only some areas", "Build / Deep work");
   const schedule = page.getByRole("region", { name: "Fixed schedule" });
   await expect(schedule).toContainText("Every day · 12:30–13:15 · no tasks · meal reminder");
-  await expect(page.getByRole("group", { name: "Start from a template" }).getByRole("button", { name: /Lunch/ })).toHaveCount(0);
+  await expect(
+    page.getByRole("group", { name: "Start from a template" }).getByRole("button", { name: /Lunch/ }),
+  ).toHaveCount(0);
 
   // Every Build task gets a 15-minute recovery break after it.
   await page.getByLabel("Break length for Build / Deep work").selectOption({ label: "15 min break" });
   // Breaks and routines can be given a colour; the Lunch template starts orange.
-  await page.getByRole("radiogroup", { name: "Colour of breaks on your calendar" }).getByRole("radio", { name: "Violet" }).click();
-  await expect(page.getByRole("radiogroup", { name: "Colour of breaks on your calendar" }).getByRole("radio", { name: "Violet" })).toHaveAttribute("aria-checked", "true");
+  await page
+    .getByRole("radiogroup", { name: "Colour of breaks on your calendar" })
+    .getByRole("radio", { name: "Violet" })
+    .click();
+  await expect(
+    page.getByRole("radiogroup", { name: "Colour of breaks on your calendar" }).getByRole("radio", { name: "Violet" }),
+  ).toHaveAttribute("aria-checked", "true");
   await expect(page.getByLabel("When the break for Build / Deep work happens")).toBeEnabled();
 
   const tomorrow = await dayFromToday(page, 1);
   await page.goto(`/?date=${tomorrow}`);
   await page.getByRole("button", { name: "Plan my day" }).click();
   const box = page.getByLabel("Add a new task to this plan");
-  for (const t of ["Ship the importer", "Do the laundry"]) { await box.fill(t); await box.press("Enter"); }
+  for (const t of ["Ship the importer", "Do the laundry"]) {
+    await box.fill(t);
+    await box.press("Enter");
+  }
   const ship = page.getByRole("group", { name: "Options for Ship the importer" });
   await ship.getByRole("button", { name: /^Focus area/ }).click();
   await page.getByRole("menuitemradio", { name: "Build / Deep work" }).click();
   await ship.getByRole("button", { name: /^Length/ }).click();
   await page.getByRole("menuitemradio", { name: "3h" }).click();
-  await page.getByRole("group", { name: "Options for Do the laundry" }).getByRole("button", { name: /^Focus area/ }).click();
+  await page
+    .getByRole("group", { name: "Options for Do the laundry" })
+    .getByRole("button", { name: /^Focus area/ })
+    .click();
   await page.getByRole("menuitemradio", { name: "Home / Admin" }).click();
 
   await page.getByRole("button", { name: /Next: top three/ }).click();
@@ -73,7 +86,9 @@ test("routines and recovery breaks shape the plan, and show on Today", async ({ 
 
   // The Planner shows the routine, the break and a key that explains them (P2-H1).
   await page.goto(`/planner?date=${tomorrow}`);
-  await expect(page.locator('.cal-routine[data-area="orange"]', { hasText: "Lunch" }).first()).toContainText("Lunch 12:30–13:15 · protected");
+  await expect(page.locator('.cal-routine[data-area="orange"]', { hasText: "Lunch" }).first()).toContainText(
+    "Lunch 12:30–13:15 · protected",
+  );
   await expect(page.locator('.cal-break[data-area="violet"]').first()).toBeVisible();
   await expect(page.getByRole("list", { name: "Calendar key" })).toContainText("Recovery break");
   await page.goto(`/planner?date=${tomorrow}&view=list`);

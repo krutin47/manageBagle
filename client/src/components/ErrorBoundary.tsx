@@ -42,9 +42,14 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="empty boundary" role="alert">
         <h3>Something went wrong showing {this.props.area}</h3>
-        <p>Your data is safe. Try again, or go to another page. If it keeps happening, quote reference {this.state.reference}.</p>
+        <p>
+          Your data is safe. Try again, or go to another page. If it keeps happening, quote reference{" "}
+          {this.state.reference}.
+        </p>
         <div className="boundary-actions">
-          <Button variant="primary" onClick={() => this.setState({ error: null })}>Try again</Button>
+          <Button variant="primary" onClick={() => this.setState({ error: null })}>
+            Try again
+          </Button>
           <Button onClick={() => window.location.assign("/")}>Go to Today</Button>
         </div>
       </div>
